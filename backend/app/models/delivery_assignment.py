@@ -27,8 +27,8 @@ class DeliveryAssignment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("subscription_deliveries.id", ondelete="CASCADE"),
         unique=True, nullable=False, index=True
     )
-    delivery_boy_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("delivery_boys.id"), nullable=False, index=True
+    delivery_partner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("delivery_partners.id"), nullable=False, index=True
     )
     status: Mapped[AssignmentStatus] = mapped_column(
         SAEnum(AssignmentStatus, name="assignment_status_enum", values_callable=lambda x: [e.value for e in x]),
@@ -48,7 +48,7 @@ class DeliveryAssignment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     # Relationships
     delivery: Mapped["SubscriptionDelivery"] = relationship("SubscriptionDelivery", back_populates="assignment")
-    delivery_boy: Mapped["DeliveryBoy"] = relationship("DeliveryBoy", back_populates="assignments")
+    delivery_partner: Mapped["DeliveryPartner"] = relationship("DeliveryPartner", back_populates="assignments")
     gps_logs: Mapped[List["GpsTrackingLog"]] = relationship("GpsTrackingLog", back_populates="assignment", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:

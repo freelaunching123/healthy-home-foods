@@ -5,7 +5,7 @@ from sqlalchemy import select, func, and_
 from datetime import datetime, timezone
 import uuid
 
-from app.models.delivery_boy import DeliveryBoy
+from app.models.delivery_partner import DeliveryPartner
 from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
 from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
 from app.models.user_address import UserAddress
@@ -43,8 +43,8 @@ async def auto_assign_delivery(
     1. Within 3km radius (Distance Matrix / Mock Haversine).
     2. Max workload: 30 active deliveries per boy.
     3. Round-robin assignment if multiple match (based on fewest current deliveries).
-    4. If no delivery boy available -> mark "Unassigned" and alert Admin.
-    5. Delivery Boy gets push notification to accept/reject.
+    4. If no delivery partner available -> mark "Unassigned" and alert Admin.
+    5. Delivery Partner gets push notification to accept/reject.
     """
     
     # 1. Get destination coordinates from subscription -> address
@@ -62,22 +62,22 @@ async def auto_assign_delivery(
         
     dest_lat, dest_lng = float(row.latitude), float(row.longitude)
     
-    # 2. Get all available delivery boys
-    boys_stmt = select(DeliveryBoy).where(DeliveryBoy.is_available == True)
-    boys_result = await db.execute(boys_stmt)
-    available_boys = boys_result.scalars().all()
+    # 2. Get all available delivery partners
+    partners_stmt = select(DeliveryPartner).where(DeliveryPartner.is_available == True)
+    partners_result = await db.execute(partners_stmt)
+    available_partners = partners_result.scalars().all()
     
-    if not available_boys:
+    if not available_partners:
         return None
         
     # 3. Filter by capacity (< 30 active deliveries)
-    eligible_boys = []
+    eligible_partners = []
     
-    for boy in available_boys:
+    for partner in available_partners:
         # Check active assignments (PENDING, ACCEPTED, OUT_FOR_DELIVERY)
         active_count_stmt = select(func.count()).select_from(DeliveryAssignment).where(
             and_(
-                DeliveryAssignment.delivery_boy_id == boy.id,
+                DeliveryAssignment.delivery_partner_id == partner.id,
                 DeliveryAssignment.status.in_([
                     AssignmentStatus.PENDING,
                     AssignmentStatus.ACCEPTED,
@@ -93,37 +93,37 @@ async def auto_assign_delivery(
             
         # 4. Filter by radius (<= 3km)
         # Using current_lat/lng if available, otherwise assume they start from hub
-        # Here we assume hub is at dest_lat, dest_lng for testing if boy has no current_lat
-        boy_lat = float(boy.current_lat) if boy.current_lat else None
-        boy_lng = float(boy.current_lng) if boy.current_lng else None
+        # Here we assume hub is at dest_lat, dest_lng for testing if partner has no current_lat
+        partner_lat = float(partner.current_lat) if partner.current_lat else None
+        partner_lng = float(partner.current_lng) if partner.current_lng else None
         
-        if boy_lat and boy_lng:
-            dist = haversine(dest_lat, dest_lng, boy_lat, boy_lng)
+        if partner_lat and partner_lng:
+            dist = haversine(dest_lat, dest_lng, partner_lat, partner_lng)
             if dist > MAX_RADIUS_KM:
                 continue
         else:
-            # If we don't know where the boy is, give them a penalty distance or skip
-            dist = 0.0 # Mock dist for boys without GPS
+            # If we don't know where the partner is, give them a penalty distance or skip
+            dist = 0.0 # Mock dist for partners without GPS
             
-        eligible_boys.append({
-            'boy': boy,
+        eligible_partners.append({
+            'partner': partner,
             'active_count': active_count,
             'distance': dist
         })
         
-    if not eligible_boys:
+    if not eligible_partners:
         return None
         
     # 5. Round Robin / Load Balancing: Sort by fewest active assignments, then distance
-    eligible_boys.sort(key=lambda x: (x['active_count'], x['distance']))
+    eligible_partners.sort(key=lambda x: (x['active_count'], x['distance']))
     
-    best_match = eligible_boys[0]['boy']
-    dist = eligible_boys[0]['distance']
+    best_match = eligible_partners[0]['partner']
+    dist = eligible_partners[0]['distance']
     
     # 6. Create Assignment
     assignment = DeliveryAssignment(
         delivery_id=delivery.id,
-        delivery_boy_id=best_match.id,
+        delivery_partner_id=best_match.id,
         status=AssignmentStatus.PENDING,
         assigned_at=datetime.now(timezone.utc),
         distance_km=dist,
@@ -146,7 +146,7 @@ async def auto_assign_delivery(
 
 
 async def process_unassigned_deliveries(db: AsyncSession):
-    """Cron job or background task to find boys for pending deliveries."""
+    """Cron job or background task to find partners for pending deliveries."""
     stmt = select(SubscriptionDelivery).where(SubscriptionDelivery.status == DeliveryStatus.PENDING)
     result = await db.execute(stmt)
     pending_deliveries = result.scalars().all()

@@ -1,7 +1,7 @@
 import uuid
 import enum
 from typing import Optional, List
-from sqlalchemy import String, Boolean, ForeignKey, Numeric, Enum as SAEnum
+from sqlalchemy import String, Boolean, ForeignKey, Numeric, Enum as SAEnum, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from app.db.base import Base
@@ -15,16 +15,23 @@ class VehicleType(str, enum.Enum):
     VAN = "van"
 
 
-class DeliveryBoy(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Delivery boy profile — one-to-one with User."""
+class DeliveryPartner(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Delivery partner profile — one-to-one with User."""
 
-    __tablename__ = "delivery_boys"
+    __tablename__ = "delivery_partners"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
         unique=True, nullable=False, index=True
     )
     employee_code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    
+    # New fields
+    age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    gender: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    photo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    # Existing fields
     vehicle_type: Mapped[Optional[VehicleType]] = mapped_column(
         SAEnum(VehicleType, name="vehicle_type_enum", values_callable=lambda x: [e.value for e in x]), nullable=True
     )
@@ -38,8 +45,8 @@ class DeliveryBoy(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     rating: Mapped[Optional[float]] = mapped_column(Numeric(3, 2), nullable=True)
 
     # Relationships
-    user: Mapped["User"] = relationship("User", back_populates="delivery_boy")
-    assignments: Mapped[List["DeliveryAssignment"]] = relationship("DeliveryAssignment", back_populates="delivery_boy")
+    user: Mapped["User"] = relationship("User", back_populates="delivery_partner")
+    assignments: Mapped[List["DeliveryAssignment"]] = relationship("DeliveryAssignment", back_populates="delivery_partner")
 
     def __repr__(self) -> str:
-        return f"<DeliveryBoy code={self.employee_code}>"
+        return f"<DeliveryPartner code={self.employee_code}>"

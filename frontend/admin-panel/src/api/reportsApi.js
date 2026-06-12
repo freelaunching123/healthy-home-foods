@@ -1,7 +1,7 @@
 import api from './axios';
 
 export const getDashboardStats = () => api.get('/reports/dashboard');
-export const getDeliveryBoyPerformance = () => api.get('/reports/delivery-boys');
+export const getDeliveryPartnerPerformance = () => api.get('/reports/delivery-partners');
 export const exportExcel = () =>
   api.get('/reports/export/excel', { responseType: 'blob' });
 export const exportPdf = () =>

@@ -12,9 +12,9 @@ from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
 from app.models.delivery_assignment import DeliveryAssignment
-from app.models.delivery_boy import DeliveryBoy
+from app.models.delivery_partner import DeliveryPartner
 from app.models.customer import Customer
-from app.schemas.common import DashboardStats, DeliveryBoyPerformance
+from app.schemas.common import DashboardStats, DeliveryPartnerPerformance
 
 router = APIRouter(prefix="/reports", tags=["Reports & Analytics"])
 
@@ -80,41 +80,41 @@ async def get_dashboard_stats(
     )
 
 
-@router.get("/delivery-boys", response_model=list[DeliveryBoyPerformance])
-async def delivery_boy_performance(
+@router.get("/delivery-partners", response_model=list[DeliveryPartnerPerformance])
+async def delivery_partner_performance(
     _: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
     days: int = Query(30, ge=1, le=365),
 ):
-    """Performance report for all delivery boys over last N days."""
+    """Performance report for all delivery partners over last N days."""
     since = date.today() - timedelta(days=days)
-    boys_result = await db.execute(select(DeliveryBoy))
-    boys = boys_result.scalars().all()
+    partners_result = await db.execute(select(DeliveryPartner))
+    partners = partners_result.scalars().all()
     performance = []
-    for boy in boys:
-        user_result = await db.execute(select(User).where(User.id == boy.user_id))
+    for partner in partners:
+        user_result = await db.execute(select(User).where(User.id == partner.user_id))
         user = user_result.scalar_one()
         assigned = await db.execute(
             select(func.count(DeliveryAssignment.id))
-            .where(and_(DeliveryAssignment.delivery_boy_id == boy.id,
+            .where(and_(DeliveryAssignment.delivery_partner_id == partner.id,
                         func.date(DeliveryAssignment.created_at) >= since))
         )
         delivered = await db.execute(
             select(func.count(DeliveryAssignment.id))
             .join(SubscriptionDelivery, DeliveryAssignment.delivery_id == SubscriptionDelivery.id)
-            .where(and_(DeliveryAssignment.delivery_boy_id == boy.id,
+            .where(and_(DeliveryAssignment.delivery_partner_id == partner.id,
                         SubscriptionDelivery.status == DeliveryStatus.DELIVERED,
                         func.date(DeliveryAssignment.created_at) >= since))
         )
         total_a = assigned.scalar_one() or 1
         total_d = delivered.scalar_one()
-        performance.append(DeliveryBoyPerformance(
-            delivery_boy_id=boy.id,
+        performance.append(DeliveryPartnerPerformance(
+            delivery_partner_id=partner.id,
             name=user.full_name,
             total_assigned=total_a,
             total_delivered=total_d,
             success_rate=round((total_d / total_a) * 100, 1),
-            avg_rating=float(boy.rating) if boy.rating else None,
+            avg_rating=float(partner.rating) if partner.rating else None,
         ))
     return performance
 

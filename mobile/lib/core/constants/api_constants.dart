@@ -5,7 +5,7 @@ class ApiConstants {
   // Base URL — change for production
   static const String baseUrl = 'http://127.0.0.1:8000/api/v1'; // Android localhost (uses adb reverse)
   static const String baseUrlIOS = 'http://localhost:8000/api/v1';
-  static const String baseUrlWeb = 'http://localhost:8000/api/v1';
+  static const String baseUrlWeb = 'http://127.0.0.1:8000/api/v1';
 
   // Auth
   static const String register = '/auth/register';
@@ -44,7 +44,7 @@ class ApiConstants {
   // Admin
   static const String adminSettings = '/admin/settings';
   static const String adminDashboard = '/admin/dashboard';
-  static const String adminDeliveryBoys = '/admin/delivery-boys';
+  static const String adminDeliveryPartners = '/admin/delivery-partners';
 
   // Reports
   static const String reports = '/reports';

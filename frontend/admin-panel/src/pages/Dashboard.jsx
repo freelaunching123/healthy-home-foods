@@ -8,7 +8,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import { getDashboardStats, getDeliveryBoyPerformance } from '../api/reportsApi';
+import { getDashboardStats, getDeliveryPartnerPerformance } from '../api/reportsApi';
 import './Dashboard.css';
 
 const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
@@ -62,10 +62,10 @@ const Dashboard = () => {
   });
 
   const { data: perfData } = useQuery({
-    queryKey: ['deliveryBoyPerf'],
+    queryKey: ['deliveryPartnerPerf'],
     queryFn: async () => {
       try {
-        const { data } = await getDeliveryBoyPerformance();
+        const { data } = await getDeliveryPartnerPerformance();
         return data;
       } catch { return []; }
     },
@@ -146,7 +146,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Delivery Boy Performance */}
+        {/* Delivery Partner Performance */}
         <div className="card list-card">
           <div className="card-header">
             <h3 className="card-title">Delivery Team Performance</h3>
@@ -162,7 +162,7 @@ const Dashboard = () => {
                     {(db.full_name || 'D')[0].toUpperCase()}
                   </div>
                   <div className="item-content">
-                    <h4>{db.full_name || 'Delivery Boy'}</h4>
+                    <h4>{db.full_name || 'Delivery Partner'}</h4>
                     <p>{db.completed_deliveries || 0} completed · {db.pending_deliveries || 0} pending</p>
                   </div>
                   <div className="item-meta">

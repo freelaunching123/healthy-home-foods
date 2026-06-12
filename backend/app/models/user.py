@@ -38,7 +38,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     user_roles: Mapped[List["UserRole"]] = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
     customer: Mapped[Optional["Customer"]] = relationship("Customer", back_populates="user", uselist=False)
     admin: Mapped[Optional["Admin"]] = relationship("Admin", back_populates="user", uselist=False)
-    delivery_boy: Mapped[Optional["DeliveryBoy"]] = relationship("DeliveryBoy", back_populates="user", uselist=False)
+    delivery_partner: Mapped[Optional["DeliveryPartner"]] = relationship("DeliveryPartner", back_populates="user", uselist=False)
     addresses: Mapped[List["Address"]] = relationship("Address", back_populates="user", cascade="all, delete-orphan")
     notifications: Mapped[List["Notification"]] = relationship("Notification", back_populates="user")
     audit_logs: Mapped[List["AuditLog"]] = relationship("AuditLog", back_populates="user")

@@ -4,7 +4,7 @@ from app.models.user import User  # noqa
 from app.models.role import Role, UserRole  # noqa
 from app.models.customer import Customer  # noqa
 from app.models.admin import Admin  # noqa
-from app.models.delivery_boy import DeliveryBoy  # noqa
+from app.models.delivery_partner import DeliveryPartner  # noqa
 from app.models.address import Address  # noqa
 from app.models.product import Product, ProductCategory  # noqa
 from app.models.subscription import SubscriptionPlan, Subscription  # noqa

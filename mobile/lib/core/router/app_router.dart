@@ -7,7 +7,7 @@ import '../../features/auth/screens/splash_screen.dart';
 import '../../features/auth/screens/role_selection_screen.dart';
 import '../../features/auth/screens/customer_login_screen.dart';
 import '../../features/auth/screens/admin_login_screen.dart';
-import '../../features/auth/screens/delivery_boy_login_screen.dart';
+import '../../features/auth/screens/delivery_partner_login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/customer/screens/customer_shell.dart';
 import '../../features/customer/screens/home_screen.dart';
@@ -29,8 +29,8 @@ import '../../features/admin/screens/add_product_screen.dart';
 import '../../features/admin/screens/customer_management_screen.dart';
 import '../../features/admin/screens/subscription_management_screen.dart';
 import '../../features/admin/screens/delivery_management_screen.dart';
-import '../../features/admin/screens/delivery_boy_management_screen.dart';
-import '../../features/admin/screens/create_delivery_boy_screen.dart';
+import '../../features/admin/screens/delivery_partner_management_screen.dart';
+import '../../features/admin/screens/create_delivery_partner_screen.dart';
 import '../../features/admin/screens/reports_screen.dart';
 import '../../features/admin/screens/admin_settings_screen.dart';
 
@@ -66,7 +66,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/role-selection', builder: (_, __) => const RoleSelectionScreen()),
     GoRoute(path: '/customer-login', builder: (_, __) => const CustomerLoginScreen()),
     GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginScreen()),
-    GoRoute(path: '/delivery-login', builder: (_, __) => const DeliveryBoyLoginScreen()),
+    GoRoute(path: '/delivery-login', builder: (_, __) => const DeliveryPartnerLoginScreen()),
     GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
 
     // Customer shell with bottom nav
@@ -138,8 +138,8 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(path: '/admin/customers', builder: (_, __) => const CustomerManagementScreen()),
     GoRoute(path: '/admin/subscriptions', builder: (_, __) => const SubscriptionManagementScreen()),
-    GoRoute(path: '/admin/delivery-boys', builder: (_, __) => const DeliveryBoyManagementScreen()),
-    GoRoute(path: '/admin/delivery-boys/create', builder: (_, __) => const CreateDeliveryBoyScreen()),
+    GoRoute(path: '/admin/delivery-partners', builder: (_, __) => const DeliveryPartnerManagementScreen()),
+    GoRoute(path: '/admin/delivery-partners/create', builder: (_, __) => const CreateDeliveryPartnerScreen()),
     GoRoute(path: '/admin/settings', builder: (_, __) => const AdminSettingsScreen()),
 
     // Delivery boy shell

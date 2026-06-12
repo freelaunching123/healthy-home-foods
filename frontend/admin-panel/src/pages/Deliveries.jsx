@@ -27,11 +27,11 @@ export default function Deliveries() {
     refetchInterval: 30000,
   });
 
-  const { data: deliveryBoys = [] } = useQuery({
-    queryKey: ['delivery-boys-list'],
+  const { data: deliveryPartners = [] } = useQuery({
+    queryKey: ['delivery-partners-list'],
     queryFn: async () => {
       try {
-        const { data } = await getUsers({ role: 'delivery_boy' });
+        const { data } = await getUsers({ role: 'delivery_partner' });
         return data?.items || data || [];
       } catch { return []; }
     },
@@ -119,18 +119,18 @@ export default function Deliveries() {
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {/* Assign dropdown */}
-                    {d.status === 'pending' && deliveryBoys.length > 0 && (
+                    {d.status === 'pending' && deliveryPartners.length > 0 && (
                       <select className="form-control" style={{ fontSize: '13px', padding: '6px 10px' }}
                         defaultValue=""
                         onChange={e => {
                           if (e.target.value) {
-                            assignMut.mutate({ delivery_id: d.id, delivery_boy_id: e.target.value });
+                            assignMut.mutate({ delivery_id: d.id, delivery_partner_id: e.target.value });
                             e.target.value = '';
                           }
                         }}>
                         <option value="">Assign to...</option>
-                        {deliveryBoys.map(db => (
-                          <option key={db.id} value={db.id}>{db.full_name}</option>
+                        {deliveryPartners.map(dp => (
+                          <option key={dp.id} value={dp.id}>{dp.full_name}</option>
                         ))}
                       </select>
                     )}

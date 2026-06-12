@@ -95,21 +95,21 @@ class ApiClient {
 
   // Convenience methods
   Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) =>
-      dio.get(path, queryParameters: queryParameters);
+      dio.get('${dio.options.baseUrl}$path', queryParameters: queryParameters);
 
   Future<Response> post(String path, {dynamic data}) =>
-      dio.post(path, data: data);
+      dio.post('${dio.options.baseUrl}$path', data: data);
 
   Future<Response> put(String path, {dynamic data}) =>
-      dio.put(path, data: data);
+      dio.put('${dio.options.baseUrl}$path', data: data);
 
   Future<Response> delete(String path) =>
-      dio.delete(path);
+      dio.delete('${dio.options.baseUrl}$path');
 
   Future<Response> uploadFile(String path, String filePath, {String fieldName = 'file'}) {
     final formData = FormData.fromMap({
       fieldName: MultipartFile.fromFileSync(filePath),
     });
-    return dio.post(path, data: formData);
+    return dio.post('${dio.options.baseUrl}$path', data: formData);
   }
 }

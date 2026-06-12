@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getDashboardStats, getDeliveryBoyPerformance, exportExcel, exportPdf, downloadBlob } from '../api/reportsApi';
+import { getDashboardStats, getDeliveryPartnerPerformance, exportExcel, exportPdf, downloadBlob } from '../api/reportsApi';
 import toast from 'react-hot-toast';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -18,8 +18,8 @@ export default function Reports() {
   });
 
   const { data: perfData = [], isLoading } = useQuery({
-    queryKey: ['deliveryBoyPerf'],
-    queryFn: async () => { const { data } = await getDeliveryBoyPerformance(); return data || []; },
+    queryKey: ['deliveryPartnerPerf'],
+    queryFn: async () => { const { data } = await getDeliveryPartnerPerformance(); return data || []; },
   });
 
   const deliveryPieData = stats ? [
@@ -91,7 +91,7 @@ export default function Reports() {
       </div>
 
       <div className="charts-grid">
-        {/* Delivery Boy Performance Bar Chart */}
+        {/* Delivery Partner Performance Bar Chart */}
         <div className="card chart-card">
           <div className="card-header">
             <h3 className="card-title">Delivery Team Performance</h3>
@@ -148,7 +148,7 @@ export default function Reports() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr>
-                    {['Delivery Boy', 'Done', 'Pending', 'Rate'].map(h => (
+                    {['Delivery Partner', 'Done', 'Pending', 'Rate'].map(h => (
                       <th key={h} style={{ padding: '6px 8px', textAlign: 'left', color: '#64748b', fontWeight: 600 }}>{h}</th>
                     ))}
                   </tr>

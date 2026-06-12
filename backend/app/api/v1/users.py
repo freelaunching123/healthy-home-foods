@@ -106,3 +106,71 @@ async def deactivate_user(
     user.status = "inactive"
     await db.commit()
     return MessageResponse(message="User deactivated successfully")
+
+
+@router.post("/delivery-partners", response_model=MessageResponse)
+async def create_delivery_partner(
+    payload: __import__('app.schemas.common', fromlist=['CreateDeliveryPartnerRequest']).CreateDeliveryPartnerRequest,
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.delivery_partner import DeliveryPartner
+    from app.models.role import Role, UserRole
+    import shortuuid
+    import base64
+    import os
+    from app.core.config import settings
+    import uuid
+
+    # Check if user already exists
+    user_result = await db.execute(select(User).where(User.phone == payload.mobile_number))
+    if user_result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Phone number already registered")
+
+    user = User(
+        phone=payload.mobile_number,
+        full_name=payload.full_name,
+        password_hash=hash_password(payload.password),
+        is_verified=True,
+    )
+    db.add(user)
+    await db.flush()
+
+    # Assign role
+    role_result = await db.execute(select(Role).where(Role.name == "delivery_partner"))
+    role = role_result.scalar_one_or_none()
+    if role:
+        db.add(UserRole(user_id=user.id, role_id=role.id))
+
+    # Save photo if provided
+    photo_url = None
+    if payload.photo_base64:
+        try:
+            # Assumes format: data:image/png;base64,iVBORw0KGgo...
+            header, encoded = payload.photo_base64.split(",", 1) if "," in payload.photo_base64 else ("data:image/png;base64", payload.photo_base64)
+            ext = "png"
+            if "jpeg" in header or "jpg" in header:
+                ext = "jpg"
+            img_data = base64.b64decode(encoded)
+            upload_dir = os.path.join(settings.UPLOAD_DIR, "profiles")
+            os.makedirs(upload_dir, exist_ok=True)
+            filename = f"{uuid.uuid4()}.{ext}"
+            filepath = os.path.join(upload_dir, filename)
+            with open(filepath, "wb") as f:
+                f.write(img_data)
+            photo_url = f"/uploads/profiles/{filename}"
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Invalid photo data")
+
+    employee_code = f"DP{shortuuid.ShortUUID().random(length=6).upper()}"
+    dp = DeliveryPartner(
+        user_id=user.id,
+        employee_code=employee_code,
+        age=payload.age,
+        gender=payload.gender,
+        photo_url=photo_url,
+    )
+    db.add(dp)
+    await db.commit()
+
+    return MessageResponse(message="Delivery partner created successfully")

@@ -116,9 +116,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     onTap: () => context.push('/admin/subscriptions'),
                   ),
                   _QuickLink(
-                    title: 'Delivery Boys',
+                    title: 'Delivery Partners',
                     icon: Icons.motorcycle_outlined,
-                    onTap: () => context.push('/admin/delivery-boys'),
+                    onTap: () => context.push('/admin/delivery-partners'),
                   ),
                 ],
               ),

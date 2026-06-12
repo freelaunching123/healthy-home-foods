@@ -139,7 +139,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   Widget _buildTrackingInfoPanel() {
     final estMinutes = _trackingData?['estimated_minutes'] ?? '--';
-    final driverName = _trackingData?['delivery_boy_name'] ?? 'Delivery Agent';
+    final driverName = _trackingData?['delivery_partner_name'] ?? 'Delivery Agent';
     
     return Container(
       padding: const EdgeInsets.all(24),

@@ -8,7 +8,7 @@ from app.db.mixins import UUIDPrimaryKeyMixin, TimestampMixin
 
 
 class Role(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """RBAC roles: super_admin, customer, delivery_boy."""
+    """RBAC roles: super_admin, customer, delivery_partner."""
 
     __tablename__ = "roles"
 

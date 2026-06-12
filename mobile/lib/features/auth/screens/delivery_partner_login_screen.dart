@@ -3,14 +3,14 @@ import 'package:go_router/go_router.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/theme/app_theme.dart';
 
-class DeliveryBoyLoginScreen extends StatefulWidget {
-  const DeliveryBoyLoginScreen({super.key});
+class DeliveryPartnerLoginScreen extends StatefulWidget {
+  const DeliveryPartnerLoginScreen({super.key});
 
   @override
-  State<DeliveryBoyLoginScreen> createState() => _DeliveryBoyLoginScreenState();
+  State<DeliveryPartnerLoginScreen> createState() => _DeliveryPartnerLoginScreenState();
 }
 
-class _DeliveryBoyLoginScreenState extends State<DeliveryBoyLoginScreen> {
+class _DeliveryPartnerLoginScreenState extends State<DeliveryPartnerLoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -26,7 +26,7 @@ class _DeliveryBoyLoginScreenState extends State<DeliveryBoyLoginScreen> {
       await _authService.loginWithPassword(
         phone: _phoneController.text.trim(),
         password: _passwordController.text,
-        role: 'delivery_boy',
+        role: 'delivery_partner',
       );
 
       if (!mounted) return;
@@ -116,7 +116,7 @@ class _DeliveryBoyLoginScreenState extends State<DeliveryBoyLoginScreen> {
                         border: Border.all(color: accentColor, width: 1.5),
                       ),
                       child: Text(
-                        'Delivery Boy Login',
+                        'Delivery Partner Login',
                         style: TextStyle(
                           color: accentColor,
                           fontWeight: FontWeight.w700,

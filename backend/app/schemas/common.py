@@ -93,7 +93,7 @@ class GpsLocationResponse(BaseModel):
     accuracy_meters: Optional[float]
     speed_kmph: Optional[float]
     recorded_at: datetime
-    delivery_boy_name: Optional[str] = None
+    delivery_partner_name: Optional[str] = None
     estimated_minutes: Optional[int] = None
 
 
@@ -101,7 +101,7 @@ class GpsLocationResponse(BaseModel):
 
 class AssignDeliveryRequest(BaseModel):
     delivery_id: uuid.UUID
-    delivery_boy_id: uuid.UUID
+    delivery_partner_id: uuid.UUID
 
 
 class UpdateDeliveryStatusRequest(BaseModel):
@@ -112,7 +112,7 @@ class UpdateDeliveryStatusRequest(BaseModel):
 class AssignmentResponse(BaseModel):
     id: uuid.UUID
     delivery_id: uuid.UUID
-    delivery_boy_id: uuid.UUID
+    delivery_partner_id: uuid.UUID
     status: str
     assigned_at: datetime
     distance_km: Optional[float]
@@ -191,13 +191,22 @@ class DashboardStats(BaseModel):
     missed_deliveries_today: int
 
 
-class DeliveryBoyPerformance(BaseModel):
-    delivery_boy_id: uuid.UUID
+class DeliveryPartnerPerformance(BaseModel):
+    delivery_partner_id: uuid.UUID
     name: str
     total_assigned: int
     total_delivered: int
     success_rate: float
     avg_rating: Optional[float]
+
+
+class CreateDeliveryPartnerRequest(BaseModel):
+    full_name: str
+    age: int
+    gender: str
+    mobile_number: str
+    password: str
+    photo_base64: Optional[str] = None
 
 
 # ── Common response ────────────────────────────────────────────────────────────

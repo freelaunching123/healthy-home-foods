@@ -9,9 +9,9 @@ import redis.asyncio as aioredis
 import os, shutil, uuid as uuid_lib
 
 from app.db.session import get_db
-from app.core.dependencies import get_current_user, require_super_admin, require_delivery_boy
+from app.core.dependencies import get_current_user, require_super_admin, require_delivery_partner
 from app.models.user import User
-from app.models.delivery_boy import DeliveryBoy
+from app.models.delivery_partner import DeliveryPartner
 from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
 from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
 from app.models.gps_tracking import GpsTrackingLog
@@ -62,16 +62,16 @@ async def assign_delivery(
     if not delivery:
         raise HTTPException(status_code=404, detail="Delivery not found")
 
-    boy_result = await db.execute(
-        select(DeliveryBoy).where(DeliveryBoy.id == payload.delivery_boy_id)
+    partner_result = await db.execute(
+        select(DeliveryPartner).where(DeliveryPartner.id == payload.delivery_partner_id)
     )
-    boy = boy_result.scalar_one_or_none()
-    if not boy:
-        raise HTTPException(status_code=404, detail="Delivery boy not found")
+    partner = partner_result.scalar_one_or_none()
+    if not partner:
+        raise HTTPException(status_code=404, detail="Delivery partner not found")
 
     assignment = DeliveryAssignment(
         delivery_id=delivery.id,
-        delivery_boy_id=boy.id,
+        delivery_partner_id=partner.id,
         status=AssignmentStatus.PENDING,
         assigned_at=datetime.now(timezone.utc),
     )
@@ -82,27 +82,27 @@ async def assign_delivery(
     return assignment
 
 
-# ── Delivery boy: View assigned deliveries ─────────────────────────────────────
+# ── Delivery partner: View assigned deliveries ─────────────────────────────────────
 
 @router.get("/assigned", response_model=list[AssignmentResponse])
 async def get_my_assignments(
-    current_user: User = Depends(require_delivery_boy),
+    current_user: User = Depends(require_delivery_partner),
     db: AsyncSession = Depends(get_db),
     delivery_date: date = Query(default=date.today()),
 ):
-    boy_result = await db.execute(
-        select(DeliveryBoy).where(DeliveryBoy.user_id == current_user.id)
+    partner_result = await db.execute(
+        select(DeliveryPartner).where(DeliveryPartner.user_id == current_user.id)
     )
-    boy = boy_result.scalar_one_or_none()
-    if not boy:
-        raise HTTPException(status_code=404, detail="Delivery boy profile not found")
+    partner = partner_result.scalar_one_or_none()
+    if not partner:
+        raise HTTPException(status_code=404, detail="Delivery partner profile not found")
 
     result = await db.execute(
         select(DeliveryAssignment)
         .join(SubscriptionDelivery, DeliveryAssignment.delivery_id == SubscriptionDelivery.id)
         .where(
             and_(
-                DeliveryAssignment.delivery_boy_id == boy.id,
+                DeliveryAssignment.delivery_partner_id == partner.id,
                 SubscriptionDelivery.scheduled_date == delivery_date,
             )
         )
@@ -114,10 +114,10 @@ async def get_my_assignments(
 async def update_delivery_status(
     assignment_id: UUID,
     payload: UpdateDeliveryStatusRequest,
-    current_user: User = Depends(require_delivery_boy),
+    current_user: User = Depends(require_delivery_partner),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delivery boy updates assignment status (accepted/out_for_delivery/delivered/failed)."""
+    """Delivery partner updates assignment status (accepted/out_for_delivery/delivered/failed)."""
     result = await db.execute(
         select(DeliveryAssignment).where(DeliveryAssignment.id == assignment_id)
     )
@@ -165,7 +165,7 @@ async def update_delivery_status(
 async def upload_delivery_proof(
     assignment_id: UUID,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_delivery_boy),
+    current_user: User = Depends(require_delivery_partner),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload delivery proof photo."""
@@ -201,25 +201,25 @@ async def upload_delivery_proof(
 @router.post("/gps/update", response_model=MessageResponse)
 async def update_gps_location(
     payload: GpsUpdateRequest,
-    current_user: User = Depends(require_delivery_boy),
+    current_user: User = Depends(require_delivery_partner),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delivery boy sends live location. Stored in DB + broadcasted via Redis."""
-    boy_result = await db.execute(
-        select(DeliveryBoy).where(DeliveryBoy.user_id == current_user.id)
+    """Delivery partner sends live location. Stored in DB + broadcasted via Redis."""
+    partner_result = await db.execute(
+        select(DeliveryPartner).where(DeliveryPartner.user_id == current_user.id)
     )
-    boy = boy_result.scalar_one_or_none()
-    if not boy:
-        raise HTTPException(status_code=404, detail="Delivery boy profile not found")
+    partner = partner_result.scalar_one_or_none()
+    if not partner:
+        raise HTTPException(status_code=404, detail="Delivery partner profile not found")
 
-    # Update current location on delivery boy
-    boy.current_lat = payload.latitude
-    boy.current_lng = payload.longitude
+    # Update current location on delivery partner
+    partner.current_lat = payload.latitude
+    partner.current_lng = payload.longitude
 
     # Store GPS log
     gps_log = GpsTrackingLog(
         assignment_id=payload.assignment_id,
-        delivery_boy_id=boy.id,
+        delivery_partner_id=partner.id,
         latitude=payload.latitude,
         longitude=payload.longitude,
         accuracy_meters=payload.accuracy_meters,
@@ -238,7 +238,7 @@ async def update_gps_location(
         "accuracy": payload.accuracy_meters,
         "speed": payload.speed_kmph,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "delivery_boy_name": current_user.full_name,
+        "delivery_partner_name": current_user.full_name,
     })
     await redis.publish(f"gps:{payload.assignment_id}", location_data)
     await redis.close()

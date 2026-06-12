@@ -17,8 +17,8 @@ class GpsTrackingLog(UUIDPrimaryKeyMixin, Base):
         UUID(as_uuid=True), ForeignKey("delivery_assignments.id", ondelete="CASCADE"),
         nullable=False, index=True
     )
-    delivery_boy_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("delivery_boys.id"), nullable=False, index=True
+    delivery_partner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("delivery_partners.id"), nullable=False, index=True
     )
     latitude: Mapped[float] = mapped_column(Numeric(10, 7), nullable=False)
     longitude: Mapped[float] = mapped_column(Numeric(10, 7), nullable=False)

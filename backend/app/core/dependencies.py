@@ -80,5 +80,5 @@ def require_roles(*allowed_roles: str):
 # ── Shorthand role dependencies ───────────────────────────────────────────────
 require_super_admin = require_roles("super_admin")
 require_customer = require_roles("customer", "super_admin")
-require_delivery_boy = require_roles("delivery_boy", "super_admin")
-require_any_authenticated = require_roles("super_admin", "customer", "delivery_boy")
+require_delivery_partner = require_roles("delivery_partner", "super_admin")
+require_any_authenticated = require_roles("super_admin", "customer", "delivery_partner")

@@ -45,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         case 'super_admin':
           context.go('/admin');
           break;
-        case 'delivery_boy':
+        case 'delivery_partner':
           context.go('/delivery');
           break;
         default:
