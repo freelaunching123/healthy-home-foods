@@ -31,6 +31,7 @@ import '../../features/admin/screens/subscription_management_screen.dart';
 import '../../features/admin/screens/delivery_management_screen.dart';
 import '../../features/admin/screens/delivery_partner_management_screen.dart';
 import '../../features/admin/screens/create_delivery_partner_screen.dart';
+import '../../features/admin/screens/delivery_partner_profile_screen.dart';
 import '../../features/admin/screens/reports_screen.dart';
 import '../../features/admin/screens/admin_settings_screen.dart';
 
@@ -140,6 +141,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/admin/subscriptions', builder: (_, __) => const SubscriptionManagementScreen()),
     GoRoute(path: '/admin/delivery-partners', builder: (_, __) => const DeliveryPartnerManagementScreen()),
     GoRoute(path: '/admin/delivery-partners/create', builder: (_, __) => const CreateDeliveryPartnerScreen()),
+    GoRoute(
+      path: '/admin/delivery-partners/:id',
+      builder: (_, state) => DeliveryPartnerProfileScreen(
+        partnerId: state.pathParameters['id']!,
+        initialData: state.extra as Map<String, dynamic>?,
+      ),
+    ),
     GoRoute(path: '/admin/settings', builder: (_, __) => const AdminSettingsScreen()),
 
     // Delivery boy shell

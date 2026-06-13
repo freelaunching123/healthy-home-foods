@@ -24,7 +24,7 @@ def slugify(text: str) -> str:
 async def seed_data():
     async with AsyncSessionLocal() as db:
         # 1. Seed Roles
-        roles = ["super_admin", "customer", "delivery_boy"]
+        roles = ["super_admin", "customer", "delivery_partner"]
         for role_name in roles:
             result = await db.execute(select(Role).where(Role.name == role_name))
             if not result.scalar_one_or_none():

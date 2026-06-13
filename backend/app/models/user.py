@@ -33,6 +33,8 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     profile_photo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     fcm_token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Firebase push
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     user_roles: Mapped[List["UserRole"]] = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")

@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -174,3 +175,6 @@ async def create_delivery_partner(
     await db.commit()
 
     return MessageResponse(message="Delivery partner created successfully")
+
+
+

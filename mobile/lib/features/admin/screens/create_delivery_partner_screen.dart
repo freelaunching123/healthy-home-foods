@@ -108,7 +108,7 @@ class _CreateDeliveryPartnerScreenState extends State<CreateDeliveryPartnerScree
         if (photoBase64 != null) 'photo_base64': photoBase64,
       };
 
-      await ApiClient().post('/users/delivery-partners', data: payload);
+      await ApiClient().post('/delivery-partners', data: payload);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -78,6 +78,8 @@ async def admin_login(
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if getattr(user, 'is_deleted', False):
+        raise HTTPException(status_code=403, detail="Account is deleted")
     if user.status.value != "active":
         raise HTTPException(status_code=403, detail="Account is suspended")
 
@@ -115,6 +117,8 @@ async def login_with_password(
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if getattr(user, 'is_deleted', False):
+        raise HTTPException(status_code=403, detail="Account is deleted")
     if user.status.value != "active":
         raise HTTPException(status_code=403, detail="Account is suspended")
 
@@ -165,6 +169,8 @@ async def refresh_token(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if getattr(user, 'is_deleted', False):
+        raise HTTPException(status_code=403, detail="Account is deleted")
 
     role_result = await db.execute(
         select(Role.name)

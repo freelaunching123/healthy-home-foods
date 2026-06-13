@@ -103,6 +103,9 @@ class ApiClient {
   Future<Response> put(String path, {dynamic data}) =>
       dio.put('${dio.options.baseUrl}$path', data: data);
 
+  Future<Response> patch(String path, {dynamic data}) =>
+      dio.patch('${dio.options.baseUrl}$path', data: data);
+
   Future<Response> delete(String path) =>
       dio.delete('${dio.options.baseUrl}$path');
 
