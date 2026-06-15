@@ -1,8 +1,8 @@
 import uuid
 import enum
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
-from sqlalchemy import String, Boolean, DateTime, func, Enum as SAEnum
+from sqlalchemy import String, Boolean, DateTime, Date, func, Enum as SAEnum, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from app.db.base import Base
@@ -35,6 +35,18 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Profile details
+    gender: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    dob: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+    # Notification preferences
+    delivery_notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    payment_notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    promotional_notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Security settings
+    token_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     # Relationships
     user_roles: Mapped[List["UserRole"]] = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")

@@ -1,5 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:dio/dio.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -15,6 +20,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
   final _api = ApiClient();
   List<dynamic> _payments = [];
   bool _isLoading = true;
+  String? _downloadingPaymentId;
 
   @override
   void initState() {
@@ -25,34 +31,50 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
   Future<void> _loadPayments() async {
     setState(() => _isLoading = true);
     try {
-      // Mock API call to get payment history
-      // Replace with actual endpoint if available
-      // final res = await _api.get(ApiConstants.paymentHistory);
-      
-      // Mocking data for now
-      await Future.delayed(const Duration(seconds: 1));
+      final res = await _api.get(ApiConstants.paymentHistory);
       setState(() {
-        _payments = [
-          {
-            'id': 'pay_12345',
-            'amount': 2500.0,
-            'status': 'captured',
-            'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-            'description': 'Monthly Subscription - Healthy Meal',
-          },
-          {
-            'id': 'pay_12346',
-            'amount': 850.0,
-            'status': 'failed',
-            'created_at': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
-            'description': 'Weekly Subscription - Vegan Meal',
-          },
-        ];
+        _payments = res.data is List ? res.data : [];
       });
     } catch (e) {
       debugPrint('Error loading payments: $e');
+      setState(() {
+        _payments = [];
+      });
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _downloadInvoice(String paymentId) async {
+    setState(() => _downloadingPaymentId = paymentId);
+    try {
+      final response = await _api.dio.get(
+        '/payments/$paymentId/invoice',
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      final bytes = response.data;
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/invoice_$paymentId.pdf';
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      if (mounted) {
+        await Share.shareXFiles(
+          [XFile(filePath, mimeType: 'application/pdf')],
+          subject: 'Payment Invoice #$paymentId',
+          text: 'Here is your payment invoice from Healthy Home Foods.',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error downloading invoice: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to download invoice'), backgroundColor: AppTheme.error),
+        );
+      }
+    } finally {
+      setState(() => _downloadingPaymentId = null);
     }
   }
 
@@ -61,6 +83,10 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Payment History'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
@@ -75,11 +101,24 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                     separatorBuilder: (context, index) => const SizedBox(height: 16),
                     itemBuilder: (context, index) {
                       final payment = _payments[index];
-                      final isSuccess = payment['status'] == 'captured';
+                      final id = payment['id'];
+                      final isSuccess = payment['status'] == 'success';
+                      final isDownloading = _downloadingPaymentId == id;
                       
+                      final dateStr = payment['paid_at'] != null
+                          ? DateFormat('MMM dd, yyyy hh:mm a').format(DateTime.parse(payment['paid_at']))
+                          : (payment['created_at'] != null 
+                              ? DateFormat('MMM dd, yyyy hh:mm a').format(DateTime.parse(payment['created_at']))
+                              : '—');
+
                       return Card(
+                        elevation: 1,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.grey.withValues(alpha: 0.15)),
+                        ),
                         child: ListTile(
-                          contentPadding: const EdgeInsets.all(16),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           leading: CircleAvatar(
                             backgroundColor: isSuccess ? AppTheme.success.withValues(alpha: 0.1) : AppTheme.error.withValues(alpha: 0.1),
                             child: Icon(
@@ -87,27 +126,52 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                               color: isSuccess ? AppTheme.success : AppTheme.error,
                             ),
                           ),
-                          title: Text('₹${payment['amount'].toString()}'),
+                          title: Text(
+                            '₹${payment['amount']}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 4),
-                              Text(payment['description'] ?? 'Payment', style: const TextStyle(fontSize: 13)),
+                              Text(
+                                'Method: ${(payment['payment_method'] ?? 'Razorpay').toString().toUpperCase()}',
+                                style: const TextStyle(fontSize: 13),
+                              ),
                               const SizedBox(height: 4),
                               Text(
-                                DateFormat('MMM dd, yyyy hh:mm a').format(DateTime.parse(payment['created_at'])),
+                                dateStr,
                                 style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                               ),
                             ],
                           ),
-                          trailing: Text(
-                            (payment['status'] as String).toUpperCase(),
-                            style: TextStyle(
-                              color: isSuccess ? AppTheme.success : AppTheme.error,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                          ),
+                          trailing: isSuccess
+                              ? (isDownloading
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(color: AppTheme.primaryGreen, strokeWidth: 2),
+                                    )
+                                  : IconButton(
+                                      icon: const Icon(Icons.download_for_offline_outlined, color: AppTheme.primaryGreen),
+                                      onPressed: () => _downloadInvoice(id),
+                                      tooltip: 'Download Invoice',
+                                    ))
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.error.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    (payment['status'] as String).toUpperCase(),
+                                    style: const TextStyle(
+                                      color: AppTheme.error,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
                         ),
                       );
                     },

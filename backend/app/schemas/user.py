@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
 import re
@@ -31,6 +31,12 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     profile_photo_url: Optional[str] = None
     fcm_token: Optional[str] = None
+    gender: Optional[str] = None
+    dob: Optional[date] = None
+    delivery_notifications_enabled: Optional[bool] = None
+    payment_notifications_enabled: Optional[bool] = None
+    promotional_notifications_enabled: Optional[bool] = None
+    photo_base64: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -42,8 +48,18 @@ class UserResponse(BaseModel):
     is_verified: bool
     profile_photo_url: Optional[str]
     created_at: datetime
+    gender: Optional[str] = None
+    dob: Optional[date] = None
+    delivery_notifications_enabled: bool = True
+    payment_notifications_enabled: bool = True
+    promotional_notifications_enabled: bool = True
 
     model_config = {"from_attributes": True}
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
 
 
 class UserListResponse(BaseModel):

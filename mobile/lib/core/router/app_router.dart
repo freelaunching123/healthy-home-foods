@@ -20,6 +20,10 @@ import '../../features/customer/screens/payment_history_screen.dart';
 import '../../features/customer/screens/profile_screen.dart';
 import '../../features/customer/screens/notifications_screen.dart';
 import '../../features/customer/screens/settings_screen.dart';
+import '../../features/customer/screens/edit_profile_screen.dart';
+import '../../features/customer/screens/my_subscription_detail_screen.dart';
+import '../../features/customer/screens/delivery_history_screen.dart';
+import '../../features/customer/screens/address_management_screen.dart';
 
 // Admin screens
 import '../../features/admin/screens/admin_shell.dart';
@@ -113,6 +117,10 @@ final GoRouter appRouter = GoRouter(
       builder: (_, state) => TrackingScreen(deliveryId: state.pathParameters['deliveryId']!),
     ),
     GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+    GoRoute(path: '/profile/edit', builder: (_, __) => const EditProfileScreen()),
+    GoRoute(path: '/profile/subscription', builder: (_, __) => const MySubscriptionDetailScreen()),
+    GoRoute(path: '/profile/delivery-history', builder: (_, __) => const CustomerDeliveryHistoryScreen()),
+    GoRoute(path: '/profile/addresses', builder: (_, __) => const AddressManagementScreen()),
 
     // Admin shell
     StatefulShellRoute.indexedStack(

@@ -94,7 +94,7 @@ async def admin_login(
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
 
-    token_data = {"sub": str(user.id), "role": user_role}
+    token_data = {"sub": str(user.id), "role": user_role, "version": user.token_version}
     return TokenResponse(
         access_token=create_access_token(token_data),
         refresh_token=create_refresh_token(token_data),
@@ -133,7 +133,7 @@ async def login_with_password(
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
 
-    token_data = {"sub": str(user.id), "role": user_role}
+    token_data = {"sub": str(user.id), "role": user_role, "version": user.token_version}
     return TokenResponse(
         access_token=create_access_token(token_data),
         refresh_token=create_refresh_token(token_data),
@@ -179,7 +179,7 @@ async def refresh_token(
         .limit(1)
     )
     user_role = role_result.scalar_one_or_none() or "customer"
-    token_data = {"sub": str(user.id), "role": user_role}
+    token_data = {"sub": str(user.id), "role": user_role, "version": user.token_version}
 
     return TokenResponse(
         access_token=create_access_token(token_data),

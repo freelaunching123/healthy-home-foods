@@ -15,6 +15,7 @@ from app.models.admin_settings import AdminSettings
 from app.schemas.subscription import (
     SubscriptionCreate, SubscriptionPauseRequest, SubscriptionCancelRequest,
     SubscriptionResponse, SubscriptionPlanResponse, DeliveryResponse, DeliveryListResponse,
+    CurrentSubscriptionResponse,
 )
 from app.schemas.common import MessageResponse
 from app.services import subscription_engine
@@ -114,6 +115,69 @@ async def list_subscriptions(
         query = query.where(Subscription.status == status)
     result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
     return result.scalars().all()
+
+
+@router.get("/current", response_model=CurrentSubscriptionResponse)
+async def get_current_subscription(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the customer's current active/paused (or latest) subscription with details."""
+    customer = await _get_customer(db, current_user.id)
+    
+    # Fetch subscriptions sorted by status and date
+    result = await db.execute(
+        select(Subscription)
+        .where(Subscription.customer_id == customer.id)
+        .order_by(Subscription.created_at.desc())
+    )
+    subs = result.scalars().all()
+    if not subs:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+        
+    # Find active or paused one first, otherwise fallback to latest
+    sub = None
+    for s in subs:
+        if s.status in [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED]:
+            sub = s
+            break
+    if not sub:
+        sub = subs[0]
+        
+    # Load relationships to prevent greenlet/lazy load error
+    from sqlalchemy.orm import selectinload
+    res = await db.execute(
+        select(Subscription)
+        .where(Subscription.id == sub.id)
+        .options(selectinload(Subscription.plan), selectinload(Subscription.product))
+    )
+    sub = res.scalar_one()
+
+    # Calculate carry forward deliveries count
+    carry_forward_count = await db.scalar(
+        select(func.count(SubscriptionDelivery.id))
+        .where(
+            SubscriptionDelivery.subscription_id == sub.id,
+            SubscriptionDelivery.is_carry_forward == True
+        )
+    )
+
+    return CurrentSubscriptionResponse(
+        id=sub.id,
+        plan_name=sub.plan.name if sub.plan else "—",
+        plan_type=sub.plan.plan_type.value if sub.plan and hasattr(sub.plan.plan_type, "value") else (sub.plan.plan_type if sub.plan else "—"),
+        start_date=sub.start_date,
+        status=sub.status.value if hasattr(sub.status, "value") else sub.status,
+        total_deliveries=sub.total_deliveries,
+        completed_deliveries=sub.completed_deliveries,
+        remaining_deliveries=max(0, sub.total_deliveries - sub.completed_deliveries),
+        paused_days=sub.total_paused_days,
+        missed_deliveries=sub.missed_deliveries,
+        carry_forward_deliveries=carry_forward_count or 0,
+        product_name=sub.product.name if sub.product else "—",
+        price_per_delivery=float(sub.price_per_delivery),
+        total_amount=float(sub.total_amount),
+    )
 
 
 @router.get("/{sub_id}", response_model=SubscriptionResponse)

@@ -39,7 +39,11 @@ class ApiConstants {
   // Users
   static const String users = '/users';
   static const String userProfile = '/users/profile';
-  static const String userAddresses = '/users/addresses';
+  static const String userAddresses = '/users/me/addresses';
+  static const String changePassword = '/users/change-password';
+  static const String logoutAll = '/users/logout-all';
+  static const String subscriptionCurrent = '/subscriptions/current';
+  static const String deliveryHistory = '/deliveries/history';
 
   // Admin
   static const String adminSettings = '/admin/settings';

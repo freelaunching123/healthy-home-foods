@@ -29,6 +29,7 @@ async def get_current_user(
         if payload.get("type") != "access":
             raise credentials_exception
         user_id: str = payload.get("sub")
+        token_version = payload.get("version")
         if not user_id:
             raise credentials_exception
     except JWTError:
@@ -40,6 +41,8 @@ async def get_current_user(
         raise credentials_exception
     if user.status.value != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is not active")
+    if token_version is not None and user.token_version != token_version:
+        raise credentials_exception
     return user
 
 

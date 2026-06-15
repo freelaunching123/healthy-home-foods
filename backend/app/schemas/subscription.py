@@ -77,3 +77,22 @@ class DeliveryListResponse(BaseModel):
     page: int
     page_size: int
     items: list[DeliveryResponse]
+
+
+class CurrentSubscriptionResponse(BaseModel):
+    id: uuid.UUID
+    plan_name: str
+    plan_type: str
+    start_date: Optional[date] = None
+    status: str
+    total_deliveries: int
+    completed_deliveries: int
+    remaining_deliveries: int
+    paused_days: int
+    missed_deliveries: int
+    carry_forward_deliveries: int
+    product_name: str
+    price_per_delivery: float
+    total_amount: float
+
+    model_config = {"from_attributes": True}

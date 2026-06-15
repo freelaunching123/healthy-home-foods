@@ -9,7 +9,7 @@ import redis.asyncio as aioredis
 import os, shutil, uuid as uuid_lib
 
 from app.db.session import get_db
-from app.core.dependencies import get_current_user, require_super_admin, require_delivery_partner
+from app.core.dependencies import get_current_user, require_super_admin, require_delivery_partner, require_customer
 from app.models.user import User
 from app.models.delivery_partner import DeliveryPartner
 from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
@@ -17,7 +17,7 @@ from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatu
 from app.models.gps_tracking import GpsTrackingLog
 from app.schemas.common import (
     AssignDeliveryRequest, UpdateDeliveryStatusRequest, AssignmentResponse,
-    GpsUpdateRequest, GpsLocationResponse, MessageResponse,
+    GpsUpdateRequest, GpsLocationResponse, MessageResponse, DeliveryHistoryResponse,
 )
 from app.services import subscription_engine
 from app.core.config import settings
@@ -27,6 +27,48 @@ router = APIRouter(prefix="/deliveries", tags=["Deliveries & GPS"])
 
 async def get_redis():
     return await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+
+
+@router.get("/history", response_model=list[DeliveryHistoryResponse])
+async def get_customer_delivery_history(
+    current_user: User = Depends(require_customer),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get delivery history for the authenticated customer."""
+    # Get customer
+    from app.models.customer import Customer
+    customer_result = await db.execute(select(Customer).where(Customer.user_id == current_user.id))
+    customer = customer_result.scalar_one_or_none()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer profile not found")
+
+    from app.models.subscription import Subscription
+    from app.models.product import Product
+    
+    query = (
+        select(
+            SubscriptionDelivery.id,
+            SubscriptionDelivery.scheduled_date,
+            SubscriptionDelivery.status,
+            Product.name.label("product_name")
+        )
+        .join(Subscription, Subscription.id == SubscriptionDelivery.subscription_id)
+        .join(Product, Product.id == Subscription.product_id)
+        .where(Subscription.customer_id == customer.id)
+        .order_by(SubscriptionDelivery.scheduled_date.desc())
+    )
+    result = await db.execute(query)
+    rows = result.fetchall()
+    
+    return [
+        DeliveryHistoryResponse(
+            id=row.id,
+            delivery_date=row.scheduled_date,
+            product_name=row.product_name,
+            status=row.status.value if hasattr(row.status, "value") else row.status
+        )
+        for row in rows
+    ]
 
 
 # ── Admin: View & assign deliveries ───────────────────────────────────────────

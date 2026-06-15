@@ -188,3 +188,158 @@ async def payment_history(
         .order_by(Payment.created_at.desc())
     )
     return result.scalars().all()
+
+
+@router.get("/{payment_id}/invoice")
+async def download_invoice(
+    payment_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate and return the invoice PDF for a payment transaction."""
+    # Retrieve customer profile
+    customer = await _get_customer(db, current_user.id)
+
+    # Fetch payment with relationships
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(
+        select(Payment)
+        .where(Payment.id == payment_id, Payment.customer_id == customer.id)
+        .options(
+            selectinload(Payment.invoice),
+            selectinload(Payment.subscription).selectinload(Subscription.product),
+            selectinload(Payment.subscription).selectinload(Subscription.plan)
+        )
+    )
+    payment = result.scalar_one_or_none()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment transaction not found")
+
+    # Fallback to subscription details if invoice record does not exist
+    invoice = payment.invoice
+    sub = payment.subscription
+    
+    invoice_no = invoice.invoice_number if invoice else f"INV-{payment.created_at.strftime('%Y%m')}-{str(payment.id)[:8].upper()}"
+    cust_name = invoice.customer_name if (invoice and invoice.customer_name != "Customer") else current_user.full_name
+    cust_phone = invoice.customer_phone if invoice else current_user.phone
+    cust_email = invoice.customer_email if invoice else current_user.email
+    billing_addr = invoice.billing_address if (invoice and invoice.billing_address) else "Registered Address"
+    prod_name = invoice.product_name if (invoice and invoice.product_name) else (sub.product.name if sub and sub.product else "Healthy Meal Plan")
+    plan_name = invoice.plan_name if (invoice and invoice.plan_name) else (sub.plan.name if sub and sub.plan else "Subscription Plan")
+    total_del = invoice.total_deliveries if invoice else (sub.total_deliveries if sub else 0)
+    price_per = float(invoice.price_per_delivery) if invoice else (float(sub.price_per_delivery) if sub else 0.0)
+    subtotal = float(invoice.subtotal) if invoice else (price_per * total_del)
+    del_charge = float(invoice.delivery_charge) if invoice else (float(sub.delivery_charge) if sub else 0.0)
+    tax_amt = float(invoice.tax_amount) if invoice else (float(sub.tax_amount) if sub else 0.0)
+    total_amt = float(invoice.total_amount) if invoice else float(payment.amount)
+    paid_date = payment.paid_at.strftime('%B %d, %Y') if payment.paid_at else payment.created_at.strftime('%B %d, %Y')
+    pmt_method = payment.payment_method.value if payment.payment_method and hasattr(payment.payment_method, "value") else (payment.payment_method or "Razorpay")
+
+    # Generate PDF using WeasyPrint
+    import weasyprint
+    import io
+    from fastapi.responses import StreamingResponse
+
+    html_content = f"""
+    <html>
+    <head>
+      <style>
+        body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 40px; color: #333; }}
+        .header {{ border-bottom: 2px solid #2E7D32; padding-bottom: 20px; margin-bottom: 30px; }}
+        .header h1 {{ color: #2E7D32; margin: 0; font-size: 28px; }}
+        .header p {{ margin: 5px 0 0 0; color: #666; font-size: 14px; }}
+        .invoice-details {{ width: 100%; margin-bottom: 30px; }}
+        .invoice-details td {{ vertical-align: top; font-size: 14px; }}
+        .details-title {{ font-weight: bold; color: #2E7D32; margin-bottom: 5px; text-transform: uppercase; font-size: 12px; }}
+        .table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; }}
+        .table th {{ background: #2E7D32; color: white; padding: 10px; font-size: 14px; text-align: left; }}
+        .table td {{ padding: 12px 10px; border-bottom: 1px solid #eee; font-size: 14px; }}
+        .summary {{ float: right; width: 300px; margin-top: 10px; }}
+        .summary table {{ width: 100%; border-collapse: collapse; }}
+        .summary td {{ padding: 6px 0; font-size: 14px; }}
+        .summary .total {{ font-weight: bold; font-size: 16px; border-top: 2px solid #2E7D32; color: #2E7D32; padding-top: 10px; }}
+        .footer {{ position: fixed; bottom: 0; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 10px; text-align: center; color: #999; font-size: 11px; }}
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>HEALTHY HOME FOODS</h1>
+        <p>Your Daily Dose of Healthy & Fresh Home-Cooked Meals</p>
+      </div>
+      
+      <table class="invoice-details">
+        <tr>
+          <td style="width: 50%;">
+            <div class="details-title">Billed To</div>
+            <strong>{cust_name}</strong><br/>
+            Phone: {cust_phone}<br/>
+            {f"Email: {cust_email}<br/>" if cust_email else ""}
+            Address: {billing_addr}
+          </td>
+          <td style="width: 50%; text-align: right;">
+            <div class="details-title">Invoice Information</div>
+            <strong>Invoice No:</strong> {invoice_no}<br/>
+            <strong>Date:</strong> {paid_date}<br/>
+            <strong>Payment Method:</strong> {pmt_method.upper()}<br/>
+            <strong>Status:</strong> {payment.status.upper()}
+          </td>
+        </tr>
+      </table>
+      
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Item Description</th>
+            <th style="text-align: right; width: 150px;">Price per Delivery</th>
+            <th style="text-align: right; width: 100px;">Deliveries</th>
+            <th style="text-align: right; width: 150px;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <strong>{prod_name}</strong><br/>
+              <span style="font-size: 12px; color: #666;">Plan: {plan_name.title()}</span>
+            </td>
+            <td style="text-align: right;">₹{price_per:.2f}</td>
+            <td style="text-align: right;">{total_del}</td>
+            <td style="text-align: right;">₹{subtotal:.2f}</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <div class="summary">
+        <table>
+          <tr>
+            <td>Subtotal</td>
+            <td style="text-align: right;">₹{subtotal:.2f}</td>
+          </tr>
+          <tr>
+            <td>Delivery Charge</td>
+            <td style="text-align: right;">₹{del_charge:.2f}</td>
+          </tr>
+          <tr>
+            <td>Tax Amount</td>
+            <td style="text-align: right;">₹{tax_amt:.2f}</td>
+          </tr>
+          <tr class="total">
+            <td>Total Paid</td>
+            <td style="text-align: right;">₹{total_amt:.2f}</td>
+          </tr>
+        </table>
+      </div>
+      
+      <div class="footer">
+        Thank you for subscribing to Healthy Home Foods! For support, contact support@healthyhomefoods.com
+      </div>
+    </body>
+    </html>
+    """
+    
+    pdf_bytes = weasyprint.HTML(string=html_content).write_pdf()
+    
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={invoice_no}.pdf"},
+    )

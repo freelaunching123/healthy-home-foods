@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 from pydantic import BaseModel
 
@@ -20,6 +20,7 @@ class AddressCreate(BaseModel):
 
 class AddressUpdate(BaseModel):
     label: Optional[str] = None
+    address_type: Optional[str] = None
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
     city: Optional[str] = None
@@ -214,3 +215,12 @@ class CreateDeliveryPartnerRequest(BaseModel):
 class MessageResponse(BaseModel):
     message: str
     success: bool = True
+
+
+class DeliveryHistoryResponse(BaseModel):
+    id: uuid.UUID
+    delivery_date: date
+    product_name: str
+    status: str
+
+    model_config = {"from_attributes": True}

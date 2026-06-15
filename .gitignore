@@ -9,3 +9,5 @@ build/
 .vscode/
 .idea/
 backend/**/__pycache__/
+!.env.example
+!backend/.env.example

@@ -86,10 +86,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Center(
                     child: Column(
                       children: [
-                        const CircleAvatar(
+                        CircleAvatar(
                           radius: 50,
-                          backgroundColor: AppTheme.accentLight,
-                          child: Icon(Icons.person, size: 50, color: Colors.white),
+                          backgroundColor: AppTheme.accentLight.withValues(alpha: 0.3),
+                          backgroundImage: _userProfile?['profile_photo_url'] != null
+                              ? NetworkImage(Uri.parse(_api.dio.options.baseUrl).replace(path: _userProfile!['profile_photo_url']).toString())
+                              : null,
+                          child: _userProfile?['profile_photo_url'] == null
+                              ? const Icon(Icons.person, size: 50, color: AppTheme.primaryGreen)
+                              : null,
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -101,17 +106,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           _userProfile?['phone'] ?? '+91 XXXXXXXXXX',
                           style: const TextStyle(fontSize: 16, color: AppTheme.textSecondary),
                         ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final refresh = await context.push('/profile/edit');
+                            if (refresh == true) {
+                              _loadProfile();
+                            }
+                          },
+                          icon: const Icon(Icons.edit_outlined, size: 16),
+                          label: const Text('Edit Profile'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.primaryGreen,
+                            side: const BorderSide(color: AppTheme.primaryGreen),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                            minimumSize: const Size(0, 36),
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
                   // Actions
                   _ProfileMenuItem(
+                    icon: Icons.card_membership_outlined,
+                    title: 'My Subscription',
+                    onTap: () => context.push('/profile/subscription'),
+                  ),
+                  _ProfileMenuItem(
+                    icon: Icons.history_toggle_off_outlined,
+                    title: 'Delivery History',
+                    onTap: () => context.push('/profile/delivery-history'),
+                  ),
+                  _ProfileMenuItem(
                     icon: Icons.location_on_outlined,
                     title: 'Manage Addresses',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Address management coming soon')));
+                    onTap: () async {
+                      await context.push('/profile/addresses');
+                      _loadProfile();
                     },
                   ),
                   _ProfileMenuItem(

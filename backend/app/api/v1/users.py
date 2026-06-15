@@ -7,9 +7,10 @@ from sqlalchemy import select, func, or_
 from app.db.session import get_db
 from app.core.dependencies import get_current_user, require_super_admin
 from app.models.user import User
-from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserListResponse
-from app.schemas.common import MessageResponse
-from app.core.security import hash_password
+from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserListResponse, ChangePasswordRequest
+from app.schemas.common import MessageResponse, AddressResponse, AddressCreate, AddressUpdate
+from app.core.security import hash_password, verify_password
+from app.models.address import Address
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -32,6 +33,254 @@ async def update_me(
     await db.commit()
     await db.refresh(current_user)
     return current_user
+
+
+@router.get("/profile", response_model=UserResponse)
+async def get_profile(current_user: User = Depends(get_current_user)):
+    """Get current authenticated user profile."""
+    return current_user
+
+
+@router.put("/profile", response_model=UserResponse)
+async def update_profile(
+    payload: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update current user's profile, including profile photo parsing if base64 provided."""
+    # Handle base64 image if provided
+    if payload.photo_base64:
+        try:
+            import base64
+            import os
+            import uuid
+            from app.core.config import settings
+            
+            header, encoded = payload.photo_base64.split(",", 1) if "," in payload.photo_base64 else ("data:image/png;base64", payload.photo_base64)
+            ext = "png"
+            if "jpeg" in header or "jpg" in header:
+                ext = "jpg"
+            img_data = base64.b64decode(encoded)
+            upload_dir = os.path.join(settings.UPLOAD_DIR, "profiles")
+            os.makedirs(upload_dir, exist_ok=True)
+            filename = f"{uuid.uuid4()}.{ext}"
+            filepath = os.path.join(upload_dir, filename)
+            with open(filepath, "wb") as f:
+                f.write(img_data)
+            current_user.profile_photo_url = f"/uploads/profiles/{filename}"
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Invalid photo data")
+
+    # Update other fields
+    update_data = payload.model_dump(exclude_none=True, exclude={"photo_base64"})
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.post("/change-password", response_model=MessageResponse)
+async def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change password. Revokes other active sessions by incrementing token_version."""
+    if not current_user.password_hash or not verify_password(payload.old_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Invalid old password")
+    current_user.password_hash = hash_password(payload.new_password)
+    current_user.token_version += 1
+    await db.commit()
+    return MessageResponse(message="Password changed successfully")
+
+
+@router.post("/logout-all", response_model=MessageResponse)
+async def logout_all_devices(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Increment token_version to force logout from all devices."""
+    current_user.token_version += 1
+    await db.commit()
+    return MessageResponse(message="Logged out from all devices successfully")
+
+
+@router.get("/me/addresses", response_model=list[AddressResponse])
+async def list_my_addresses(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all active addresses of current user."""
+    result = await db.execute(
+        select(Address).where(
+            Address.user_id == current_user.id,
+            Address.is_active == True
+        )
+    )
+    return result.scalars().all()
+
+
+@router.post("/me/addresses", response_model=AddressResponse)
+async def add_address(
+    payload: AddressCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Add a new address. If is_default is true, unset other defaults."""
+    from app.models.address import AddressType
+    
+    # Convert address_type string to enum
+    addr_type = AddressType.HOME
+    try:
+        addr_type = AddressType(payload.address_type.lower())
+    except ValueError:
+        pass
+
+    if payload.is_default:
+        # Unset other default addresses for user
+        await db.execute(
+            Address.__table__.update()
+            .where(Address.user_id == current_user.id)
+            .values(is_default=False)
+        )
+
+    # Create new address
+    address = Address(
+        user_id=current_user.id,
+        label=payload.label,
+        address_type=addr_type,
+        address_line1=payload.address_line1,
+        address_line2=payload.address_line2,
+        city=payload.city,
+        state=payload.state,
+        pincode=payload.pincode,
+        landmark=payload.landmark,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        is_default=payload.is_default,
+    )
+    db.add(address)
+    await db.commit()
+    await db.refresh(address)
+    return address
+
+
+@router.put("/me/addresses/{address_id}", response_model=AddressResponse)
+async def edit_address(
+    address_id: UUID,
+    payload: AddressUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update an address."""
+    result = await db.execute(
+        select(Address).where(
+            Address.id == address_id,
+            Address.user_id == current_user.id,
+            Address.is_active == True
+        )
+    )
+    address = result.scalar_one_or_none()
+    if not address:
+        raise HTTPException(status_code=404, detail="Address not found")
+
+    if payload.is_default:
+        # Unset other default addresses for user
+        await db.execute(
+            Address.__table__.update()
+            .where(Address.user_id == current_user.id)
+            .values(is_default=False)
+        )
+
+    # Extract update fields
+    update_data = payload.model_dump(exclude_none=True)
+    
+    # Handle address_type specially if it is a string in update
+    if "address_type" in update_data:
+        from app.models.address import AddressType
+        try:
+            address.address_type = AddressType(update_data.pop("address_type").lower())
+        except ValueError:
+            pass
+
+    for field, value in update_data.items():
+        setattr(address, field, value)
+
+    await db.commit()
+    await db.refresh(address)
+    return address
+
+
+@router.delete("/me/addresses/{address_id}", response_model=MessageResponse)
+async def delete_address(
+    address_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Soft-delete an address."""
+    result = await db.execute(
+        select(Address).where(
+            Address.id == address_id,
+            Address.user_id == current_user.id,
+            Address.is_active == True
+        )
+    )
+    address = result.scalar_one_or_none()
+    if not address:
+        raise HTTPException(status_code=404, detail="Address not found")
+
+    # Soft delete
+    address.is_active = False
+    
+    # If it was default, set is_default = False
+    if address.is_default:
+        address.is_default = False
+        # Optionally set another active address as default
+        active_result = await db.execute(
+            select(Address).where(
+                Address.user_id == current_user.id,
+                Address.is_active == True,
+                Address.id != address_id
+            ).limit(1)
+        )
+        other = active_result.scalar_one_or_none()
+        if other:
+            other.is_default = True
+
+    await db.commit()
+    return MessageResponse(message="Address deleted successfully")
+
+
+@router.patch("/me/addresses/{address_id}/default", response_model=MessageResponse)
+async def set_default_address(
+    address_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Set an address as default and unset other default addresses."""
+    result = await db.execute(
+        select(Address).where(
+            Address.id == address_id,
+            Address.user_id == current_user.id,
+            Address.is_active == True
+        )
+    )
+    address = result.scalar_one_or_none()
+    if not address:
+        raise HTTPException(status_code=404, detail="Address not found")
+
+    # Unset all other defaults
+    await db.execute(
+        Address.__table__.update()
+        .where(Address.user_id == current_user.id)
+        .values(is_default=False)
+    )
+    
+    address.is_default = True
+    await db.commit()
+    return MessageResponse(message="Address set as default successfully")
 
 
 @router.get("/", response_model=UserListResponse)
@@ -335,6 +584,8 @@ async def get_customer_detail(
         "payments": formatted_payments,
         "deliveries": formatted_deliveries
     }
+
+
 
 
 
