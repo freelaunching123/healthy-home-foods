@@ -197,6 +197,54 @@ async def cancel_subscription(db: AsyncSession, subscription: Subscription) -> S
     return subscription
 
 
+async def skip_delivery(db: AsyncSession, delivery: SubscriptionDelivery) -> SubscriptionDelivery:
+    """Marks a delivery as SKIPPED, deletes any active delivery boy assignment,
+    increments subscription pause days, and schedules a carry-forward delivery."""
+    if delivery.status in [DeliveryStatus.DELIVERED, DeliveryStatus.SKIPPED, DeliveryStatus.MISSED]:
+        raise ValueError(f"Cannot skip delivery in status {delivery.status.value}")
+
+    delivery.status = DeliveryStatus.SKIPPED
+    sub = await db.get(Subscription, delivery.subscription_id)
+    if not sub:
+        raise ValueError("Subscription not found for this delivery")
+
+    # Increment pause days
+    sub.total_paused_days += 1
+
+    # Remove active assignment if exists (using explicit select to avoid greenlet lazy load issues)
+    from app.models.delivery_assignment import DeliveryAssignment
+    assignment_res = await db.execute(
+        select(DeliveryAssignment).where(DeliveryAssignment.delivery_id == delivery.id)
+    )
+    assignment = assignment_res.scalar_one_or_none()
+    if assignment:
+        await db.delete(assignment)
+
+    # Find the latest scheduled delivery date for this subscription
+    result = await db.execute(
+        select(SubscriptionDelivery)
+        .where(SubscriptionDelivery.subscription_id == sub.id)
+        .order_by(SubscriptionDelivery.scheduled_date.desc())
+        .limit(1)
+    )
+    last = result.scalar_one_or_none()
+    carry_date = (last.scheduled_date + timedelta(days=1)) if last else date.today()
+    while carry_date.weekday() == 6:
+        carry_date += timedelta(days=1)
+
+    carry_delivery = SubscriptionDelivery(
+        subscription_id=sub.id,
+        scheduled_date=carry_date,
+        status=DeliveryStatus.CARRY_FORWARD,
+        parent_delivery_id=delivery.id,
+        is_carry_forward=True,
+    )
+    db.add(carry_delivery)
+    await db.flush()
+    logger.info(f"Skipped delivery {delivery.id}. Carry-forward delivery created for sub {sub.id} on {carry_date}")
+    return carry_delivery
+
+
 async def _complete_subscription(db: AsyncSession, subscription: Subscription) -> None:
     subscription.status = SubscriptionStatus.COMPLETED
     subscription.actual_end_date = date.today()

@@ -12,3 +12,4 @@ export const uploadDeliveryProof = (assignmentId, formData) =>
 export const updateGpsLocation = (data) => api.post('/deliveries/gps/update', data);
 export const getGpsLocation = (assignmentId) =>
   api.get(`/deliveries/gps/track/${assignmentId}`);
+export const getDeliveryPartners = () => api.get('/delivery-partners');

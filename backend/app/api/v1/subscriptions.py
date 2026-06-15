@@ -9,7 +9,7 @@ from app.core.dependencies import get_current_user, require_customer, require_su
 from app.models.user import User
 from app.models.customer import Customer
 from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
-from app.models.subscription_delivery import SubscriptionDelivery
+from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
 from app.models.product import Product
 from app.models.admin_settings import AdminSettings
 from app.schemas.subscription import (
@@ -199,3 +199,54 @@ async def get_subscription_deliveries(
     return DeliveryListResponse(
         total=total, page=page, page_size=page_size, items=result.scalars().all()
     )
+
+
+@router.post("/deliveries/{delivery_id}/skip", response_model=MessageResponse)
+async def skip_delivery_endpoint(
+    delivery_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Skip/Pause a specific delivery day (customer or admin requested). Triggers carry-forward extension."""
+    # Check user role
+    from app.models.role import Role, UserRole
+    roles_res = await db.execute(
+        select(Role.name)
+        .join(UserRole, UserRole.role_id == Role.id)
+        .where(UserRole.user_id == current_user.id)
+    )
+    user_roles = [r[0] for r in roles_res.fetchall()]
+    is_admin = "super_admin" in user_roles
+
+    # Fetch the delivery
+    delivery_result = await db.execute(
+        select(SubscriptionDelivery).where(SubscriptionDelivery.id == delivery_id)
+    )
+    delivery = delivery_result.scalar_one_or_none()
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    sub = await db.get(Subscription, delivery.subscription_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    # Verify ownership if not admin
+    if not is_admin:
+        customer = await _get_customer(db, current_user.id)
+        if sub.customer_id != customer.id:
+            raise HTTPException(status_code=403, detail="Not authorized to skip this delivery")
+
+    # Enforce status rules: only pending or assigned deliveries can be skipped
+    if delivery.status not in [DeliveryStatus.PENDING, DeliveryStatus.ASSIGNED]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot skip a delivery that is {delivery.status.value}"
+        )
+
+    try:
+        await subscription_engine.skip_delivery(db, delivery)
+        await db.commit()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return MessageResponse(message="Delivery day skipped and extended successfully")

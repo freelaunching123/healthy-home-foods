@@ -8,3 +8,4 @@ build/
 .dart_tool/
 .vscode/
 .idea/
+backend/**/__pycache__/

@@ -54,7 +54,7 @@ async def assign_delivery(
     _: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Manually assign a delivery to a specific delivery boy."""
+    """Manually assign a delivery to a specific delivery boy. Overwrites existing assignments if they exist."""
     delivery_result = await db.execute(
         select(SubscriptionDelivery).where(SubscriptionDelivery.id == payload.delivery_id)
     )
@@ -69,13 +69,32 @@ async def assign_delivery(
     if not partner:
         raise HTTPException(status_code=404, detail="Delivery partner not found")
 
-    assignment = DeliveryAssignment(
-        delivery_id=delivery.id,
-        delivery_partner_id=partner.id,
-        status=AssignmentStatus.PENDING,
-        assigned_at=datetime.now(timezone.utc),
+    # Check if a delivery assignment already exists for this delivery (to overwrite)
+    assignment_result = await db.execute(
+        select(DeliveryAssignment).where(DeliveryAssignment.delivery_id == delivery.id)
     )
-    db.add(assignment)
+    assignment = assignment_result.scalar_one_or_none()
+
+    if assignment:
+        # Overwrite/reset the existing assignment details
+        assignment.delivery_partner_id = partner.id
+        assignment.status = AssignmentStatus.PENDING
+        assignment.assigned_at = datetime.now(timezone.utc)
+        assignment.accepted_at = None
+        assignment.out_at = None
+        assignment.delivered_at = None
+        assignment.failed_at = None
+        assignment.failure_reason = None
+    else:
+        # Create a new assignment
+        assignment = DeliveryAssignment(
+            delivery_id=delivery.id,
+            delivery_partner_id=partner.id,
+            status=AssignmentStatus.PENDING,
+            assigned_at=datetime.now(timezone.utc),
+        )
+        db.add(assignment)
+
     delivery.status = DeliveryStatus.ASSIGNED
     await db.commit()
     await db.refresh(assignment)

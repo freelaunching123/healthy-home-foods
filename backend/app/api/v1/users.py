@@ -45,6 +45,21 @@ async def list_users(
 ):
     """List all users — Super Admin only. Supports search and pagination."""
     query = select(User)
+    
+    if role == "customer":
+        from app.models.customer import Customer
+        query = query.join(Customer, Customer.user_id == User.id)
+    elif role == "delivery_partner":
+        from app.models.delivery_partner import DeliveryPartner
+        query = query.join(DeliveryPartner, DeliveryPartner.user_id == User.id)
+    elif role:
+        from app.models.role import Role, UserRole
+        query = (
+            query.join(UserRole, UserRole.user_id == User.id)
+            .join(Role, Role.id == UserRole.role_id)
+            .where(Role.name == role)
+        )
+
     if search:
         query = query.where(
             or_(
@@ -175,6 +190,151 @@ async def create_delivery_partner(
     await db.commit()
 
     return MessageResponse(message="Delivery partner created successfully")
+
+
+@router.get("/customers/{user_id}/detail")
+async def get_customer_detail(
+    user_id: UUID,
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get complete profile details of a customer (addresses, subscriptions, payments, deliveries)."""
+    # Fetch user
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Fetch customer
+    from app.models.customer import Customer
+    customer_result = await db.execute(select(Customer).where(Customer.user_id == user_id))
+    customer = customer_result.scalar_one_or_none()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer profile not found for this user")
+
+    # Fetch addresses
+    from app.models.address import Address
+    addresses_result = await db.execute(select(Address).where(Address.user_id == user_id))
+    addresses = addresses_result.scalars().all()
+
+    # Fetch subscriptions
+    from app.models.subscription import Subscription
+    from sqlalchemy.orm import selectinload
+    subscriptions_result = await db.execute(
+        select(Subscription)
+        .where(Subscription.customer_id == customer.id)
+        .options(selectinload(Subscription.plan), selectinload(Subscription.product))
+        .order_by(Subscription.created_at.desc())
+    )
+    subscriptions = subscriptions_result.scalars().all()
+
+    # Fetch payments
+    from app.models.payment import Payment
+    payments_result = await db.execute(
+        select(Payment)
+        .where(Payment.customer_id == customer.id)
+        .order_by(Payment.created_at.desc())
+    )
+    payments = payments_result.scalars().all()
+
+    # Fetch deliveries
+    from app.models.subscription_delivery import SubscriptionDelivery
+    from app.models.delivery_assignment import DeliveryAssignment
+    from app.models.delivery_partner import DeliveryPartner
+    deliveries_result = await db.execute(
+        select(SubscriptionDelivery)
+        .join(Subscription, Subscription.id == SubscriptionDelivery.subscription_id)
+        .where(Subscription.customer_id == customer.id)
+        .options(
+            selectinload(SubscriptionDelivery.assignment)
+            .selectinload(DeliveryAssignment.delivery_partner)
+            .selectinload(DeliveryPartner.user)
+        )
+        .order_by(SubscriptionDelivery.scheduled_date.desc())
+    )
+    deliveries = deliveries_result.scalars().all()
+
+    # Format response
+    formatted_addresses = [{
+        "id": str(addr.id),
+        "label": addr.label,
+        "address_type": addr.address_type.value if hasattr(addr.address_type, "value") else addr.address_type,
+        "address_line1": addr.address_line1,
+        "address_line2": addr.address_line2,
+        "city": addr.city,
+        "state": addr.state,
+        "pincode": addr.pincode,
+        "is_default": addr.is_default
+    } for addr in addresses]
+
+    formatted_subscriptions = [{
+        "id": str(sub.id),
+        "plan_name": sub.plan.name if sub.plan else "—",
+        "product_name": sub.product.name if sub.product else "—",
+        "status": sub.status.value if hasattr(sub.status, "value") else sub.status,
+        "total_deliveries": sub.total_deliveries,
+        "completed_deliveries": sub.completed_deliveries,
+        "missed_deliveries": sub.missed_deliveries,
+        "start_date": sub.start_date.isoformat() if sub.start_date else None,
+        "expected_end_date": sub.expected_end_date.isoformat() if sub.expected_end_date else None,
+        "total_amount": float(sub.total_amount),
+        "paused_at": sub.paused_at.isoformat() if sub.paused_at else None,
+        "pause_reason": sub.pause_reason,
+        "total_paused_days": sub.total_paused_days
+    } for sub in subscriptions]
+
+    formatted_payments = [{
+        "id": str(p.id),
+        "subscription_id": str(p.subscription_id),
+        "amount": float(p.amount),
+        "status": p.status.value if hasattr(p.status, "value") else p.status,
+        "paid_at": p.paid_at.isoformat() if p.paid_at else None,
+        "payment_method": p.payment_method.value if p.payment_method and hasattr(p.payment_method, "value") else (p.payment_method or "—"),
+        "gateway_payment_id": p.gateway_payment_id
+    } for p in payments]
+
+    formatted_deliveries = []
+    for d in deliveries:
+        assigned_partner = None
+        if d.assignment and d.assignment.delivery_partner and d.assignment.delivery_partner.user:
+            partner_user = d.assignment.delivery_partner.user
+            assigned_partner = {
+                "id": str(d.assignment.delivery_partner.id),
+                "full_name": partner_user.full_name,
+                "mobile_number": partner_user.phone
+            }
+
+        formatted_deliveries.append({
+            "id": str(d.id),
+            "subscription_id": str(d.subscription_id),
+            "scheduled_date": d.scheduled_date.isoformat() if d.scheduled_date else None,
+            "status": d.status.value if hasattr(d.status, "value") else d.status,
+            "delivered_at": d.delivered_at.isoformat() if d.delivered_at else None,
+            "delivery_proof_url": d.delivery_proof_url,
+            "customer_rating": d.customer_rating,
+            "customer_feedback": d.customer_feedback,
+            "assigned_partner": assigned_partner
+        })
+
+    return {
+        "user": {
+            "id": str(user.id),
+            "full_name": user.full_name,
+            "phone": user.phone,
+            "email": user.email,
+            "status": user.status.value if hasattr(user.status, "value") else user.status,
+            "created_at": user.created_at.isoformat() if user.created_at else None
+        },
+        "customer": {
+            "id": str(customer.id),
+            "customer_code": customer.customer_code,
+            "is_active": customer.is_active
+        },
+        "addresses": formatted_addresses,
+        "subscriptions": formatted_subscriptions,
+        "payments": formatted_payments,
+        "deliveries": formatted_deliveries
+    }
 
 
 

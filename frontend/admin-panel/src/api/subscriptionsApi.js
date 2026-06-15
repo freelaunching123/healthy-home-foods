@@ -10,3 +10,4 @@ export const cancelSubscription = (id, reason) =>
 export const getSubscriptionDeliveries = (id) =>
   api.get(`/subscriptions/${id}/deliveries`);
 export const getSubscriptionPlans = () => api.get('/subscriptions/plans');
+export const skipDelivery = (deliveryId) => api.post(`/subscriptions/deliveries/${deliveryId}/skip`);
