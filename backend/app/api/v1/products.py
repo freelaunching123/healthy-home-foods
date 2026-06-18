@@ -65,6 +65,30 @@ async def update_category(
     return cat
 
 
+@router.delete("/categories/{cat_id}", response_model=MessageResponse)
+async def delete_category(
+    cat_id: UUID,
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(ProductCategory).where(ProductCategory.id == cat_id))
+    cat = result.scalar_one_or_none()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    # Check if any products exist under this category
+    product_check = await db.execute(select(func.count(Product.id)).where(Product.category_id == cat_id))
+    if product_check.scalar_one() > 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete category because it contains products. Please delete or move the products first."
+        )
+        
+    await db.delete(cat)
+    await db.commit()
+    return MessageResponse(message="Category deleted successfully")
+
+
 # ── Products ──────────────────────────────────────────────────────────────────
 
 @router.get("/", response_model=ProductListResponse)

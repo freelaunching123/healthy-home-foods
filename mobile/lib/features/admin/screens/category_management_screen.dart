@@ -117,6 +117,54 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
   }
 
+  Future<void> _confirmDeleteCategory(Map<String, dynamic> category) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Category'),
+        content: Text('Are you sure you want to delete "${category['name']}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _isLoading = true);
+      try {
+        await _api.delete('${ApiConstants.categories}/${category['id']}');
+        _loadCategories();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Category deleted successfully')),
+          );
+        }
+      } catch (e) {
+        _loadCategories(); // refresh anyway to be safe
+        if (mounted) {
+          String errMsg = 'Error deleting category: $e';
+          try {
+            final dioErr = e as dynamic;
+            if (dioErr.response?.data != null && dioErr.response.data['detail'] != null) {
+              errMsg = dioErr.response.data['detail'];
+            }
+          } catch (_) {}
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errMsg), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -156,6 +204,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                         IconButton(
                           icon: const Icon(Icons.edit, color: AppTheme.primaryGreen),
                           onPressed: () => _showCategoryForm(cat),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          onPressed: () => _confirmDeleteCategory(cat),
                         ),
                       ],
                     ),
