@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -163,7 +164,14 @@ class _MySubscriptionDetailScreenState extends State<MySubscriptionDetailScreen>
                       children: [
                         // Subscription Main Card
                         _buildMainSubscriptionCard(),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
+
+                        // Today's Delivery Card
+                        if (_subscription?['today_delivery'] != null)
+                          _buildTodayDeliveryCard(_subscription!['today_delivery']),
+
+                        if (_subscription?['today_delivery'] != null)
+                          const SizedBox(height: 16),
 
                         // Stats Grid
                         const Text(
@@ -192,6 +200,12 @@ class _MySubscriptionDetailScreenState extends State<MySubscriptionDetailScreen>
     final startDateStr = _subscription?['start_date'] != null
         ? DateFormat('MMMM dd, yyyy').format(DateTime.parse(_subscription!['start_date']))
         : 'TBD';
+    final endDateStr = _subscription?['expected_end_date'] != null
+        ? DateFormat('MMMM dd, yyyy').format(DateTime.parse(_subscription!['expected_end_date']))
+        : null;
+    final nextDeliveryStr = _subscription?['next_delivery_date'] != null
+        ? DateFormat('EEE, MMM dd').format(DateTime.parse(_subscription!['next_delivery_date']))
+        : null;
 
     return Card(
       elevation: 2,
@@ -231,14 +245,48 @@ class _MySubscriptionDetailScreenState extends State<MySubscriptionDetailScreen>
             const Divider(height: 24, thickness: 1),
             Row(
               children: [
-                const Icon(Icons.calendar_today_outlined, size: 18, color: AppTheme.textSecondary),
+                const Icon(Icons.play_circle_outline, size: 18, color: AppTheme.textSecondary),
                 const SizedBox(width: 8),
                 Text(
-                  'Started on: $startDateStr',
+                  'Started: $startDateStr',
                   style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
                 ),
               ],
             ),
+            if (endDateStr != null) ...[  
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.stop_circle_outlined, size: 18, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Ends: $endDateStr',
+                    style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+            ],
+            if (nextDeliveryStr != null) ...[  
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_available, size: 16, color: AppTheme.primaryGreen),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Next Delivery: $nextDeliveryStr',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [
@@ -250,6 +298,122 @@ class _MySubscriptionDetailScreenState extends State<MySubscriptionDetailScreen>
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayDeliveryCard(Map<String, dynamic> delivery) {
+    final deliveryStatus = (delivery['status'] ?? 'pending').toString();
+    final partnerName = delivery['partner_name'] as String?;
+    final partnerPhone = delivery['partner_phone'] as String?;
+    final eta = delivery['estimated_minutes'] as int?;
+    final deliveryId = delivery['delivery_id'] as String?;
+
+    Color statusColor;
+    switch (deliveryStatus) {
+      case 'out_for_delivery': statusColor = AppTheme.outForDelivery; break;
+      case 'delivered': statusColor = AppTheme.success; break;
+      case 'assigned': statusColor = AppTheme.warning; break;
+      default: statusColor = AppTheme.textSecondary;
+    }
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: statusColor.withValues(alpha: 0.3), width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.delivery_dining, color: AppTheme.primaryGreen),
+                const SizedBox(width: 8),
+                const Text("Today's Delivery", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    deliveryStatus.replaceAll('_', ' ').toUpperCase(),
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+                  ),
+                ),
+              ],
+            ),
+            if (partnerName != null) ...[  
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Color(0xFFE8F5E9),
+                    child: Icon(Icons.person, color: AppTheme.primaryGreen, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(partnerName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        if (partnerPhone != null)
+                          Text(partnerPhone, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  if (partnerPhone != null)
+                    IconButton(
+                      icon: const Icon(Icons.phone_rounded, color: AppTheme.primaryGreen),
+                      onPressed: () => launchUrl(Uri.parse('tel:$partnerPhone')),
+                    ),
+                ],
+              ),
+            ],
+            if (eta != null) ...[  
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.timer_outlined, size: 16, color: AppTheme.textSecondary),
+                  const SizedBox(width: 6),
+                  Text('ETA: ~$eta minutes', style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                ],
+              ),
+            ],
+            if (deliveryId != null && deliveryStatus == 'out_for_delivery') ...[  
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => context.push('/tracking/$deliveryId'),
+                  icon: const Icon(Icons.location_on, size: 18),
+                  label: const Text('Live Track Delivery'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryGreen,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 42),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 12),
+              const Center(
+                child: Text(
+                  'No active delivery tracking available.',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, fontStyle: FontStyle.italic),
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -29,6 +29,8 @@ import '../../features/customer/screens/address_management_screen.dart';
 import '../../features/admin/screens/admin_shell.dart';
 import '../../features/admin/screens/admin_dashboard_screen.dart';
 import '../../features/admin/screens/product_management_screen.dart';
+import '../../features/admin/screens/category_management_screen.dart';
+import '../../features/admin/screens/product_analytics_screen.dart';
 import '../../features/admin/screens/add_product_screen.dart';
 import '../../features/admin/screens/customer_management_screen.dart';
 import '../../features/admin/screens/subscription_management_screen.dart';
@@ -145,6 +147,8 @@ final GoRouter appRouter = GoRouter(
       path: '/admin/products/edit/:id',
       builder: (_, state) => AddProductScreen(productId: state.pathParameters['id']),
     ),
+    GoRoute(path: '/admin/categories', builder: (_, __) => const CategoryManagementScreen()),
+    GoRoute(path: '/admin/products/analytics', builder: (_, __) => const ProductAnalyticsScreen()),
     GoRoute(path: '/admin/customers', builder: (_, __) => const CustomerManagementScreen()),
     GoRoute(path: '/admin/subscriptions', builder: (_, __) => const SubscriptionManagementScreen()),
     GoRoute(path: '/admin/delivery-partners', builder: (_, __) => const DeliveryPartnerManagementScreen()),

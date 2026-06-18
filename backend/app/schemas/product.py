@@ -1,6 +1,7 @@
 import uuid
 from typing import Optional
 from pydantic import BaseModel
+from app.models.product import ProductStatus, ProductAvailability
 
 
 class ProductCategoryCreate(BaseModel):
@@ -30,23 +31,28 @@ class ProductCreate(BaseModel):
     name: str
     slug: str
     description: Optional[str] = None
-    short_description: Optional[str] = None
-    unit: str
-    unit_size: Optional[float] = None
-    price_per_unit: float
-    mrp: Optional[float] = None
-    sort_order: int = 0
+    price: float
+    discount_price: Optional[float] = None
+    status: ProductStatus = ProductStatus.DRAFT
+    availability: ProductAvailability = ProductAvailability.AVAILABLE
+    display_order: int = 0
+    is_featured: bool = False
+    is_popular: bool = False
+    is_today_special: bool = False
 
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    short_description: Optional[str] = None
-    price_per_unit: Optional[float] = None
-    mrp: Optional[float] = None
-    is_available: Optional[bool] = None
+    price: Optional[float] = None
+    discount_price: Optional[float] = None
+    status: Optional[ProductStatus] = None
+    availability: Optional[ProductAvailability] = None
+    display_order: Optional[int] = None
+    is_featured: Optional[bool] = None
+    is_popular: Optional[bool] = None
+    is_today_special: Optional[bool] = None
     is_active: Optional[bool] = None
-    sort_order: Optional[int] = None
     image_url: Optional[str] = None
 
 
@@ -56,15 +62,16 @@ class ProductResponse(BaseModel):
     name: str
     slug: str
     description: Optional[str]
-    short_description: Optional[str]
     image_url: Optional[str]
-    unit: str
-    unit_size: Optional[float]
-    price_per_unit: float
-    mrp: Optional[float]
-    is_available: bool
+    price: float
+    discount_price: Optional[float]
+    status: ProductStatus
+    availability: ProductAvailability
+    display_order: int
+    is_featured: bool
+    is_popular: bool
+    is_today_special: bool
     is_active: bool
-    sort_order: int
 
     model_config = {"from_attributes": True}
 

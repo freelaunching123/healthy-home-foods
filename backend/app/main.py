@@ -16,7 +16,7 @@ import os
 
 from app.core.config import settings
 import app.db.models_import  # noqa: F401 — registers ALL models so SQLAlchemy can resolve relationships
-from app.api.v1 import auth, users, products, subscriptions, deliveries, payments, admin_settings, reports, delivery_partners
+from app.api.v1 import auth, users, products, subscriptions, deliveries, payments, admin_settings, reports, delivery_partners, notifications
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -120,6 +120,7 @@ app.include_router(payments.router,        prefix=PREFIX)
 app.include_router(admin_settings.router,  prefix=PREFIX)
 app.include_router(reports.router,         prefix=PREFIX)
 app.include_router(delivery_partners.router, prefix=PREFIX)
+app.include_router(notifications.router,    prefix=PREFIX)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

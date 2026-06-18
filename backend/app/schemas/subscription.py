@@ -79,11 +79,20 @@ class DeliveryListResponse(BaseModel):
     items: list[DeliveryResponse]
 
 
+class TodayDeliveryInfo(BaseModel):
+    delivery_id: Optional[str] = None
+    status: Optional[str] = None
+    partner_name: Optional[str] = None
+    partner_phone: Optional[str] = None
+    estimated_minutes: Optional[int] = None
+
+
 class CurrentSubscriptionResponse(BaseModel):
     id: uuid.UUID
     plan_name: str
     plan_type: str
     start_date: Optional[date] = None
+    expected_end_date: Optional[date] = None
     status: str
     total_deliveries: int
     completed_deliveries: int
@@ -94,5 +103,8 @@ class CurrentSubscriptionResponse(BaseModel):
     product_name: str
     price_per_delivery: float
     total_amount: float
+    next_delivery_date: Optional[date] = None
+    today_delivery: Optional[TodayDeliveryInfo] = None
 
     model_config = {"from_attributes": True}
+

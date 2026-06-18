@@ -39,3 +39,33 @@ class NotificationService:
         """Mock OTP SMS"""
         message = f"Your Healthy Home Foods verification code is {otp}. Do not share this with anyone."
         return await NotificationService.send_sms(phone_number, message)
+
+    @staticmethod
+    async def create_in_app_notification(
+        db,
+        user_id,
+        title: str,
+        body: str,
+        category: str = "system",
+        action_type: str = "system",
+        reference_id: str = None,
+    ):
+        """Create an in-app notification for a user."""
+        from app.models.notification import Notification
+        
+        new_notification = Notification(
+            user_id=user_id,
+            title=title,
+            body=body,
+            channel="in_app",
+            status="sent",
+            category=category,
+            action_type=action_type,
+            reference_id=reference_id,
+            is_read=False,
+            is_deleted=False,
+        )
+        db.add(new_notification)
+        await db.commit()
+        return new_notification
+

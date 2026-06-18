@@ -119,18 +119,18 @@ async def seed_data():
             if not p:
                 cat = cat_map.get(p_data["category"])
                 if cat:
-                    # In this DB schema, we don't have separate weekly/monthly pricing on the Product table itself,
-                    # we have `price_per_unit`. For simplicity, we can calculate base price from the monthly plan
+                    # we have `price`. For simplicity, we can calculate base price from the monthly plan
                     # e.g., price = monthly / 26
                     base_price = round(p_data["monthly"] / 26, 2)
+                    from app.models.product import ProductStatus, ProductAvailability
                     product = Product(
                         category_id=cat.id,
                         name=p_data["name"],
                         slug=slugify(p_data["name"]),
                         description=f"Delicious {p_data['name']}",
-                        price_per_unit=base_price,
-                        unit="pack",
-                        is_available=True
+                        price=base_price,
+                        status=ProductStatus.PUBLISHED,
+                        availability=ProductAvailability.AVAILABLE
                     )
                     db.add(product)
                     logger.info(f"Seeded product: {p_data['name']}")

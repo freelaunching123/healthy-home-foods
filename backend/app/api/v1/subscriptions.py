@@ -15,10 +15,11 @@ from app.models.admin_settings import AdminSettings
 from app.schemas.subscription import (
     SubscriptionCreate, SubscriptionPauseRequest, SubscriptionCancelRequest,
     SubscriptionResponse, SubscriptionPlanResponse, DeliveryResponse, DeliveryListResponse,
-    CurrentSubscriptionResponse,
+    CurrentSubscriptionResponse, TodayDeliveryInfo,
 )
 from app.schemas.common import MessageResponse
 from app.services import subscription_engine
+from app.services.notification_service import NotificationService
 import math
 
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
@@ -80,7 +81,7 @@ async def create_subscription(
     tax_amount = 0.0
     if settings:
         tax_rate = float(settings.tax_percentage) / 100
-        subtotal = float(product.price_per_unit) * plan.total_deliveries
+        subtotal = float(product.price) * plan.total_deliveries
         tax_amount = round(subtotal * tax_rate, 2)
 
     sub = await subscription_engine.create_subscription(
@@ -89,7 +90,7 @@ async def create_subscription(
         plan=plan,
         product_id=payload.product_id,
         address_id=payload.address_id,
-        price_per_delivery=float(product.price_per_unit),
+        price_per_delivery=float(product.price),
         delivery_charge=delivery_charge,
         tax_amount=tax_amount,
         preferred_delivery_time=payload.preferred_delivery_time,
@@ -122,7 +123,7 @@ async def get_current_subscription(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get the customer's current active/paused (or latest) subscription with details."""
+    """Get the customer's current active/paused (or latest) subscription with all details."""
     customer = await _get_customer(db, current_user.id)
     
     # Fetch subscriptions sorted by status and date
@@ -144,7 +145,7 @@ async def get_current_subscription(
     if not sub:
         sub = subs[0]
         
-    # Load relationships to prevent greenlet/lazy load error
+    # Load relationships
     from sqlalchemy.orm import selectinload
     res = await db.execute(
         select(Subscription)
@@ -162,11 +163,72 @@ async def get_current_subscription(
         )
     )
 
+    # Get next pending delivery date
+    today = date.today()
+    next_delivery_result = await db.execute(
+        select(SubscriptionDelivery.scheduled_date)
+        .where(
+            SubscriptionDelivery.subscription_id == sub.id,
+            SubscriptionDelivery.status == DeliveryStatus.PENDING,
+            SubscriptionDelivery.scheduled_date >= today,
+        )
+        .order_by(SubscriptionDelivery.scheduled_date.asc())
+        .limit(1)
+    )
+    next_delivery_date = next_delivery_result.scalar_one_or_none()
+
+    # Get today's delivery info (if any delivery is scheduled today)
+    today_delivery_info = None
+    today_delivery_result = await db.execute(
+        select(SubscriptionDelivery)
+        .where(
+            SubscriptionDelivery.subscription_id == sub.id,
+            SubscriptionDelivery.scheduled_date == today,
+        )
+        .limit(1)
+    )
+    today_delivery = today_delivery_result.scalar_one_or_none()
+    if today_delivery:
+        partner_name = None
+        partner_phone = None
+        estimated_minutes = None
+        # Try to load assignment + delivery partner
+        from app.models.delivery_assignment import DeliveryAssignment
+        from app.models.delivery_partner import DeliveryPartner
+        from app.models.user import User as UserModel
+        assignment_result = await db.execute(
+            select(DeliveryAssignment)
+            .where(DeliveryAssignment.delivery_id == today_delivery.id)
+        )
+        assignment = assignment_result.scalar_one_or_none()
+        if assignment:
+            estimated_minutes = assignment.estimated_minutes
+            dp_result = await db.execute(
+                select(DeliveryPartner).where(DeliveryPartner.id == assignment.delivery_partner_id)
+            )
+            dp = dp_result.scalar_one_or_none()
+            if dp:
+                dp_user_result = await db.execute(
+                    select(UserModel).where(UserModel.id == dp.user_id)
+                )
+                dp_user = dp_user_result.scalar_one_or_none()
+                partner_name = dp_user.full_name if dp_user else None
+                partner_phone = dp_user.phone if dp_user else None
+
+        today_delivery_info = TodayDeliveryInfo(
+            delivery_id=str(today_delivery.id),
+            status=today_delivery.status.value if hasattr(today_delivery.status, "value") else str(today_delivery.status),
+            partner_name=partner_name,
+            partner_phone=partner_phone,
+            estimated_minutes=estimated_minutes,
+        )
+
     return CurrentSubscriptionResponse(
         id=sub.id,
         plan_name=sub.plan.name if sub.plan else "—",
         plan_type=sub.plan.plan_type.value if sub.plan and hasattr(sub.plan.plan_type, "value") else (sub.plan.plan_type if sub.plan else "—"),
         start_date=sub.start_date,
+        expected_end_date=sub.expected_end_date,
         status=sub.status.value if hasattr(sub.status, "value") else sub.status,
         total_deliveries=sub.total_deliveries,
         completed_deliveries=sub.completed_deliveries,
@@ -177,6 +239,8 @@ async def get_current_subscription(
         product_name=sub.product.name if sub.product else "—",
         price_per_delivery=float(sub.price_per_delivery),
         total_amount=float(sub.total_amount),
+        next_delivery_date=next_delivery_date,
+        today_delivery=today_delivery_info,
     )
 
 
@@ -203,6 +267,18 @@ async def pause_subscription(
         await subscription_engine.pause_subscription(db, sub, payload.reason)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+    # Send Notification
+    await NotificationService.create_in_app_notification(
+        db=db,
+        user_id=customer.user_id,
+        title="Subscription Paused",
+        body=f"Your subscription has been paused. Reason: {payload.reason}",
+        category="subscription",
+        action_type="subscription",
+        reference_id=str(sub.id)
+    )
+    
     await db.commit()
     return MessageResponse(message="Subscription paused successfully")
 
@@ -219,6 +295,18 @@ async def resume_subscription(
         await subscription_engine.resume_subscription(db, sub)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+        
+    # Send Notification
+    await NotificationService.create_in_app_notification(
+        db=db,
+        user_id=customer.user_id,
+        title="Subscription Resumed",
+        body="Your subscription has been resumed and deliveries will continue.",
+        category="subscription",
+        action_type="subscription",
+        reference_id=str(sub.id)
+    )
+    
     await db.commit()
     return MessageResponse(message="Subscription resumed successfully")
 

@@ -1,10 +1,23 @@
 import uuid
+import enum
 from typing import Optional, List
-from sqlalchemy import String, Boolean, ForeignKey, Numeric, Text, Integer
+from sqlalchemy import String, Boolean, ForeignKey, Numeric, Text, Integer, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from app.db.base import Base
 from app.db.mixins import UUIDPrimaryKeyMixin, TimestampMixin
+
+
+class ProductStatus(str, enum.Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    HIDDEN = "hidden"
+
+
+class ProductAvailability(str, enum.Enum):
+    AVAILABLE = "available"
+    OUT_OF_STOCK = "out_of_stock"
+    TEMPORARILY_UNAVAILABLE = "temporarily_unavailable"
 
 
 class ProductCategory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -39,19 +52,28 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(300), unique=True, nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    short_description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    unit: Mapped[str] = mapped_column(String(50), nullable=False)  # e.g. "litre", "kg", "pcs"
-    unit_size: Mapped[Optional[float]] = mapped_column(Numeric(10, 3), nullable=True)  # e.g. 0.5
-    price_per_unit: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
-    mrp: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
-    is_available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    discount_price: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    
+    status: Mapped[ProductStatus] = mapped_column(
+        SAEnum(ProductStatus, name="product_status_enum", values_callable=lambda x: [e.value for e in x]),
+        default=ProductStatus.DRAFT, nullable=False, index=True
+    )
+    availability: Mapped[ProductAvailability] = mapped_column(
+        SAEnum(ProductAvailability, name="product_availability_enum", values_callable=lambda x: [e.value for e in x]),
+        default=ProductAvailability.AVAILABLE, nullable=False
+    )
+    display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_popular: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_today_special: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Relationships
     category: Mapped["ProductCategory"] = relationship("ProductCategory", back_populates="products")
     subscriptions: Mapped[List["Subscription"]] = relationship("Subscription", back_populates="product")
 
     def __repr__(self) -> str:
-        return f"<Product name={self.name} price={self.price_per_unit}>"
+        return f"<Product name={self.name} price={self.price}>"

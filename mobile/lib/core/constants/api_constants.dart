@@ -57,4 +57,9 @@ class ApiConstants {
 
   // Notifications
   static const String notifications = '/notifications';
+  static const String notificationsUnreadCount = '/notifications/unread-count';
+  static const String notificationsReadAll = '/notifications/read-all';
+
+  // Payment Summary
+  static const String paymentSummary = '/payments/summary';
 }

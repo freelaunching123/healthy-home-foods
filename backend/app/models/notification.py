@@ -12,6 +12,7 @@ class NotificationChannel(str, enum.Enum):
     SMS = "sms"
     EMAIL = "email"
     PUSH = "push"
+    IN_APP = "in_app"
 
 
 class NotificationStatus(str, enum.Enum):
@@ -20,8 +21,16 @@ class NotificationStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class NotificationCategory(str, enum.Enum):
+    DELIVERY = "delivery"
+    SUBSCRIPTION = "subscription"
+    PAYMENT = "payment"
+    PROMO = "promo"
+    SYSTEM = "system"
+
+
 class Notification(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Notification log for all outbound messages."""
+    """Notification log for all outbound + in-app messages."""
 
     __tablename__ = "notifications"
 
@@ -41,5 +50,14 @@ class Notification(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string
+
+    # In-app notification fields
+    category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True, server_default=None)
+    # action_type drives navigation on the client (delivery, subscription, payment, promo, system)
+    action_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, server_default=None)
+    # reference_id is the UUID of the related entity (delivery_id, payment_id, subscription_id)
+    reference_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, server_default=None)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
 
     user: Mapped["User"] = relationship("User", back_populates="notifications")

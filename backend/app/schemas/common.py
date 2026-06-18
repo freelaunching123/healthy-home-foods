@@ -73,8 +73,21 @@ class PaymentResponse(BaseModel):
     status: str
     payment_method: Optional[str]
     paid_at: Optional[datetime]
+    # Enriched fields from subscription
+    subscription_name: Optional[str] = None  # "{product_name} ({plan_name})"
+    gst_amount: Optional[float] = None
+    delivery_charge: Optional[float] = None
+    total_amount: Optional[float] = None     # amount (base) + tax + delivery
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class PaymentSummaryResponse(BaseModel):
+    total_transactions: int
+    total_amount_spent: float
+    last_payment_date: Optional[datetime]
+    active_subscription_cost: Optional[float]
 
 
 # ── GPS schemas ────────────────────────────────────────────────────────────────

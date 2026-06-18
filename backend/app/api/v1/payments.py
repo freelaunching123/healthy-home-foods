@@ -13,8 +13,9 @@ from app.models.customer import Customer
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.payment import Payment, PaymentStatus, PaymentMethod
 from app.models.invoice import Invoice
-from app.schemas.common import PaymentInitiateRequest, PaymentVerifyRequest, PaymentResponse, MessageResponse
+from app.schemas.common import PaymentInitiateRequest, PaymentVerifyRequest, PaymentResponse, PaymentSummaryResponse, MessageResponse
 from app.services import subscription_engine
+from app.services.notification_service import NotificationService
 from app.core.config import settings
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
@@ -140,6 +141,28 @@ async def verify_payment(
         total_amount=float(sub.total_amount),
     )
     db.add(invoice)
+    
+    # Send Notifications
+    await NotificationService.create_in_app_notification(
+        db=db,
+        user_id=current_user.id,
+        title="Payment Successful",
+        body=f"Your payment of ₹{payment.amount} was successful.",
+        category="payment",
+        action_type="payment",
+        reference_id=str(payment.id)
+    )
+    
+    await NotificationService.create_in_app_notification(
+        db=db,
+        user_id=current_user.id,
+        title="Subscription Activated",
+        body="Your meal plan subscription has been activated! Your deliveries will begin as scheduled.",
+        category="subscription",
+        action_type="subscription",
+        reference_id=str(sub.id)
+    )
+    
     await db.commit()
 
     return MessageResponse(message="Payment verified and subscription activated")
@@ -181,13 +204,102 @@ async def razorpay_webhook(request: Request, db: AsyncSession = Depends(get_db))
 async def payment_history(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    status: str = None,
 ):
+    """Return enriched payment history for the current customer."""
+    from sqlalchemy.orm import selectinload
+    from app.models.product import Product
+    from app.models.subscription import SubscriptionPlan
     customer = await _get_customer(db, current_user.id)
-    result = await db.execute(
-        select(Payment).where(Payment.customer_id == customer.id)
+    
+    query = (
+        select(Payment)
+        .where(Payment.customer_id == customer.id)
+        .options(
+            selectinload(Payment.subscription).selectinload(Subscription.product),
+            selectinload(Payment.subscription).selectinload(Subscription.plan),
+        )
         .order_by(Payment.created_at.desc())
     )
-    return result.scalars().all()
+    if status:
+        query = query.where(Payment.status == status)
+    
+    result = await db.execute(query)
+    payments = result.scalars().all()
+    
+    enriched = []
+    for pmt in payments:
+        sub = pmt.subscription
+        product_name = sub.product.name if sub and sub.product else None
+        plan_name = sub.plan.name if sub and sub.plan else None
+        subscription_name = None
+        if product_name and plan_name:
+            subscription_name = f"{product_name} ({plan_name})"
+        elif product_name:
+            subscription_name = product_name
+
+        gst_amount = float(sub.tax_amount) if sub and sub.tax_amount is not None else 0.0
+        delivery_charge = float(sub.delivery_charge) if sub and sub.delivery_charge is not None else 0.0
+        total_amount = float(pmt.amount)
+
+        enriched.append(PaymentResponse(
+            id=pmt.id,
+            subscription_id=pmt.subscription_id,
+            gateway_order_id=pmt.gateway_order_id,
+            gateway_payment_id=pmt.gateway_payment_id,
+            amount=float(pmt.amount),
+            currency=pmt.currency,
+            status=pmt.status.value if hasattr(pmt.status, "value") else str(pmt.status),
+            payment_method=pmt.payment_method.value if pmt.payment_method and hasattr(pmt.payment_method, "value") else pmt.payment_method,
+            paid_at=pmt.paid_at,
+            created_at=pmt.created_at,
+            subscription_name=subscription_name,
+            gst_amount=gst_amount,
+            delivery_charge=delivery_charge,
+            total_amount=total_amount,
+        ))
+    return enriched
+
+
+@router.get("/summary", response_model=PaymentSummaryResponse)
+async def payment_summary(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return payment summary stats for the current customer."""
+    from sqlalchemy import func as sqlfunc
+    customer = await _get_customer(db, current_user.id)
+
+    total_result = await db.execute(
+        select(
+            sqlfunc.count(Payment.id).label("total"),
+            sqlfunc.coalesce(sqlfunc.sum(Payment.amount), 0).label("total_amount"),
+            sqlfunc.max(Payment.paid_at).label("last_paid"),
+        ).where(
+            Payment.customer_id == customer.id,
+            Payment.status == PaymentStatus.SUCCESS,
+        )
+    )
+    row = total_result.one()
+
+    # Active subscription cost
+    active_sub_result = await db.execute(
+        select(Subscription.total_amount)
+        .where(
+            Subscription.customer_id == customer.id,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+        .order_by(Subscription.created_at.desc())
+        .limit(1)
+    )
+    active_cost = active_sub_result.scalar_one_or_none()
+
+    return PaymentSummaryResponse(
+        total_transactions=row.total or 0,
+        total_amount_spent=float(row.total_amount or 0),
+        last_payment_date=row.last_paid,
+        active_subscription_cost=float(active_cost) if active_cost else None,
+    )
 
 
 @router.get("/{payment_id}/invoice")
