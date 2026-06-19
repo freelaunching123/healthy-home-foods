@@ -7,8 +7,8 @@ from app.models.admin import Admin  # noqa
 from app.models.delivery_partner import DeliveryPartner  # noqa
 from app.models.address import Address  # noqa
 from app.models.product import Product, ProductCategory  # noqa
-from app.models.subscription import SubscriptionPlan, Subscription  # noqa
-from app.models.subscription_delivery import SubscriptionDelivery  # noqa
+from app.models.subscription import SubscriptionPlan, Subscription, SubscriptionItem, SubscriptionPauseHistory, SubscriptionStatusHistory, SubscriptionPaymentHistory  # noqa
+from app.models.subscription_delivery import SubscriptionDelivery, SubscriptionDeliveryHistory  # noqa
 from app.models.delivery_assignment import DeliveryAssignment  # noqa
 from app.models.payment import Payment  # noqa
 from app.models.invoice import Invoice  # noqa

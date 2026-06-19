@@ -109,8 +109,8 @@ const Dashboard = () => {
       <div className="stats-grid">
         <StatCard title="Daily Revenue" value={`₹${(stats?.daily_revenue || 0).toLocaleString('en-IN')}`} icon={IndianRupee} color="primary" subtitle={`Monthly: ₹${(stats?.monthly_revenue || 0).toLocaleString('en-IN')}`} />
         <StatCard title="Active Subscriptions" value={stats?.active_subscriptions || 0} icon={Users} color="info" subtitle={`Total customers: ${stats?.total_customers || 0}`} />
-        <StatCard title="Today's Deliveries" value={stats?.today_deliveries || 0} icon={CheckCircle} color="success" subtitle={`Completed: ${stats?.completed_deliveries || 0}`} />
-        <StatCard title="Pending Deliveries" value={stats?.pending_deliveries || 0} icon={AlertCircle} color="warning" subtitle={`Success rate: ${stats?.delivery_success_rate || 0}%`} />
+        <StatCard title="Today's Pending Deliveries" value={stats?.pending_deliveries || 0} icon={Clock} color="warning" subtitle={`Missed today: ${stats?.missed_deliveries_today || 0}`} />
+        <StatCard title="Delivery Success Rate" value={stats?.delivery_success_rate !== undefined ? `${stats.delivery_success_rate}%` : '0%'} icon={CheckCircle} color="success" subtitle="Last 30 days performance" />
       </div>
 
       <div className="charts-grid">

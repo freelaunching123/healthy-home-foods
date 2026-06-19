@@ -16,10 +16,14 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
-from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionPlan
-from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
+from app.models.subscription import (
+    Subscription, SubscriptionStatus, SubscriptionPlan, SubscriptionItem,
+    SubscriptionStatusHistory, SubscriptionPauseHistory, SubscriptionPaymentHistory
+)
+from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus, SubscriptionDeliveryHistory
 from app.models.customer import Customer
 from app.models.admin_settings import AdminSettings
+from app.models.payment import Payment
 
 logger = logging.getLogger(__name__)
 
@@ -33,22 +37,28 @@ async def create_subscription(
     db: AsyncSession,
     customer: Customer,
     plan: SubscriptionPlan,
-    product_id: UUID,
+    items_data: list,  # list of {"product": Product, "quantity": int}
     address_id: UUID,
-    price_per_delivery: float,
     delivery_charge: float,
     tax_amount: float,
     preferred_delivery_time: str | None = None,
     auto_renew: bool = False,
     notes: str | None = None,
 ) -> Subscription:
-    """Creates a subscription record. Status remains pending_payment until payment confirmed."""
+    """Creates a subscription record with multiple items. Status remains pending_payment."""
+    price_per_delivery = 0.0
+    for item in items_data:
+        prod = item["product"]
+        qty = item["quantity"]
+        price_per_delivery += float(prod.price) * qty
+
     total_amount = (price_per_delivery * plan.total_deliveries) + delivery_charge + tax_amount
+    first_prod_id = items_data[0]["product"].id if items_data else None
 
     sub = Subscription(
         customer_id=customer.id,
         plan_id=plan.id,
-        product_id=product_id,
+        product_id=first_prod_id,
         address_id=address_id,
         status=SubscriptionStatus.PENDING_PAYMENT,
         total_deliveries=plan.total_deliveries,
@@ -62,13 +72,60 @@ async def create_subscription(
     )
     db.add(sub)
     await db.flush()
+
+    # Save individual items
+    for item in items_data:
+        prod = item["product"]
+        qty = item["quantity"]
+        sub_item = SubscriptionItem(
+            subscription_id=sub.id,
+            product_id=prod.id,
+            quantity=qty,
+            price_per_delivery=float(prod.price),
+        )
+        db.add(sub_item)
+
+    # Status history audit log
+    history = SubscriptionStatusHistory(
+        subscription_id=sub.id,
+        old_status="",
+        new_status=SubscriptionStatus.PENDING_PAYMENT.value,
+        reason="Subscription created",
+    )
+    db.add(history)
+    await db.flush()
     return sub
 
 
 async def activate_subscription(db: AsyncSession, subscription: Subscription) -> Subscription:
     """Activates subscription after payment success and generates first delivery."""
+    old_status = subscription.status.value if hasattr(subscription.status, "value") else str(subscription.status)
     subscription.status = SubscriptionStatus.ACTIVE
     subscription.start_date = date.today()
+
+    # Status history log
+    history = SubscriptionStatusHistory(
+        subscription_id=subscription.id,
+        old_status=old_status,
+        new_status=SubscriptionStatus.ACTIVE.value,
+        reason="Payment successful, subscription activated"
+    )
+    db.add(history)
+
+    # Capture in payment history
+    result = await db.execute(
+        select(Payment).where(Payment.subscription_id == subscription.id).order_by(Payment.created_at.desc()).limit(1)
+    )
+    last_pay = result.scalar_one_or_none()
+    pay_history = SubscriptionPaymentHistory(
+        subscription_id=subscription.id,
+        payment_id=last_pay.id if last_pay else None,
+        amount=float(subscription.total_amount),
+        status="success",
+        transaction_id=last_pay.gateway_payment_id if last_pay else None,
+    )
+    db.add(pay_history)
+
     await db.flush()
     await _generate_next_delivery(db, subscription)
     return subscription
@@ -103,14 +160,34 @@ async def _generate_next_delivery(db: AsyncSession, subscription: Subscription) 
     )
     db.add(delivery)
     await db.flush()
+
+    # Audit delivery generation state
+    del_history = SubscriptionDeliveryHistory(
+        delivery_id=delivery.id,
+        old_status="",
+        new_status=DeliveryStatus.PENDING.value,
+        notes="Scheduled automatically"
+    )
+    db.add(del_history)
+
     logger.info(f"Generated delivery for sub {subscription.id} on {next_date}")
     return delivery
 
 
 async def mark_delivered(db: AsyncSession, delivery: SubscriptionDelivery) -> None:
     """Marks a delivery as DELIVERED and advances subscription counter."""
+    old_status = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
     delivery.status = DeliveryStatus.DELIVERED
     delivery.delivered_at = datetime.now(timezone.utc)
+
+    # Log delivery history
+    del_history = SubscriptionDeliveryHistory(
+        delivery_id=delivery.id,
+        old_status=old_status,
+        new_status=DeliveryStatus.DELIVERED.value,
+        notes="Delivery marked as completed"
+    )
+    db.add(del_history)
 
     sub = await db.get(Subscription, delivery.subscription_id)
     sub.completed_deliveries += 1
@@ -123,7 +200,18 @@ async def mark_delivered(db: AsyncSession, delivery: SubscriptionDelivery) -> No
 
 async def handle_missed_delivery(db: AsyncSession, delivery: SubscriptionDelivery) -> None:
     """Marks delivery as MISSED and carry-forwards to next available slot."""
+    old_status = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
     delivery.status = DeliveryStatus.MISSED
+
+    # Log delivery history
+    del_history = SubscriptionDeliveryHistory(
+        delivery_id=delivery.id,
+        old_status=old_status,
+        new_status=DeliveryStatus.MISSED.value,
+        notes="Delivery marked as missed"
+    )
+    db.add(del_history)
+
     sub = await db.get(Subscription, delivery.subscription_id)
     sub.missed_deliveries += 1
 
@@ -149,6 +237,16 @@ async def handle_missed_delivery(db: AsyncSession, delivery: SubscriptionDeliver
             is_carry_forward=True,
         )
         db.add(carry_delivery)
+
+        # Audit carry forward generation
+        del_history_cf = SubscriptionDeliveryHistory(
+            delivery_id=carry_delivery.id,
+            old_status="",
+            new_status=DeliveryStatus.CARRY_FORWARD.value,
+            notes="Carry-forward due to missed delivery"
+        )
+        db.add(del_history_cf)
+
         logger.info(f"Carry-forward delivery created for sub {sub.id} on {carry_date}")
     await db.flush()
 
@@ -166,9 +264,28 @@ async def pause_subscription(
     if settings and subscription.total_paused_days >= settings.max_pause_days_per_subscription:
         raise ValueError(f"Maximum pause limit ({settings.max_pause_days_per_subscription} days) reached")
 
+    old_status = subscription.status.value if hasattr(subscription.status, "value") else str(subscription.status)
     subscription.status = SubscriptionStatus.PAUSED
     subscription.paused_at = datetime.now(timezone.utc)
     subscription.pause_reason = reason
+
+    # Status history log
+    history = SubscriptionStatusHistory(
+        subscription_id=subscription.id,
+        old_status=old_status,
+        new_status=SubscriptionStatus.PAUSED.value,
+        reason=reason or "Subscription paused"
+    )
+    db.add(history)
+
+    # Pause history log
+    pause_log = SubscriptionPauseHistory(
+        subscription_id=subscription.id,
+        paused_at=subscription.paused_at,
+        pause_reason=reason,
+    )
+    db.add(pause_log)
+
     return subscription
 
 
@@ -177,11 +294,38 @@ async def resume_subscription(db: AsyncSession, subscription: Subscription) -> S
     if subscription.status != SubscriptionStatus.PAUSED:
         raise ValueError("Subscription is not paused")
 
+    paused_days = 0
     if subscription.paused_at:
         paused_days = (datetime.now(timezone.utc) - subscription.paused_at).days
         subscription.total_paused_days += paused_days
 
+    old_status = subscription.status.value if hasattr(subscription.status, "value") else str(subscription.status)
     subscription.status = SubscriptionStatus.ACTIVE
+
+    # Status history log
+    history = SubscriptionStatusHistory(
+        subscription_id=subscription.id,
+        old_status=old_status,
+        new_status=SubscriptionStatus.ACTIVE.value,
+        reason="Subscription resumed"
+    )
+    db.add(history)
+
+    # Update active pause history log
+    pause_result = await db.execute(
+        select(SubscriptionPauseHistory)
+        .where(
+            SubscriptionPauseHistory.subscription_id == subscription.id,
+            SubscriptionPauseHistory.resumed_at == None
+        )
+        .order_by(SubscriptionPauseHistory.paused_at.desc())
+        .limit(1)
+    )
+    active_pause = pause_result.scalar_one_or_none()
+    if active_pause:
+        active_pause.resumed_at = datetime.now(timezone.utc)
+        active_pause.paused_days = paused_days
+
     subscription.paused_at = None
     subscription.pause_reason = None
 
@@ -190,20 +334,62 @@ async def resume_subscription(db: AsyncSession, subscription: Subscription) -> S
     return subscription
 
 
-async def cancel_subscription(db: AsyncSession, subscription: Subscription) -> Subscription:
+async def cancel_subscription(db: AsyncSession, subscription: Subscription, reason: str | None = None) -> Subscription:
     """Cancel a subscription. Refund handled separately via payment service."""
+    old_status = subscription.status.value if hasattr(subscription.status, "value") else str(subscription.status)
     subscription.status = SubscriptionStatus.CANCELLED
     subscription.actual_end_date = date.today()
+
+    # Status history log
+    history = SubscriptionStatusHistory(
+        subscription_id=subscription.id,
+        old_status=old_status,
+        new_status=SubscriptionStatus.CANCELLED.value,
+        reason=reason or "Subscription cancelled"
+    )
+    db.add(history)
+
+    # Cancel/skip any upcoming pending deliveries
+    deliveries_result = await db.execute(
+        select(SubscriptionDelivery).where(
+            SubscriptionDelivery.subscription_id == subscription.id,
+            SubscriptionDelivery.status.in_([DeliveryStatus.PENDING, DeliveryStatus.ASSIGNED])
+        )
+    )
+    for delivery in deliveries_result.scalars().all():
+        old_del_status = delivery.status.value
+        delivery.status = DeliveryStatus.SKIPPED
+        
+        # Log delivery history
+        del_history = SubscriptionDeliveryHistory(
+            delivery_id=delivery.id,
+            old_status=old_del_status,
+            new_status=DeliveryStatus.SKIPPED.value,
+            notes="Skipped due to subscription cancellation"
+        )
+        db.add(del_history)
+
     return subscription
 
 
 async def skip_delivery(db: AsyncSession, delivery: SubscriptionDelivery) -> SubscriptionDelivery:
-    """Marks a delivery as SKIPPED, deletes any active delivery boy assignment,
+    """Marks a delivery as SKIPPED, deletes any active delivery partner assignment,
     increments subscription pause days, and schedules a carry-forward delivery."""
     if delivery.status in [DeliveryStatus.DELIVERED, DeliveryStatus.SKIPPED, DeliveryStatus.MISSED]:
         raise ValueError(f"Cannot skip delivery in status {delivery.status.value}")
 
+    old_status = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
     delivery.status = DeliveryStatus.SKIPPED
+
+    # Log delivery history
+    del_history = SubscriptionDeliveryHistory(
+        delivery_id=delivery.id,
+        old_status=old_status,
+        new_status=DeliveryStatus.SKIPPED.value,
+        notes="Delivery skipped by user/admin"
+    )
+    db.add(del_history)
+
     sub = await db.get(Subscription, delivery.subscription_id)
     if not sub:
         raise ValueError("Subscription not found for this delivery")
@@ -211,7 +397,7 @@ async def skip_delivery(db: AsyncSession, delivery: SubscriptionDelivery) -> Sub
     # Increment pause days
     sub.total_paused_days += 1
 
-    # Remove active assignment if exists (using explicit select to avoid greenlet lazy load issues)
+    # Remove active assignment if exists
     from app.models.delivery_assignment import DeliveryAssignment
     assignment_res = await db.execute(
         select(DeliveryAssignment).where(DeliveryAssignment.delivery_id == delivery.id)
@@ -240,15 +426,83 @@ async def skip_delivery(db: AsyncSession, delivery: SubscriptionDelivery) -> Sub
         is_carry_forward=True,
     )
     db.add(carry_delivery)
+
+    # Log CF delivery history
+    del_history_cf = SubscriptionDeliveryHistory(
+        delivery_id=carry_delivery.id,
+        old_status="",
+        new_status=DeliveryStatus.CARRY_FORWARD.value,
+        notes="Carry-forward due to skipped delivery day"
+    )
+    db.add(del_history_cf)
+
     await db.flush()
     logger.info(f"Skipped delivery {delivery.id}. Carry-forward delivery created for sub {sub.id} on {carry_date}")
     return carry_delivery
 
 
 async def _complete_subscription(db: AsyncSession, subscription: Subscription) -> None:
+    old_status = subscription.status.value if hasattr(subscription.status, "value") else str(subscription.status)
     subscription.status = SubscriptionStatus.COMPLETED
     subscription.actual_end_date = date.today()
+
+    # Status history log
+    history = SubscriptionStatusHistory(
+        subscription_id=subscription.id,
+        old_status=old_status,
+        new_status=SubscriptionStatus.COMPLETED.value,
+        reason="Subscription completed successfully"
+    )
+    db.add(history)
     logger.info(f"Subscription {subscription.id} completed after {subscription.completed_deliveries} deliveries")
+
+
+async def renew_subscription(
+    db: AsyncSession,
+    subscription: Subscription,
+    new_plan_id: UUID | None = None,
+    auto_renew: bool | None = None,
+) -> Subscription:
+    """Manually renews a subscription. Copies items into a new pending_payment subscription."""
+    from sqlalchemy.orm import selectinload
+    # Ensure items and customer are loaded
+    res = await db.execute(
+        select(Subscription)
+        .where(Subscription.id == subscription.id)
+        .options(selectinload(Subscription.items), selectinload(Subscription.customer))
+    )
+    sub_loaded = res.scalar_one()
+
+    # Determine plan
+    plan_id = new_plan_id or sub_loaded.plan_id
+    plan_result = await db.execute(select(SubscriptionPlan).where(SubscriptionPlan.id == plan_id))
+    plan = plan_result.scalar_one()
+
+    # Resolve items data with product models
+    items_data = []
+    from app.models.product import Product
+    for item in sub_loaded.items:
+        prod_res = await db.execute(select(Product).where(Product.id == item.product_id))
+        prod = prod_res.scalar_one()
+        items_data.append({
+            "product": prod,
+            "quantity": item.quantity
+        })
+
+    # Generate new renewed subscription
+    new_sub = await create_subscription(
+        db=db,
+        customer=sub_loaded.customer,
+        plan=plan,
+        items_data=items_data,
+        address_id=sub_loaded.address_id,
+        delivery_charge=float(sub_loaded.delivery_charge),
+        tax_amount=float(sub_loaded.tax_amount),
+        preferred_delivery_time=sub_loaded.preferred_delivery_time,
+        auto_renew=auto_renew if auto_renew is not None else sub_loaded.auto_renew,
+        notes=sub_loaded.notes,
+    )
+    return new_sub
 
 
 async def daily_delivery_generation_job(db: AsyncSession) -> dict:

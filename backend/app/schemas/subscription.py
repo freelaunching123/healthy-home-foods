@@ -4,13 +4,36 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+class SubscriptionItemCreate(BaseModel):
+    product_id: uuid.UUID
+    quantity: int = 1
+
+
+class SubscriptionItemResponse(BaseModel):
+    id: uuid.UUID
+    product_id: uuid.UUID
+    product_name: Optional[str] = None
+    quantity: int
+    price_per_delivery: float
+
+    model_config = {"from_attributes": True}
+
+
 class SubscriptionCreate(BaseModel):
     plan_id: uuid.UUID
-    product_id: uuid.UUID
+    items: list[SubscriptionItemCreate]
     address_id: uuid.UUID
     preferred_delivery_time: Optional[str] = None
     auto_renew: bool = False
     notes: Optional[str] = None
+
+
+class SubscriptionUpdate(BaseModel):
+    address_id: Optional[uuid.UUID] = None
+    preferred_delivery_time: Optional[str] = None
+    auto_renew: Optional[bool] = None
+    notes: Optional[str] = None
+    items: Optional[list[SubscriptionItemCreate]] = None
 
 
 class SubscriptionPauseRequest(BaseModel):
@@ -36,26 +59,67 @@ class SubscriptionPlanResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SubscriptionStatusHistoryResponse(BaseModel):
+    id: uuid.UUID
+    old_status: str
+    new_status: str
+    changed_at: datetime
+    reason: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class SubscriptionPauseHistoryResponse(BaseModel):
+    id: uuid.UUID
+    paused_at: datetime
+    resumed_at: Optional[datetime] = None
+    pause_reason: Optional[str] = None
+    paused_days: int
+
+    model_config = {"from_attributes": True}
+
+
+class SubscriptionPaymentHistoryResponse(BaseModel):
+    id: uuid.UUID
+    payment_id: Optional[uuid.UUID] = None
+    amount: float
+    status: str
+    transaction_id: Optional[str] = None
+    changed_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class SubscriptionResponse(BaseModel):
     id: uuid.UUID
     plan_id: uuid.UUID
-    product_id: uuid.UUID
+    product_id: Optional[uuid.UUID] = None
     address_id: uuid.UUID
     status: str
     total_deliveries: int
     completed_deliveries: int
     missed_deliveries: int
-    start_date: Optional[date]
-    expected_end_date: Optional[date]
+    start_date: Optional[date] = None
+    expected_end_date: Optional[date] = None
     price_per_delivery: float
     total_amount: float
     delivery_charge: float
     tax_amount: float
     auto_renew: bool
-    preferred_delivery_time: Optional[str]
+    preferred_delivery_time: Optional[str] = None
     created_at: datetime
+    items: list[SubscriptionItemResponse] = []
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    plan_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class SubscriptionDetailResponse(SubscriptionResponse):
+    status_history: list[SubscriptionStatusHistoryResponse] = []
+    pause_history: list[SubscriptionPauseHistoryResponse] = []
+    payment_history: list[SubscriptionPaymentHistoryResponse] = []
 
 
 class DeliveryResponse(BaseModel):

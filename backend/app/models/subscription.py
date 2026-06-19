@@ -48,8 +48,8 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     plan_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("subscription_plans.id"), nullable=False
     )
-    product_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("products.id"), nullable=False, index=True
+    product_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id"), nullable=True, index=True
     )
     address_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("addresses.id"), nullable=False
@@ -87,10 +87,97 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Relationships
     customer: Mapped["Customer"] = relationship("Customer", back_populates="subscriptions")
     plan: Mapped["SubscriptionPlan"] = relationship("SubscriptionPlan", back_populates="subscriptions")
-    product: Mapped["Product"] = relationship("Product", back_populates="subscriptions")
+    product: Mapped[Optional["Product"]] = relationship("Product", back_populates="subscriptions")
     address: Mapped["Address"] = relationship("Address", back_populates="subscriptions")
     deliveries: Mapped[List["SubscriptionDelivery"]] = relationship("SubscriptionDelivery", back_populates="subscription", cascade="all, delete-orphan")
     payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="subscription")
+    
+    # Multi-product items
+    items: Mapped[List["SubscriptionItem"]] = relationship("SubscriptionItem", back_populates="subscription", cascade="all, delete-orphan")
+    
+    # History tables
+    pause_history: Mapped[List["SubscriptionPauseHistory"]] = relationship("SubscriptionPauseHistory", back_populates="subscription", cascade="all, delete-orphan")
+    status_history: Mapped[List["SubscriptionStatusHistory"]] = relationship("SubscriptionStatusHistory", back_populates="subscription", cascade="all, delete-orphan")
+    payment_history: Mapped[List["SubscriptionPaymentHistory"]] = relationship("SubscriptionPaymentHistory", back_populates="subscription", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Subscription id={self.id} status={self.status} done={self.completed_deliveries}/{self.total_deliveries}>"
+
+
+class SubscriptionItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """An individual product within a subscription."""
+
+    __tablename__ = "subscription_items"
+
+    subscription_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="CASCADE"),
+        nullable=False, index=True
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("products.id"), nullable=False, index=True
+    )
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    price_per_delivery: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+
+    subscription: Mapped["Subscription"] = relationship("Subscription", back_populates="items")
+    product: Mapped["Product"] = relationship("Product")
+
+    def __repr__(self) -> str:
+        return f"<SubscriptionItem sub={self.subscription_id} product={self.product_id} qty={self.quantity}>"
+
+
+class SubscriptionPauseHistory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """History of subscription pause and resume actions."""
+
+    __tablename__ = "subscription_pause_history"
+
+    subscription_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="CASCADE"),
+        nullable=False, index=True
+    )
+    paused_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resumed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    pause_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    paused_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    subscription: Mapped["Subscription"] = relationship("Subscription", back_populates="pause_history")
+
+
+class SubscriptionStatusHistory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Audit trail of subscription status transitions."""
+
+    __tablename__ = "subscription_status_history"
+
+    subscription_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="CASCADE"),
+        nullable=False, index=True
+    )
+    old_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    new_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    subscription: Mapped["Subscription"] = relationship("Subscription", back_populates="status_history")
+
+
+class SubscriptionPaymentHistory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Payment transaction logging per subscription status change or capture."""
+
+    __tablename__ = "subscription_payment_history"
+
+    subscription_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="CASCADE"),
+        nullable=False, index=True
+    )
+    payment_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("payments.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
+    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), nullable=False)
+    transaction_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), nullable=False)
+
+    subscription: Mapped["Subscription"] = relationship("Subscription", back_populates="payment_history")
+    payment: Mapped[Optional["Payment"]] = relationship("Payment")
+

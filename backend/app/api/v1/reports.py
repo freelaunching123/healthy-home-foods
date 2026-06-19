@@ -10,7 +10,7 @@ import io
 from app.db.session import get_db
 from app.core.dependencies import require_super_admin
 from app.models.user import User
-from app.models.subscription import Subscription, SubscriptionStatus
+from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionItem
 from app.models.payment import Payment, PaymentStatus
 from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
 from app.models.delivery_assignment import DeliveryAssignment
@@ -236,7 +236,8 @@ async def get_product_performance_summary(
             Product.name,
             func.count(SubscriptionDelivery.id).label("delivered_count")
         )
-        .outerjoin(Subscription, Subscription.product_id == Product.id)
+        .outerjoin(SubscriptionItem, SubscriptionItem.product_id == Product.id)
+        .outerjoin(Subscription, Subscription.id == SubscriptionItem.subscription_id)
         .outerjoin(
             SubscriptionDelivery,
             and_(
@@ -300,7 +301,8 @@ async def get_category_performance(
             func.count(SubscriptionDelivery.id).label("delivered_count")
         )
         .where(Product.category_id == category_id)
-        .outerjoin(Subscription, Subscription.product_id == Product.id)
+        .outerjoin(SubscriptionItem, SubscriptionItem.product_id == Product.id)
+        .outerjoin(Subscription, Subscription.id == SubscriptionItem.subscription_id)
         .outerjoin(
             SubscriptionDelivery,
             and_(
