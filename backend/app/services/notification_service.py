@@ -59,6 +59,7 @@ class NotificationService:
             body=body,
             channel="in_app",
             status="sent",
+            event_type="in_app",
             category=category,
             action_type=action_type,
             reference_id=reference_id,

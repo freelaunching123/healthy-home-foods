@@ -49,6 +49,9 @@ class ApiConstants {
   static const String adminSettings = '/admin/settings';
   static const String adminDashboard = '/admin/dashboard';
   static const String adminDeliveryPartners = '/admin/delivery-partners';
+  static const String adminDeliveries = '/admin/deliveries';
+  static const String adminDeliveriesAnalytics = '/admin/deliveries/analytics';
+  static const String adminDeliveriesExport = '/admin/deliveries/export';
 
   // Reports
   static const String reports = '/reports';

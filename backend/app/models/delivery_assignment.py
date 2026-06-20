@@ -2,7 +2,7 @@ import uuid
 import enum
 from typing import Optional, List
 from datetime import datetime
-from sqlalchemy import String, ForeignKey, Numeric, Text, DateTime, Enum as SAEnum
+from sqlalchemy import String, ForeignKey, Numeric, Text, DateTime, Enum as SAEnum, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from app.db.base import Base
@@ -37,6 +37,7 @@ class DeliveryAssignment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    picked_up_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     out_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     failed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -53,3 +54,36 @@ class DeliveryAssignment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<DeliveryAssignment id={self.id} status={self.status}>"
+
+
+class DeliveryAssignmentHistory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Audit log of delivery partner assignments and reassignments."""
+
+    __tablename__ = "delivery_assignment_history"
+
+    delivery_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subscription_deliveries.id", ondelete="CASCADE"),
+        nullable=False, index=True
+    )
+    previous_partner_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("delivery_partners.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
+    new_partner_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("delivery_partners.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
+    changed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), nullable=False)
+
+    # Relationships
+    delivery: Mapped["SubscriptionDelivery"] = relationship("SubscriptionDelivery")
+    previous_partner: Mapped[Optional["DeliveryPartner"]] = relationship("DeliveryPartner", foreign_keys=[previous_partner_id])
+    new_partner: Mapped[Optional["DeliveryPartner"]] = relationship("DeliveryPartner", foreign_keys=[new_partner_id])
+    changed_by: Mapped[Optional["User"]] = relationship("User")
+
+    def __repr__(self) -> str:
+        return f"<DeliveryAssignmentHistory delivery_id={self.delivery_id} prev={self.previous_partner_id} new={self.new_partner_id}>"
