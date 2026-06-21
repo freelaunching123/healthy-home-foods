@@ -1,5 +1,7 @@
 from datetime import date, timedelta
-from fastapi import APIRouter, Depends, Query
+from uuid import UUID
+from typing import Optional
+from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
@@ -8,13 +10,14 @@ import io
 from app.db.session import get_db
 from app.core.dependencies import require_super_admin
 from app.models.user import User
-from app.models.subscription import Subscription, SubscriptionStatus
+from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionItem
 from app.models.payment import Payment, PaymentStatus
 from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
 from app.models.delivery_assignment import DeliveryAssignment
 from app.models.delivery_partner import DeliveryPartner
 from app.models.customer import Customer
-from app.schemas.common import DashboardStats, DeliveryPartnerPerformance
+from app.models.product import Product, ProductCategory
+from app.schemas.common import MessageResponse, DashboardStats, DeliveryPartnerPerformance
 
 router = APIRouter(prefix="/reports", tags=["Reports & Analytics"])
 
@@ -213,3 +216,114 @@ async def export_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={report_type}_report.pdf"},
     )
+
+
+@router.get("/product-performance-summary")
+async def get_product_performance_summary(
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    # Total, Active, Inactive product counts
+    total_products = await db.scalar(select(func.count(Product.id)))
+    active_products = await db.scalar(select(func.count(Product.id)).where(Product.is_active == True))
+    inactive_products = await db.scalar(select(func.count(Product.id)).where(Product.is_active == False))
+
+    # Query all products and their successful (DELIVERED) delivery counts
+    # This will allow us to sort them in python to get top 5 and bottom 5.
+    query = (
+        select(
+            Product.id,
+            Product.name,
+            func.count(SubscriptionDelivery.id).label("delivered_count")
+        )
+        .outerjoin(SubscriptionItem, SubscriptionItem.product_id == Product.id)
+        .outerjoin(Subscription, Subscription.id == SubscriptionItem.subscription_id)
+        .outerjoin(
+            SubscriptionDelivery,
+            and_(
+                SubscriptionDelivery.subscription_id == Subscription.id,
+                SubscriptionDelivery.status == DeliveryStatus.DELIVERED
+            )
+        )
+        .group_by(Product.id, Product.name)
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+    
+    performance_list = [
+        {
+            "id": str(row[0]),
+            "name": row[1],
+            "delivered_count": row[2]
+        }
+        for row in rows
+    ]
+
+    # Sort for top performing (descending)
+    top_performing = sorted(performance_list, key=lambda x: x["delivered_count"], reverse=True)[:5]
+    # Sort for worst performing (ascending)
+    worst_performing = sorted(performance_list, key=lambda x: x["delivered_count"])[:5]
+
+    return {
+        "total_products": total_products or 0,
+        "active_products": active_products or 0,
+        "inactive_products": inactive_products or 0,
+        "top_performing": top_performing,
+        "worst_performing": worst_performing,
+    }
+
+
+@router.get("/category-performance")
+async def get_category_performance(
+    category_id: UUID,
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    # Verify if category exists
+    cat_result = await db.execute(select(ProductCategory).where(ProductCategory.id == category_id))
+    if not cat_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    # Filter conditions for deliveries
+    delivery_filter = [SubscriptionDelivery.status == DeliveryStatus.DELIVERED]
+    if start_date:
+        delivery_filter.append(SubscriptionDelivery.scheduled_date >= start_date)
+    if end_date:
+        delivery_filter.append(SubscriptionDelivery.scheduled_date <= end_date)
+
+    query = (
+        select(
+            Product.id,
+            Product.name,
+            func.count(SubscriptionDelivery.id).label("delivered_count")
+        )
+        .where(Product.category_id == category_id)
+        .outerjoin(SubscriptionItem, SubscriptionItem.product_id == Product.id)
+        .outerjoin(Subscription, Subscription.id == SubscriptionItem.subscription_id)
+        .outerjoin(
+            SubscriptionDelivery,
+            and_(
+                SubscriptionDelivery.subscription_id == Subscription.id,
+                *delivery_filter
+            )
+        )
+        .group_by(Product.id, Product.name)
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    performance = [
+        {
+            "id": str(row[0]),
+            "name": row[1],
+            "delivered_count": row[2]
+        }
+        for row in rows
+    ]
+
+    return performance
+

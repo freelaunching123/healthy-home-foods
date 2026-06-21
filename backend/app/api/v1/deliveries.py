@@ -45,7 +45,7 @@ async def get_customer_delivery_history(
     if not customer:
         raise HTTPException(status_code=404, detail="Customer profile not found")
 
-    from app.models.subscription import Subscription
+    from app.models.subscription import Subscription, SubscriptionItem
     from app.models.product import Product
     
     query = (
@@ -53,11 +53,13 @@ async def get_customer_delivery_history(
             SubscriptionDelivery.id,
             SubscriptionDelivery.scheduled_date,
             SubscriptionDelivery.status,
-            Product.name.label("product_name")
+            func.string_agg(Product.name, ", ").label("product_name")
         )
         .join(Subscription, Subscription.id == SubscriptionDelivery.subscription_id)
-        .join(Product, Product.id == Subscription.product_id)
+        .outerjoin(SubscriptionItem, SubscriptionItem.subscription_id == Subscription.id)
+        .outerjoin(Product, Product.id == SubscriptionItem.product_id)
         .where(Subscription.customer_id == customer.id)
+        .group_by(SubscriptionDelivery.id, SubscriptionDelivery.scheduled_date, SubscriptionDelivery.status)
         .order_by(SubscriptionDelivery.scheduled_date.desc())
     )
     result = await db.execute(query)
@@ -125,7 +127,7 @@ async def assign_delivery(
         assignment.delivery_partner_id = partner.id
         assignment.status = AssignmentStatus.PENDING
         assignment.assigned_at = datetime.now(timezone.utc)
-        assignment.accepted_at = None
+        assignment.picked_up_at = None
         assignment.out_at = None
         assignment.delivered_at = None
         assignment.failed_at = None
@@ -208,7 +210,7 @@ async def update_delivery_status(
 
     if payload.status == "accepted":
         assignment.status = AssignmentStatus.ACCEPTED
-        assignment.accepted_at = now
+        assignment.picked_up_at = now
     elif payload.status == "out_for_delivery":
         assignment.status = AssignmentStatus.OUT_FOR_DELIVERY
         assignment.out_at = now

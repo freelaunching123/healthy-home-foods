@@ -1,8 +1,8 @@
 import uuid
 import enum
-from typing import Optional
+from typing import Optional, List
 from datetime import date, datetime
-from sqlalchemy import String, Boolean, ForeignKey, Numeric, Text, Integer, Date, DateTime, SmallInteger, Enum as SAEnum
+from sqlalchemy import String, Boolean, ForeignKey, Numeric, Text, Integer, Date, DateTime, SmallInteger, Enum as SAEnum, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from app.db.base import Base
@@ -53,6 +53,29 @@ class SubscriptionDelivery(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     parent_delivery: Mapped[Optional["SubscriptionDelivery"]] = relationship(
         "SubscriptionDelivery", remote_side="SubscriptionDelivery.id"
     )
+    delivery_history: Mapped[List["SubscriptionDeliveryHistory"]] = relationship("SubscriptionDeliveryHistory", back_populates="delivery", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<SubscriptionDelivery date={self.scheduled_date} status={self.status}>"
+
+
+class SubscriptionDeliveryHistory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Audit trail of subscription delivery status transitions."""
+
+    __tablename__ = "subscription_delivery_history"
+
+    delivery_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subscription_deliveries.id", ondelete="CASCADE"),
+        nullable=False, index=True
+    )
+    old_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    new_status: Mapped[str] = mapped_column(String(50), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    changed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
+    )
+
+    delivery: Mapped["SubscriptionDelivery"] = relationship("SubscriptionDelivery", back_populates="delivery_history")
+    changed_by: Mapped[Optional["User"]] = relationship("User")

@@ -215,6 +215,7 @@ async def diagnose_and_fix():
         result = await db.execute(select(User).where(User.phone == test_phone))
         existing = result.scalar_one_or_none()
         if existing:
+            await db.execute(text(f"DELETE FROM delivery_partners WHERE user_id = '{existing.id}'"))
             await db.execute(text(f"DELETE FROM user_roles WHERE user_id = '{existing.id}'"))
             await db.delete(existing)
             await db.commit()

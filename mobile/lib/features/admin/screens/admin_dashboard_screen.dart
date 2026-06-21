@@ -116,11 +116,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     onTap: () => context.push('/admin/categories'),
                   ),
                   _QuickLink(
-                    title: 'Product Analytics',
-                    icon: Icons.analytics_outlined,
-                    onTap: () => context.push('/admin/products/analytics'),
-                  ),
-                  _QuickLink(
                     title: 'Manage Subscriptions',
                     icon: Icons.receipt_long_outlined,
                     onTap: () => context.push('/admin/subscriptions'),

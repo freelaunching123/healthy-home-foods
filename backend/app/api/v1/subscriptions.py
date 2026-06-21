@@ -1,20 +1,22 @@
 from uuid import UUID
 from datetime import date
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, and_
+from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
 from app.core.dependencies import get_current_user, require_customer, require_super_admin
 from app.models.user import User
 from app.models.customer import Customer
-from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus
+from app.models.subscription import Subscription, SubscriptionPlan, SubscriptionStatus, SubscriptionItem, SubscriptionStatusHistory, SubscriptionPauseHistory, SubscriptionPaymentHistory
 from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
 from app.models.product import Product
 from app.models.admin_settings import AdminSettings
 from app.schemas.subscription import (
-    SubscriptionCreate, SubscriptionPauseRequest, SubscriptionCancelRequest,
-    SubscriptionResponse, SubscriptionPlanResponse, DeliveryResponse, DeliveryListResponse,
+    SubscriptionCreate, SubscriptionUpdate, SubscriptionPauseRequest, SubscriptionCancelRequest,
+    SubscriptionResponse, SubscriptionDetailResponse, SubscriptionPlanResponse, DeliveryResponse, DeliveryListResponse,
     CurrentSubscriptionResponse, TodayDeliveryInfo,
 )
 from app.schemas.common import MessageResponse
@@ -54,43 +56,82 @@ async def list_plans(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
+@router.get("/dashboard/stats")
+async def get_subscription_dashboard_stats(
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get subscription metrics for admin dashboard."""
+    active = await db.scalar(select(func.count(Subscription.id)).where(Subscription.status == SubscriptionStatus.ACTIVE))
+    paused = await db.scalar(select(func.count(Subscription.id)).where(Subscription.status == SubscriptionStatus.PAUSED))
+    completed = await db.scalar(select(func.count(Subscription.id)).where(Subscription.status == SubscriptionStatus.COMPLETED))
+    cancelled = await db.scalar(select(func.count(Subscription.id)).where(Subscription.status == SubscriptionStatus.CANCELLED))
+    pending = await db.scalar(select(func.count(Subscription.id)).where(Subscription.status == SubscriptionStatus.PENDING_PAYMENT))
+
+    # Total revenue from payments
+    from app.models.payment import Payment, PaymentStatus
+    total_rev = await db.scalar(select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.status == PaymentStatus.SUCCESS))
+
+    today = date.today()
+    first_of_month = date(today.year, today.month, 1)
+    new_subs = await db.scalar(select(func.count(Subscription.id)).where(Subscription.created_at >= first_of_month))
+
+    return {
+        "active": active or 0,
+        "paused": paused or 0,
+        "completed": completed or 0,
+        "cancelled": cancelled or 0,
+        "pending_payment": pending or 0,
+        "total_revenue": float(total_rev or 0),
+        "new_subscriptions_this_month": new_subs or 0,
+    }
+
+
 @router.post("/", response_model=SubscriptionResponse)
 async def create_subscription(
     payload: SubscriptionCreate,
     current_user: User = Depends(require_customer),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new subscription (pending payment)."""
+    """Create a new multi-product subscription (pending payment)."""
     customer = await _get_customer(db, current_user.id)
 
-    # Validate plan and product
+    # Validate plan
     plan_result = await db.execute(select(SubscriptionPlan).where(SubscriptionPlan.id == payload.plan_id))
     plan = plan_result.scalar_one_or_none()
     if not plan or not plan.is_active:
         raise HTTPException(status_code=404, detail="Subscription plan not found")
 
-    product_result = await db.execute(select(Product).where(Product.id == payload.product_id))
-    product = product_result.scalar_one_or_none()
-    if not product or not product.is_available:
-        raise HTTPException(status_code=404, detail="Product not found or unavailable")
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="Subscription must contain at least one product")
 
-    # Calculate delivery charge from admin settings
+    # Validate products & compile items_data
+    items_data = []
+    price_per_delivery = 0.0
+    for item in payload.items:
+        prod_result = await db.execute(select(Product).where(Product.id == item.product_id))
+        product = prod_result.scalar_one_or_none()
+        if not product or not product.is_active:
+            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found or inactive")
+        items_data.append({"product": product, "quantity": item.quantity})
+        price_per_delivery += float(product.price) * item.quantity
+
+    # Calculate delivery charge and tax from admin settings
     settings_result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
     settings = settings_result.scalar_one_or_none()
     delivery_charge = 0.0
     tax_amount = 0.0
     if settings:
         tax_rate = float(settings.tax_percentage) / 100
-        subtotal = float(product.price) * plan.total_deliveries
+        subtotal = price_per_delivery * plan.total_deliveries
         tax_amount = round(subtotal * tax_rate, 2)
 
     sub = await subscription_engine.create_subscription(
         db=db,
         customer=customer,
         plan=plan,
-        product_id=payload.product_id,
+        items_data=items_data,
         address_id=payload.address_id,
-        price_per_delivery=float(product.price),
         delivery_charge=delivery_charge,
         tax_amount=tax_amount,
         preferred_delivery_time=payload.preferred_delivery_time,
@@ -98,8 +139,148 @@ async def create_subscription(
         notes=payload.notes,
     )
     await db.commit()
-    await db.refresh(sub)
-    return sub
+
+    # Load with items and products
+    result = await db.execute(
+        select(Subscription)
+        .where(Subscription.id == sub.id)
+        .options(
+            selectinload(Subscription.items).selectinload(SubscriptionItem.product),
+            selectinload(Subscription.customer).selectinload(Customer.user),
+            selectinload(Subscription.plan)
+        )
+    )
+    sub_loaded = result.scalar_one()
+    if sub_loaded.customer and sub_loaded.customer.user:
+        sub_loaded.customer_name = sub_loaded.customer.user.full_name
+        sub_loaded.customer_phone = sub_loaded.customer.user.phone
+    if sub_loaded.plan:
+        sub_loaded.plan_name = sub_loaded.plan.name
+    for item in sub_loaded.items:
+        item.product_name = item.product.name
+
+    return sub_loaded
+
+
+@router.put("/{sub_id}", response_model=SubscriptionResponse)
+async def update_subscription(
+    sub_id: UUID,
+    payload: SubscriptionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update subscription options and items."""
+    from app.models.role import Role, UserRole
+    roles_res = await db.execute(
+        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+    )
+    user_roles = [r[0] for r in roles_res.fetchall()]
+    is_admin = "super_admin" in user_roles
+
+    result = await db.execute(
+        select(Subscription)
+        .where(Subscription.id == sub_id)
+        .options(selectinload(Subscription.items))
+    )
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    if not is_admin:
+        customer = await _get_customer(db, current_user.id)
+        if sub.customer_id != customer.id:
+            raise HTTPException(status_code=403, detail="Not authorized to edit this subscription")
+
+    # Update items if provided
+    if payload.items is not None:
+        # Delete existing items
+        for existing in sub.items:
+            await db.delete(existing)
+        sub.items.clear()
+
+        price_per_delivery = 0.0
+        for item in payload.items:
+            p_res = await db.execute(select(Product).where(Product.id == item.product_id))
+            prod = p_res.scalar_one_or_none()
+            if not prod or not prod.is_active:
+                raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found or inactive")
+            
+            sub_item = SubscriptionItem(
+                subscription_id=sub.id,
+                product_id=prod.id,
+                quantity=item.quantity,
+                price_per_delivery=float(prod.price)
+            )
+            db.add(sub_item)
+            price_per_delivery += float(prod.price) * item.quantity
+
+        sub.price_per_delivery = price_per_delivery
+        
+        # Recalculate totals
+        settings_result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
+        settings = settings_result.scalar_one_or_none()
+        tax_rate = float(settings.tax_percentage) / 100 if settings else 0.0
+        subtotal = price_per_delivery * sub.total_deliveries
+        sub.tax_amount = round(subtotal * tax_rate, 2)
+        sub.total_amount = subtotal + float(sub.delivery_charge) + sub.tax_amount
+
+    # Update other parameters
+    if payload.address_id is not None:
+        sub.address_id = payload.address_id
+    if payload.preferred_delivery_time is not None:
+        sub.preferred_delivery_time = payload.preferred_delivery_time
+    if payload.auto_renew is not None:
+        sub.auto_renew = payload.auto_renew
+    if payload.notes is not None:
+        sub.notes = payload.notes
+
+    # Add change logging
+    history = SubscriptionStatusHistory(
+        subscription_id=sub.id,
+        old_status=sub.status.value,
+        new_status=sub.status.value,
+        reason="Subscription items or configurations updated"
+    )
+    db.add(history)
+
+    await db.commit()
+
+    # Reload with products
+    result = await db.execute(
+        select(Subscription)
+        .where(Subscription.id == sub.id)
+        .options(
+            selectinload(Subscription.items).selectinload(SubscriptionItem.product),
+            selectinload(Subscription.customer).selectinload(Customer.user),
+            selectinload(Subscription.plan)
+        )
+    )
+    sub_loaded = result.scalar_one()
+    if sub_loaded.customer and sub_loaded.customer.user:
+        sub_loaded.customer_name = sub_loaded.customer.user.full_name
+        sub_loaded.customer_phone = sub_loaded.customer.user.phone
+    if sub_loaded.plan:
+        sub_loaded.plan_name = sub_loaded.plan.name
+    for item in sub_loaded.items:
+        item.product_name = item.product.name
+    return sub_loaded
+
+
+@router.delete("/{sub_id}", response_model=MessageResponse)
+async def delete_subscription(
+    sub_id: UUID,
+    current_user: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a subscription permanently."""
+    result = await db.execute(select(Subscription).where(Subscription.id == sub_id))
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    await db.delete(sub)
+    await db.commit()
+    return MessageResponse(message="Subscription permanently deleted")
 
 
 @router.get("/", response_model=list[SubscriptionResponse])
@@ -107,15 +288,70 @@ async def list_subscriptions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     status: str = Query(None),
+    customer_id: Optional[UUID] = Query(None),
+    search: str = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=50),
 ):
-    customer = await _get_customer(db, current_user.id)
-    query = select(Subscription).where(Subscription.customer_id == customer.id)
-    if status:
+    """List subscriptions with search, filtering and sorting."""
+    from app.models.role import Role, UserRole
+    roles_res = await db.execute(
+        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+    )
+    user_roles = [r[0] for r in roles_res.fetchall()]
+    is_admin = "super_admin" in user_roles
+
+    query = select(Subscription).options(
+        selectinload(Subscription.items).selectinload(SubscriptionItem.product),
+        selectinload(Subscription.customer).selectinload(Customer.user),
+        selectinload(Subscription.plan)
+    )
+
+    if not is_admin:
+        customer = await _get_customer(db, current_user.id)
+        query = query.where(Subscription.customer_id == customer.id)
+    elif customer_id:
+        query = query.where(Subscription.customer_id == customer_id)
+
+    if status and status != "all":
         query = query.where(Subscription.status == status)
+
+    if search:
+        from app.models.user import User as UserModel
+        from app.models.product import Product as ProductModel
+        
+        query = (
+            query.join(Customer, Customer.id == Subscription.customer_id)
+            .join(UserModel, UserModel.id == Customer.user_id)
+            .outerjoin(SubscriptionItem, SubscriptionItem.subscription_id == Subscription.id)
+            .outerjoin(ProductModel, ProductModel.id == SubscriptionItem.product_id)
+            .where(
+                or_(
+                    UserModel.full_name.ilike(f"%{search}%"),
+                    UserModel.phone.ilike(f"%{search}%"),
+                    ProductModel.name.ilike(f"%{search}%"),
+                )
+            )
+            .distinct()
+        )
+
+    # Sort descending
+    query = query.order_by(Subscription.created_at.desc())
+
     result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
-    return result.scalars().all()
+    subs = result.scalars().all()
+
+    # Map fields
+    for sub in subs:
+        if sub.customer and sub.customer.user:
+            sub.customer_name = sub.customer.user.full_name
+            sub.customer_phone = sub.customer.user.phone
+        if sub.plan:
+            sub.plan_name = sub.plan.name
+        for item in sub.items:
+            item.product_name = item.product.name
+
+    return subs
 
 
 @router.get("/current", response_model=CurrentSubscriptionResponse)
@@ -123,10 +359,9 @@ async def get_current_subscription(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get the customer's current active/paused (or latest) subscription with all details."""
+    """Get the customer's current active/paused subscription with all details."""
     customer = await _get_customer(db, current_user.id)
     
-    # Fetch subscriptions sorted by status and date
     result = await db.execute(
         select(Subscription)
         .where(Subscription.customer_id == customer.id)
@@ -136,7 +371,6 @@ async def get_current_subscription(
     if not subs:
         raise HTTPException(status_code=404, detail="No active subscription found")
         
-    # Find active or paused one first, otherwise fallback to latest
     sub = None
     for s in subs:
         if s.status in [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED]:
@@ -145,16 +379,22 @@ async def get_current_subscription(
     if not sub:
         sub = subs[0]
         
-    # Load relationships
-    from sqlalchemy.orm import selectinload
     res = await db.execute(
         select(Subscription)
         .where(Subscription.id == sub.id)
-        .options(selectinload(Subscription.plan), selectinload(Subscription.product))
+        .options(selectinload(Subscription.plan), selectinload(Subscription.items).selectinload(SubscriptionItem.product))
     )
     sub = res.scalar_one()
 
-    # Calculate carry forward deliveries count
+    # Combine product names for multi-product support
+    product_name = "—"
+    if sub.items:
+        prod_names = [item.product.name for item in sub.items]
+        if len(prod_names) > 1:
+            product_name = f"{prod_names[0]} + {len(prod_names) - 1} other(s)"
+        elif len(prod_names) == 1:
+            product_name = prod_names[0]
+
     carry_forward_count = await db.scalar(
         select(func.count(SubscriptionDelivery.id))
         .where(
@@ -163,7 +403,6 @@ async def get_current_subscription(
         )
     )
 
-    # Get next pending delivery date
     today = date.today()
     next_delivery_result = await db.execute(
         select(SubscriptionDelivery.scheduled_date)
@@ -177,7 +416,6 @@ async def get_current_subscription(
     )
     next_delivery_date = next_delivery_result.scalar_one_or_none()
 
-    # Get today's delivery info (if any delivery is scheduled today)
     today_delivery_info = None
     today_delivery_result = await db.execute(
         select(SubscriptionDelivery)
@@ -192,7 +430,6 @@ async def get_current_subscription(
         partner_name = None
         partner_phone = None
         estimated_minutes = None
-        # Try to load assignment + delivery partner
         from app.models.delivery_assignment import DeliveryAssignment
         from app.models.delivery_partner import DeliveryPartner
         from app.models.user import User as UserModel
@@ -236,7 +473,7 @@ async def get_current_subscription(
         paused_days=sub.total_paused_days,
         missed_deliveries=sub.missed_deliveries,
         carry_forward_deliveries=carry_forward_count or 0,
-        product_name=sub.product.name if sub.product else "—",
+        product_name=product_name,
         price_per_delivery=float(sub.price_per_delivery),
         total_amount=float(sub.total_amount),
         next_delivery_date=next_delivery_date,
@@ -244,36 +481,90 @@ async def get_current_subscription(
     )
 
 
-@router.get("/{sub_id}", response_model=SubscriptionResponse)
+@router.get("/{sub_id}", response_model=SubscriptionDetailResponse)
 async def get_subscription(
     sub_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    customer = await _get_customer(db, current_user.id)
-    return await _get_subscription_for_customer(db, sub_id, customer.id)
+    """Get rich subscription detail including history log lists."""
+    from app.models.role import Role, UserRole
+    roles_res = await db.execute(
+        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+    )
+    user_roles = [r[0] for r in roles_res.fetchall()]
+    is_admin = "super_admin" in user_roles
+
+    query = (
+        select(Subscription)
+        .where(Subscription.id == sub_id)
+        .options(
+            selectinload(Subscription.items).selectinload(SubscriptionItem.product),
+            selectinload(Subscription.customer).selectinload(Customer.user),
+            selectinload(Subscription.plan),
+            selectinload(Subscription.status_history),
+            selectinload(Subscription.pause_history),
+            selectinload(Subscription.payment_history),
+        )
+    )
+    result = await db.execute(query)
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    if not is_admin:
+        customer = await _get_customer(db, current_user.id)
+        if sub.customer_id != customer.id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this subscription")
+
+    if sub.customer and sub.customer.user:
+        sub.customer_name = sub.customer.user.full_name
+        sub.customer_phone = sub.customer.user.phone
+    if sub.plan:
+        sub.plan_name = sub.plan.name
+    for item in sub.items:
+        item.product_name = item.product.name
+
+    return sub
 
 
 @router.post("/{sub_id}/pause", response_model=MessageResponse)
 async def pause_subscription(
     sub_id: UUID,
     payload: SubscriptionPauseRequest,
-    current_user: User = Depends(require_customer),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    customer = await _get_customer(db, current_user.id)
-    sub = await _get_subscription_for_customer(db, sub_id, customer.id)
+    """Pause an active subscription."""
+    from app.models.role import Role, UserRole
+    roles_res = await db.execute(
+        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+    )
+    user_roles = [r[0] for r in roles_res.fetchall()]
+    is_admin = "super_admin" in user_roles
+
+    sub_res = await db.execute(select(Subscription).where(Subscription.id == sub_id))
+    sub = sub_res.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    if not is_admin:
+        customer = await _get_customer(db, current_user.id)
+        if sub.customer_id != customer.id:
+            raise HTTPException(status_code=403, detail="Not authorized to pause this subscription")
+
     try:
         await subscription_engine.pause_subscription(db, sub, payload.reason)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
     # Send Notification
+    customer_profile = await db.get(Customer, sub.customer_id)
     await NotificationService.create_in_app_notification(
         db=db,
-        user_id=customer.user_id,
+        user_id=customer_profile.user_id,
         title="Subscription Paused",
-        body=f"Your subscription has been paused. Reason: {payload.reason}",
+        body=f"Your subscription has been paused. Reason: {payload.reason or 'Admin paused'}",
         category="subscription",
         action_type="subscription",
         reference_id=str(sub.id)
@@ -286,20 +577,37 @@ async def pause_subscription(
 @router.post("/{sub_id}/resume", response_model=MessageResponse)
 async def resume_subscription(
     sub_id: UUID,
-    current_user: User = Depends(require_customer),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    customer = await _get_customer(db, current_user.id)
-    sub = await _get_subscription_for_customer(db, sub_id, customer.id)
+    """Resume a paused subscription."""
+    from app.models.role import Role, UserRole
+    roles_res = await db.execute(
+        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+    )
+    user_roles = [r[0] for r in roles_res.fetchall()]
+    is_admin = "super_admin" in user_roles
+
+    sub_res = await db.execute(select(Subscription).where(Subscription.id == sub_id))
+    sub = sub_res.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    if not is_admin:
+        customer = await _get_customer(db, current_user.id)
+        if sub.customer_id != customer.id:
+            raise HTTPException(status_code=403, detail="Not authorized to resume this subscription")
+
     try:
         await subscription_engine.resume_subscription(db, sub)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
         
     # Send Notification
+    customer_profile = await db.get(Customer, sub.customer_id)
     await NotificationService.create_in_app_notification(
         db=db,
-        user_id=customer.user_id,
+        user_id=customer_profile.user_id,
         title="Subscription Resumed",
         body="Your subscription has been resumed and deliveries will continue.",
         category="subscription",
@@ -318,11 +626,102 @@ async def cancel_subscription(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    customer = await _get_customer(db, current_user.id)
-    sub = await _get_subscription_for_customer(db, sub_id, customer.id)
-    await subscription_engine.cancel_subscription(db, sub)
+    """Cancel a subscription."""
+    from app.models.role import Role, UserRole
+    roles_res = await db.execute(
+        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+    )
+    user_roles = [r[0] for r in roles_res.fetchall()]
+    is_admin = "super_admin" in user_roles
+
+    sub_res = await db.execute(select(Subscription).where(Subscription.id == sub_id))
+    sub = sub_res.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    if not is_admin:
+        customer = await _get_customer(db, current_user.id)
+        if sub.customer_id != customer.id:
+            raise HTTPException(status_code=403, detail="Not authorized to cancel this subscription")
+
+    try:
+        await subscription_engine.cancel_subscription(db, sub, payload.reason)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Send Notification
+    customer_profile = await db.get(Customer, sub.customer_id)
+    await NotificationService.create_in_app_notification(
+        db=db,
+        user_id=customer_profile.user_id,
+        title="Subscription Cancelled",
+        body=f"Your subscription has been cancelled. Reason: {payload.reason}",
+        category="subscription",
+        action_type="subscription",
+        reference_id=str(sub.id)
+    )
+
     await db.commit()
     return MessageResponse(message="Subscription cancelled successfully")
+
+
+@router.post("/{sub_id}/renew", response_model=SubscriptionResponse)
+async def renew_subscription(
+    sub_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    new_plan_id: Optional[UUID] = Query(None),
+    auto_renew: Optional[bool] = Query(None),
+):
+    """Renew a subscription manually."""
+    from app.models.role import Role, UserRole
+    roles_res = await db.execute(
+        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+    )
+    user_roles = [r[0] for r in roles_res.fetchall()]
+    is_admin = "super_admin" in user_roles
+
+    sub_res = await db.execute(select(Subscription).where(Subscription.id == sub_id))
+    sub = sub_res.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    if not is_admin:
+        customer = await _get_customer(db, current_user.id)
+        if sub.customer_id != customer.id:
+            raise HTTPException(status_code=403, detail="Not authorized to renew this subscription")
+
+    try:
+        renewed_sub = await subscription_engine.renew_subscription(
+            db=db,
+            subscription=sub,
+            new_plan_id=new_plan_id,
+            auto_renew=auto_renew,
+        )
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Reload with products
+    result = await db.execute(
+        select(Subscription)
+        .where(Subscription.id == renewed_sub.id)
+        .options(
+            selectinload(Subscription.items).selectinload(SubscriptionItem.product),
+            selectinload(Subscription.customer).selectinload(Customer.user),
+            selectinload(Subscription.plan)
+        )
+    )
+    sub_loaded = result.scalar_one()
+    if sub_loaded.customer and sub_loaded.customer.user:
+        sub_loaded.customer_name = sub_loaded.customer.user.full_name
+        sub_loaded.customer_phone = sub_loaded.customer.user.phone
+    if sub_loaded.plan:
+        sub_loaded.plan_name = sub_loaded.plan.name
+    for item in sub_loaded.items:
+        item.product_name = item.product.name
+    return sub_loaded
 
 
 @router.get("/{sub_id}/deliveries", response_model=DeliveryListResponse)
@@ -334,8 +733,16 @@ async def get_subscription_deliveries(
     page_size: int = Query(20, ge=1, le=100),
     status: str = Query(None),
 ):
-    customer = await _get_customer(db, current_user.id)
-    await _get_subscription_for_customer(db, sub_id, customer.id)
+    from app.models.role import Role, UserRole
+    roles_res = await db.execute(
+        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+    )
+    user_roles = [r[0] for r in roles_res.fetchall()]
+    is_admin = "super_admin" in user_roles
+
+    if not is_admin:
+        customer = await _get_customer(db, current_user.id)
+        await _get_subscription_for_customer(db, sub_id, customer.id)
 
     query = select(SubscriptionDelivery).where(SubscriptionDelivery.subscription_id == sub_id)
     if status:
@@ -359,8 +766,7 @@ async def skip_delivery_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Skip/Pause a specific delivery day (customer or admin requested). Triggers carry-forward extension."""
-    # Check user role
+    """Skip a specific delivery day. Triggers carry-forward extension and registers skipped status history."""
     from app.models.role import Role, UserRole
     roles_res = await db.execute(
         select(Role.name)
@@ -370,7 +776,6 @@ async def skip_delivery_endpoint(
     user_roles = [r[0] for r in roles_res.fetchall()]
     is_admin = "super_admin" in user_roles
 
-    # Fetch the delivery
     delivery_result = await db.execute(
         select(SubscriptionDelivery).where(SubscriptionDelivery.id == delivery_id)
     )
@@ -382,13 +787,11 @@ async def skip_delivery_endpoint(
     if not sub:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
-    # Verify ownership if not admin
     if not is_admin:
         customer = await _get_customer(db, current_user.id)
         if sub.customer_id != customer.id:
             raise HTTPException(status_code=403, detail="Not authorized to skip this delivery")
 
-    # Enforce status rules: only pending or assigned deliveries can be skipped
     if delivery.status not in [DeliveryStatus.PENDING, DeliveryStatus.ASSIGNED]:
         raise HTTPException(
             status_code=400,
