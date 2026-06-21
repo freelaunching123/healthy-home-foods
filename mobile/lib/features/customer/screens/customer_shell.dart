@@ -35,8 +35,8 @@ class _CustomerShellState extends State<CustomerShell> {
   void didUpdateWidget(CustomerShell oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Refresh badge when switching back to notifications tab
-    if (widget.navigationShell.currentIndex == 3 &&
-        oldWidget.navigationShell.currentIndex != 3) {
+    if (widget.navigationShell.currentIndex == 4 &&
+        oldWidget.navigationShell.currentIndex != 4) {
       Future.delayed(const Duration(seconds: 1), _fetchUnreadCount);
     }
   }
@@ -75,18 +75,24 @@ class _CustomerShellState extends State<CustomerShell> {
                   onTap: () => widget.navigationShell.goBranch(1),
                 ),
                 _NavItem(
-                  icon: Icons.receipt_long_rounded,
-                  label: 'Payments',
+                  icon: Icons.local_grocery_store_rounded,
+                  label: 'Fruits',
                   isSelected: widget.navigationShell.currentIndex == 2,
                   onTap: () => widget.navigationShell.goBranch(2),
+                ),
+                _NavItem(
+                  icon: Icons.receipt_long_rounded,
+                  label: 'Payments',
+                  isSelected: widget.navigationShell.currentIndex == 3,
+                  onTap: () => widget.navigationShell.goBranch(3),
                 ),
                 _NavItemBadge(
                   icon: Icons.notifications_rounded,
                   label: 'Alerts',
                   badgeCount: _unreadCount,
-                  isSelected: widget.navigationShell.currentIndex == 3,
+                  isSelected: widget.navigationShell.currentIndex == 4,
                   onTap: () {
-                    widget.navigationShell.goBranch(3);
+                    widget.navigationShell.goBranch(4);
                     // Clear badge after navigating to notifications
                     Future.delayed(const Duration(milliseconds: 500), () {
                       if (mounted) setState(() => _unreadCount = 0);
@@ -96,8 +102,8 @@ class _CustomerShellState extends State<CustomerShell> {
                 _NavItem(
                   icon: Icons.person_rounded,
                   label: 'Profile',
-                  isSelected: widget.navigationShell.currentIndex == 4,
-                  onTap: () => widget.navigationShell.goBranch(4),
+                  isSelected: widget.navigationShell.currentIndex == 5,
+                  onTap: () => widget.navigationShell.goBranch(5),
                 ),
               ],
             ),

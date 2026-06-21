@@ -42,6 +42,7 @@ class Address(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="addresses")
     subscriptions: Mapped[List["Subscription"]] = relationship("Subscription", back_populates="address")
+    fruit_orders: Mapped[List["FruitOrder"]] = relationship("FruitOrder", back_populates="address")
 
     def __repr__(self) -> str:
         return f"<Address id={self.id} pincode={self.pincode}>"

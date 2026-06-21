@@ -17,3 +17,4 @@ from app.models.otp_log import OtpLog  # noqa
 from app.models.gps_tracking import GpsTrackingLog  # noqa
 from app.models.audit_log import AuditLog  # noqa
 from app.models.admin_settings import AdminSettings  # noqa
+from app.models.fruit import Fruit, FruitCart, FruitOrder, FruitOrderItem  # noqa

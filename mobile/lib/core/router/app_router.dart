@@ -24,6 +24,12 @@ import '../../features/customer/screens/edit_profile_screen.dart';
 import '../../features/customer/screens/my_subscription_detail_screen.dart';
 import '../../features/customer/screens/delivery_history_screen.dart';
 import '../../features/customer/screens/address_management_screen.dart';
+// Fruit screens (Customer)
+import '../../features/customer/screens/fruits_screen.dart';
+import '../../features/customer/screens/fruit_cart_screen.dart';
+import '../../features/customer/screens/fruit_checkout_screen.dart';
+import '../../features/customer/screens/fruit_order_history_screen.dart';
+import '../../features/customer/screens/fruit_order_detail_screen.dart';
 
 // Admin screens
 import '../../features/admin/screens/admin_shell.dart';
@@ -40,6 +46,10 @@ import '../../features/admin/screens/create_delivery_partner_screen.dart';
 import '../../features/admin/screens/delivery_partner_profile_screen.dart';
 import '../../features/admin/screens/reports_screen.dart';
 import '../../features/admin/screens/admin_settings_screen.dart';
+// Fruit screens (Admin)
+import '../../features/admin/screens/fruit_management_screen.dart';
+import '../../features/admin/screens/add_edit_fruit_screen.dart';
+import '../../features/admin/screens/fruit_orders_screen.dart';
 
 // Delivery boy screens
 import '../../features/delivery/screens/delivery_shell.dart';
@@ -48,6 +58,7 @@ import '../../features/delivery/screens/order_detail_screen.dart';
 import '../../features/delivery/screens/route_screen.dart';
 import '../../features/delivery/screens/delivery_history_screen.dart';
 import '../../features/delivery/screens/delivery_profile_screen.dart';
+import '../../features/delivery/screens/active_deliveries_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -76,7 +87,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/delivery-login', builder: (_, __) => const DeliveryPartnerLoginScreen()),
     GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
 
-    // Customer shell with bottom nav
+    // Customer shell with bottom nav (6 tabs: Home, Plans, Fruits, Payments, Alerts, Profile)
     StatefulShellRoute.indexedStack(
       builder: (_, __, navigationShell) => CustomerShell(navigationShell: navigationShell),
       branches: [
@@ -85,6 +96,9 @@ final GoRouter appRouter = GoRouter(
         ]),
         StatefulShellBranch(routes: [
           GoRoute(path: '/subscriptions', builder: (_, __) => const SubscriptionsScreen()),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(path: '/fruits', builder: (_, __) => const FruitsScreen()),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(path: '/payments', builder: (_, __) => const PaymentHistoryScreen()),
@@ -124,7 +138,16 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/profile/delivery-history', builder: (_, __) => const CustomerDeliveryHistoryScreen()),
     GoRoute(path: '/profile/addresses', builder: (_, __) => const AddressManagementScreen()),
 
-    // Admin shell
+    // ── Fruit customer routes ──────────────────────────────────────────────────
+    GoRoute(path: '/fruits/cart', builder: (_, __) => const FruitCartScreen()),
+    GoRoute(path: '/fruits/checkout', builder: (_, __) => const FruitCheckoutScreen()),
+    GoRoute(path: '/fruits/orders', builder: (_, __) => const FruitOrderHistoryScreen()),
+    GoRoute(
+      path: '/fruits/orders/:id',
+      builder: (_, state) => FruitOrderDetailScreen(orderId: state.pathParameters['id']!),
+    ),
+
+    // Admin shell (5 tabs: Dashboard, Products, Fruits, Deliveries, Reports)
     StatefulShellRoute.indexedStack(
       builder: (_, __, navigationShell) => AdminShell(navigationShell: navigationShell),
       branches: [
@@ -133,6 +156,9 @@ final GoRouter appRouter = GoRouter(
         ]),
         StatefulShellBranch(routes: [
           GoRoute(path: '/admin/products', builder: (_, __) => const ProductManagementScreen()),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(path: '/admin/fruits', builder: (_, __) => const FruitManagementScreen()),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(path: '/admin/deliveries', builder: (_, __) => const DeliveryManagementScreen()),
@@ -162,6 +188,14 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(path: '/admin/settings', builder: (_, __) => const AdminSettingsScreen()),
 
+    // ── Fruit admin routes ─────────────────────────────────────────────────────
+    GoRoute(path: '/admin/fruits/add', builder: (_, __) => const AddEditFruitScreen()),
+    GoRoute(
+      path: '/admin/fruits/edit/:id',
+      builder: (_, state) => AddEditFruitScreen(fruitId: state.pathParameters['id']),
+    ),
+    GoRoute(path: '/admin/fruits/orders', builder: (_, __) => const FruitOrdersScreen()),
+
     // Delivery boy shell
     StatefulShellRoute.indexedStack(
       builder: (_, __, navigationShell) => DeliveryShell(navigationShell: navigationShell),
@@ -179,6 +213,10 @@ final GoRouter appRouter = GoRouter(
           GoRoute(path: '/delivery/profile', builder: (_, __) => const DeliveryProfileScreen()),
         ]),
       ],
+    ),
+    GoRoute(
+      path: '/delivery/active',
+      builder: (_, __) => const ActiveDeliveriesScreen(),
     ),
     GoRoute(
       path: '/delivery/order/:id',

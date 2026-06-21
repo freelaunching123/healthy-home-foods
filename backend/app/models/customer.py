@@ -23,6 +23,8 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="customer")
     subscriptions: Mapped[List["Subscription"]] = relationship("Subscription", back_populates="customer")
+    fruit_cart_items: Mapped[List["FruitCart"]] = relationship("FruitCart", back_populates="customer", cascade="all, delete-orphan")
+    fruit_orders: Mapped[List["FruitOrder"]] = relationship("FruitOrder", back_populates="customer")
 
     def __repr__(self) -> str:
         return f"<Customer code={self.customer_code}>"

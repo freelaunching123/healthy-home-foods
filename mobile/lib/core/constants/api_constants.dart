@@ -36,6 +36,16 @@ class ApiConstants {
   static const String gpsUpdate = '/deliveries/gps/update';
   static const String gpsTrack = '/deliveries/gps/track';
 
+  // Delivery Partner App
+  static const String partnerDashboard = '/delivery-partner/dashboard';
+  static const String partnerActiveDeliveries = '/delivery-partner/active';
+  static const String partnerRoute = '/delivery-partner/route';
+  static const String partnerHistory = '/delivery-partner/history';
+  static const String partnerProfile = '/delivery-partner/profile';
+  static const String partnerChangePassword = '/delivery-partner/change-password';
+  
+  static String partnerUpdateStatus(String assignmentId) => '/delivery-partner/assignments/$assignmentId/status';
+
   // Users
   static const String users = '/users';
   static const String userProfile = '/users/profile';
@@ -62,4 +72,17 @@ class ApiConstants {
 
   // Payment Summary
   static const String paymentSummary = '/payments/summary';
+
+  // Fruits (Customer)
+  static const String fruits = '/fruits';
+  static const String fruitDetail = '/fruits/detail';
+  static const String fruitCart = '/fruits/cart';
+  static const String fruitCartAdd = '/fruits/cart/add';
+  static const String fruitOrdersCheckout = '/fruits/orders/checkout';
+  static const String fruitOrdersHistory = '/fruits/orders/history';
+  static const String fruitOrders = '/fruits/orders';
+
+  // Fruits (Admin)
+  static const String adminFruits = '/fruits/admin/fruits';
+  static const String adminFruitOrders = '/fruits/admin/orders';
 }

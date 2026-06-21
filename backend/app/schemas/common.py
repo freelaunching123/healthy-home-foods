@@ -125,7 +125,8 @@ class UpdateDeliveryStatusRequest(BaseModel):
 
 class AssignmentResponse(BaseModel):
     id: uuid.UUID
-    delivery_id: uuid.UUID
+    subscription_delivery_id: Optional[uuid.UUID]
+    fruit_order_id: Optional[uuid.UUID]
     delivery_partner_id: uuid.UUID
     status: str
     assigned_at: datetime
@@ -133,6 +134,48 @@ class AssignmentResponse(BaseModel):
     estimated_minutes: Optional[int]
 
     model_config = {"from_attributes": True}
+
+
+class ActiveDeliveryResponse(BaseModel):
+    id: uuid.UUID
+    order_id: str
+    order_type: str  # 'subscription' or 'fruit'
+    customer_name: str
+    customer_phone: str
+    delivery_address: str
+    latitude: Optional[float]
+    longitude: Optional[float]
+    status: str
+    assigned_at: datetime
+    items_summary: str
+    total_amount: float
+    delivery_instructions: Optional[str]
+
+
+class DeliveryRouteResponse(BaseModel):
+    stops: list[ActiveDeliveryResponse]
+    total_distance_km: float
+    total_estimated_minutes: int
+
+
+class PartnerDashboardStats(BaseModel):
+    assigned_today: int
+    completed_today: int
+    pending_deliveries: int
+    failed_deliveries: int
+    success_rate: float
+    active_deliveries: int
+
+
+class PartnerProfileUpdate(BaseModel):
+    vehicle_type: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    service_zone: Optional[str] = None
+
+
+class PartnerPasswordChange(BaseModel):
+    old_password: str
+    new_password: str
 
 
 # ── Admin settings schemas ─────────────────────────────────────────────────────
@@ -235,5 +278,8 @@ class DeliveryHistoryResponse(BaseModel):
     delivery_date: date
     product_name: str
     status: str
+    order_type: str = "subscription"
+    customer_name: str = ""
+    delivery_time: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

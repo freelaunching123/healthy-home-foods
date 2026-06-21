@@ -16,7 +16,7 @@ import os
 
 from app.core.config import settings
 import app.db.models_import  # noqa: F401 — registers ALL models so SQLAlchemy can resolve relationships
-from app.api.v1 import auth, users, products, subscriptions, deliveries, payments, admin_settings, reports, delivery_partners, notifications
+from app.api.v1 import auth, users, products, subscriptions, deliveries, payments, admin_settings, reports, delivery_partners, notifications, fruits, delivery_partner_app
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(os.path.join(settings.UPLOAD_DIR, "products"), exist_ok=True)
     os.makedirs(os.path.join(settings.UPLOAD_DIR, "proofs"), exist_ok=True)
+    os.makedirs(os.path.join(settings.UPLOAD_DIR, "fruits"), exist_ok=True)
     yield
     logger.info("👋 Healthy Home Foods API shutting down...")
 
@@ -121,6 +122,8 @@ app.include_router(admin_settings.router,  prefix=PREFIX)
 app.include_router(reports.router,         prefix=PREFIX)
 app.include_router(delivery_partners.router, prefix=PREFIX)
 app.include_router(notifications.router,    prefix=PREFIX)
+app.include_router(fruits.router,           prefix=PREFIX)
+app.include_router(delivery_partner_app.router, prefix=PREFIX)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

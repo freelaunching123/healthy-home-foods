@@ -49,7 +49,7 @@ class SubscriptionDelivery(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     # Relationships
     subscription: Mapped["Subscription"] = relationship("Subscription", back_populates="deliveries")
-    assignment: Mapped[Optional["DeliveryAssignment"]] = relationship("DeliveryAssignment", back_populates="delivery", uselist=False)
+    assignment: Mapped[Optional["DeliveryAssignment"]] = relationship("DeliveryAssignment", back_populates="subscription_delivery", uselist=False)
     parent_delivery: Mapped[Optional["SubscriptionDelivery"]] = relationship(
         "SubscriptionDelivery", remote_side="SubscriptionDelivery.id"
     )
