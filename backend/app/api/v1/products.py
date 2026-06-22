@@ -265,6 +265,16 @@ async def upload_product_image(
     filename = f"{uuid_lib.uuid4()}{ext}"
     filepath = os.path.join(upload_dir, filename)
 
+    # Delete old image if it exists to overwrite/rewrite it
+    if product.image_url:
+        old_filename = os.path.basename(product.image_url)
+        old_filepath = os.path.join(upload_dir, old_filename)
+        if os.path.exists(old_filepath):
+            try:
+                os.remove(old_filepath)
+            except Exception:
+                pass
+
     with open(filepath, "wb") as f:
         shutil.copyfileobj(file.file, f)
 

@@ -200,6 +200,7 @@ class _ProductAdminCard extends StatelessWidget {
     final bool isActive = product['is_active'] == true;
     final String status = product['status'] ?? 'unknown';
     final String availability = product['availability'] ?? 'unknown';
+    final mediaBaseUrl = ApiClient().mediaBaseUrl;
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -223,7 +224,7 @@ class _ProductAdminCard extends StatelessWidget {
                     color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                     image: product['image_url'] != null 
-                        ? DecorationImage(image: NetworkImage('http://10.0.2.2:8000${product['image_url']}'), fit: BoxFit.cover)
+                        ? DecorationImage(image: NetworkImage('$mediaBaseUrl${product['image_url']}'), fit: BoxFit.cover)
                         : null,
                   ),
                   child: product['image_url'] == null ? const Icon(Icons.eco, color: AppTheme.primaryGreen) : null,

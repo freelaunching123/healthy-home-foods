@@ -177,7 +177,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       image: _selectedImageBytes != null
                           ? DecorationImage(image: MemoryImage(_selectedImageBytes!), fit: BoxFit.cover)
                           : _existingImageUrl != null
-                              ? DecorationImage(image: NetworkImage('${ApiConstants.baseUrl}$_existingImageUrl'), fit: BoxFit.cover)
+                              ? DecorationImage(image: NetworkImage('${_api.mediaBaseUrl}$_existingImageUrl'), fit: BoxFit.cover)
                               : null,
                     ),
                     child: _selectedImageBytes == null && _existingImageUrl == null

@@ -590,7 +590,7 @@ class _Avatar extends StatelessWidget {
           radius: 30,
           backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.15),
           backgroundImage: photoUrl != null
-              ? NetworkImage('http://127.0.0.1:8000$photoUrl')
+              ? NetworkImage('${ApiClient().mediaBaseUrl}$photoUrl')
               : null,
           child: photoUrl == null
               ? Text(
@@ -943,7 +943,7 @@ class _EditPartnerDialogState extends State<_EditPartnerDialog> {
                               )
                             : (widget.partner['photo_url'] != null
                                 ? NetworkImage(
-                                    'http://127.0.0.1:8000${widget.partner['photo_url']}',
+                                    '${ApiClient().mediaBaseUrl}${widget.partner['photo_url']}',
                                   ) as ImageProvider
                                 : null),
                         child: (_photoBase64 == null &&

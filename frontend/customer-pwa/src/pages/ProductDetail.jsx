@@ -30,12 +30,14 @@ export default function ProductDetail() {
   );
 
   // Price computation — weekly = price * 6, monthly = price * 26
-  const pricePerUnit = parseFloat(product.price_per_unit || 0);
+  const pricePerUnit = parseFloat(product.price || product.price_per_unit || 0);
   const weeklyTotal  = (pricePerUnit * 6).toFixed(0);
   const monthlyTotal = (pricePerUnit * 26).toFixed(0);
 
   const selectedPrice = plan === 'weekly' ? weeklyTotal : monthlyTotal;
   const deliveryCount = plan === 'weekly' ? 6 : 26;
+
+  const isAvailable = product.availability === 'available' || product.is_available === true;
 
   return (
     <div>
@@ -58,10 +60,10 @@ export default function ProductDetail() {
         {/* Name + badge */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
           <h1 style={{ fontSize: '22px', fontFamily: 'Poppins,sans-serif', fontWeight: 700 }}>{product.name}</h1>
-          <span className="badge badge-success">{product.is_available ? '✓ Available' : 'Unavailable'}</span>
+          <span className={`badge ${isAvailable ? 'badge-success' : 'badge-danger'}`}>{isAvailable ? '✓ Available' : 'Unavailable'}</span>
         </div>
         <p style={{ fontSize: '13px', color: '#757575', marginBottom: '16px' }}>
-          {product.unit} · {product.category_name || 'Healthy Food'}
+          {product.category_name || 'Healthy Food'}
         </p>
 
         {product.description && (
@@ -101,10 +103,10 @@ export default function ProductDetail() {
         {/* Subscribe button */}
         <button
           className="btn-primary"
-          disabled={!product.is_available}
+          disabled={!isAvailable}
           onClick={() => navigate('/checkout', { state: { product, plan } })}
         >
-          {product.is_available ? `Subscribe — ₹${selectedPrice}` : 'Currently Unavailable'}
+          {isAvailable ? `Subscribe — ₹${selectedPrice}` : 'Currently Unavailable'}
         </button>
       </div>
     </div>

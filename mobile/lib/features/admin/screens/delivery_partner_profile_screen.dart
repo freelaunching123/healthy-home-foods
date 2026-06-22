@@ -167,7 +167,7 @@ class _ProfileHeader extends StatelessWidget {
                       radius: 44,
                       backgroundColor: Colors.white.withValues(alpha: 0.2),
                       backgroundImage: photoUrl != null
-                          ? NetworkImage('http://127.0.0.1:8000$photoUrl')
+                          ? NetworkImage('${ApiClient().mediaBaseUrl}$photoUrl')
                           : null,
                       child: photoUrl == null
                           ? Text(

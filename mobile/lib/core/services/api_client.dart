@@ -14,7 +14,8 @@ class ApiClient {
     if (!kIsWeb && Platform.isIOS) {
       baseUrl = ApiConstants.baseUrlIOS;
     } else if (kIsWeb) {
-      baseUrl = ApiConstants.baseUrlWeb;
+      final host = Uri.base.host.isNotEmpty ? Uri.base.host : 'localhost';
+      baseUrl = 'http://$host:8000/api/v1';
     }
 
     dio = Dio(BaseOptions(
@@ -114,5 +115,13 @@ class ApiClient {
       fieldName: MultipartFile.fromFileSync(filePath),
     });
     return dio.post('${dio.options.baseUrl}$path', data: formData);
+  }
+
+  String get mediaBaseUrl {
+    final base = dio.options.baseUrl;
+    if (base.endsWith('/api/v1')) {
+      return base.substring(0, base.length - 8);
+    }
+    return base;
   }
 }

@@ -75,7 +75,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 ),
                 child: _product!['image_url'] != null
-                  ? Image.network('http://10.0.2.2:8000${_product!['image_url']}', fit: BoxFit.cover,
+                  ? Image.network('${_api.mediaBaseUrl}${_product!['image_url']}', fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.eco_rounded, size: 80, color: AppTheme.primaryGreen)))
                   : const Center(child: Icon(Icons.eco_rounded, size: 80, color: AppTheme.primaryGreen)),
               ),

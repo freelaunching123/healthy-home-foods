@@ -91,8 +91,14 @@ export default function Home() {
                 </div>
                 <div className="product-card-body">
                   <p className="product-name">{p.name}</p>
-                  <p className="product-unit">{p.unit}</p>
-                  <p className="product-price">₹{parseFloat(p.price_per_unit || 0).toFixed(0)}</p>
+                  <p className="product-price">
+                    ₹{parseFloat(p.price || p.price_per_unit || 0).toFixed(0)}
+                    {p.discount_price && (
+                      <span style={{ fontSize: '12px', textDecoration: 'line-through', color: '#9e9e9e', marginLeft: 6 }}>
+                        ₹{parseFloat(p.discount_price).toFixed(0)}
+                      </span>
+                    )}
+                  </p>
                   <button
                     onClick={e => { e.stopPropagation(); navigate(`/product/${p.id}`); }}
                     style={{ marginTop: '8px', width: '100%', padding: '8px', background: '#2E7D32', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>

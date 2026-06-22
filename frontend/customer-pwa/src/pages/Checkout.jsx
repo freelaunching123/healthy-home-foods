@@ -24,7 +24,7 @@ export default function Checkout() {
     return null;
   }
 
-  const pricePerUnit = parseFloat(product.price_per_unit || 0);
+  const pricePerUnit = parseFloat(product.price || product.price_per_unit || 0);
   const deliveryCount = plan === 'weekly' ? 6 : 26;
   const productTotal = pricePerUnit * deliveryCount;
   const deliveryCharge = distKm > FREE_KM ? Math.round((distKm - FREE_KM) * CHARGE_PER_KM) : 0;

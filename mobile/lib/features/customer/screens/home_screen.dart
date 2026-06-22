@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
@@ -16,6 +17,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _api = ApiClient();
   List<dynamic> _categories = [];
   List<dynamic> _products = [];
+  Timer? _pollingTimer;
   
   List<dynamic> get _featuredProducts => _products.where((p) => p['is_featured'] == true || p['is_popular'] == true).toList();
   List<dynamic> get _todaySpecials => _products.where((p) => p['is_today_special'] == true).toList();
@@ -28,10 +30,25 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadData();
+    _startPolling();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      _loadData(isSilent: true);
+    });
+  }
+
+  Future<void> _loadData({bool isSilent = false}) async {
+    if (!isSilent) {
+      setState(() => _isLoading = true);
+    }
     try {
       final catRes = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true});
       final prodRes = await _api.get(ApiConstants.products, queryParameters: {
@@ -39,14 +56,26 @@ class _HomeScreenState extends State<HomeScreen> {
         'status': 'published',
         'active_only': true,
       });
-      setState(() {
-        _categories = catRes.data is List ? catRes.data : [];
-        _products = prodRes.data['items'] ?? [];
-      });
+      if (mounted) {
+        setState(() {
+          _categories = catRes.data is List ? catRes.data : [];
+          _products = prodRes.data['items'] ?? [];
+
+          // If the selected category is no longer active or exists, reset to "All"
+          if (_selectedCategoryId != null) {
+            final exists = _categories.any((c) => c['id'] == _selectedCategoryId);
+            if (!exists) {
+              _selectedCategoryId = null;
+            }
+          }
+        });
+      }
     } catch (e) {
       debugPrint('Error loading data: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (!isSilent && mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -193,6 +222,7 @@ class _SpecialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mediaBaseUrl = ApiClient().mediaBaseUrl;
     return GestureDetector(
       onTap: () => context.push('/product/${product['id']}'),
       child: Container(
@@ -201,7 +231,7 @@ class _SpecialCard extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           image: product['image_url'] != null 
-              ? DecorationImage(image: NetworkImage('http://10.0.2.2:8000${product['image_url']}'), fit: BoxFit.cover, colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.4), BlendMode.darken))
+              ? DecorationImage(image: NetworkImage('$mediaBaseUrl${product['image_url']}'), fit: BoxFit.cover, colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.4), BlendMode.darken))
               : null,
           color: AppTheme.primaryGreen,
         ),
@@ -266,6 +296,7 @@ class _ProductCard extends StatelessWidget {
     final double price = double.tryParse(product['price']?.toString() ?? '0') ?? 0;
     final double? discountPrice = product['discount_price'] != null ? double.tryParse(product['discount_price'].toString()) : null;
     final bool isOutOfStock = product['availability'] != 'available';
+    final mediaBaseUrl = ApiClient().mediaBaseUrl;
 
     return GestureDetector(
       onTap: () => context.push('/product/${product['id']}'),
@@ -294,7 +325,7 @@ class _ProductCard extends StatelessWidget {
                         ? ClipRRect(
                             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                             child: Image.network(
-                              'http://10.0.2.2:8000${product['image_url']}',
+                              '$mediaBaseUrl${product['image_url']}',
                               fit: BoxFit.cover, width: double.infinity, height: 110,
                               errorBuilder: (_, __, ___) => const Icon(Icons.eco_rounded, size: 40, color: AppTheme.primaryGreen),
                             ),
