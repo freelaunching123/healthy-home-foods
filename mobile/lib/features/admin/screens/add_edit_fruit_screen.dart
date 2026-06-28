@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -27,7 +28,8 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
   String _availability = 'in_stock';
   bool _isActive = true;
   String? _existingImageUrl;
-  File? _pickedImage;
+  XFile? _pickedImage;
+  Uint8List? _pickedImageBytes;
   bool _loading = false;
   bool _saving = false;
   bool _uploadingImage = false;
@@ -74,7 +76,11 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 800);
     if (picked != null) {
-      setState(() => _pickedImage = File(picked.path));
+      final bytes = await picked.readAsBytes();
+      setState(() {
+        _pickedImage = picked;
+        _pickedImageBytes = bytes;
+      });
     }
   }
 
@@ -130,7 +136,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
     if (_pickedImage == null) return;
     try {
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(_pickedImage!.path),
+        'file': MultipartFile.fromBytes(_pickedImageBytes!, filename: _pickedImage!.name),
       });
       await _api.dio.post(
         '${_api.dio.options.baseUrl}${ApiConstants.adminFruits}/$fruitId/image',
@@ -150,7 +156,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
     final id = _savedFruitId ?? widget.fruitId!;
     try {
       await _api.delete('${ApiConstants.adminFruits}/$id/image');
-      setState(() { _existingImageUrl = null; _pickedImage = null; });
+      setState(() { _existingImageUrl = null; _pickedImage = null; _pickedImageBytes = null; });
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Image removed'), backgroundColor: AppTheme.success),
       );
@@ -200,8 +206,10 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(14),
-                                child: _pickedImage != null
-                                    ? Image.file(_pickedImage!, fit: BoxFit.cover)
+                                child: _pickedImageBytes != null
+                                    ? kIsWeb 
+                                        ? Image.memory(_pickedImageBytes!, fit: BoxFit.cover)
+                                        : Image.file(File(_pickedImage!.path), fit: BoxFit.cover)
                                     : _existingImageUrl != null
                                         ? CachedNetworkImage(
                                             imageUrl: '$baseUrl$_existingImageUrl', fit: BoxFit.cover,
@@ -229,7 +237,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
                                 const SizedBox(width: 8),
                                 OutlinedButton.icon(
                                   onPressed: () {
-                                    if (_pickedImage != null) setState(() => _pickedImage = null);
+                                    if (_pickedImage != null) setState(() { _pickedImage = null; _pickedImageBytes = null; });
                                     else _deleteImage();
                                   },
                                   icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppTheme.error),

@@ -36,8 +36,10 @@ async def get_settings(db: AsyncSession) -> AdminSettings:
 async def create_subscription(
     db: AsyncSession,
     customer: Customer,
-    plan: SubscriptionPlan,
-    items_data: list,  # list of {"product": Product, "quantity": int}
+    items_data: list,  # list of {"product": Product, "quantity": int, "package_price": float}
+    plan_type: str,
+    total_deliveries: int,
+    plan_id: UUID | None,
     address_id: UUID,
     delivery_charge: float,
     tax_amount: float,
@@ -46,23 +48,24 @@ async def create_subscription(
     notes: str | None = None,
 ) -> Subscription:
     """Creates a subscription record with multiple items. Status remains pending_payment."""
-    price_per_delivery = 0.0
+    selected_price = 0.0
     for item in items_data:
-        prod = item["product"]
         qty = item["quantity"]
-        price_per_delivery += float(prod.price) * qty
+        item_price = item["package_price"]
+        selected_price += item_price * qty
 
-    total_amount = (price_per_delivery * plan.total_deliveries) + delivery_charge + tax_amount
+    total_amount = selected_price + delivery_charge + tax_amount
     first_prod_id = items_data[0]["product"].id if items_data else None
 
     sub = Subscription(
         customer_id=customer.id,
-        plan_id=plan.id,
+        plan_id=plan_id,
         product_id=first_prod_id,
         address_id=address_id,
         status=SubscriptionStatus.PENDING_PAYMENT,
-        total_deliveries=plan.total_deliveries,
-        price_per_delivery=price_per_delivery,
+        total_deliveries=total_deliveries,
+        plan_type=plan_type,
+        package_price=selected_price,
         total_amount=total_amount,
         delivery_charge=delivery_charge,
         tax_amount=tax_amount,
@@ -81,7 +84,7 @@ async def create_subscription(
             subscription_id=sub.id,
             product_id=prod.id,
             quantity=qty,
-            price_per_delivery=float(prod.price),
+            package_price=item["package_price"],
         )
         db.add(sub_item)
 

@@ -79,8 +79,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
       if (image == null) return;
 
-      final file = File(image.path);
-      final bytes = await file.readAsBytes();
+      final bytes = await image.readAsBytes();
       final base64String = base64Encode(bytes);
       
       // Determine mime type from extension
@@ -90,7 +89,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
 
       setState(() {
-        _selectedImageFile = file;
         _photoBase64 = 'data:$mimeType;base64,$base64String';
       });
     } catch (e) {

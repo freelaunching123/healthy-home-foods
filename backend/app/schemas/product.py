@@ -1,6 +1,6 @@
 import uuid
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, Literal
+from pydantic import BaseModel, root_validator, model_validator
 from app.models.product import ProductStatus, ProductAvailability
 
 
@@ -31,8 +31,18 @@ class ProductCreate(BaseModel):
     name: str
     slug: str
     description: Optional[str] = None
-    price: float
+    plan_type: Literal['weekly', 'monthly']
+    package_days: int
+    package_price: float
     discount_price: Optional[float] = None
+    
+    @model_validator(mode='after')
+    def validate_plan(self) -> 'ProductCreate':
+        if self.plan_type == 'weekly' and self.package_days != 6:
+            raise ValueError("Weekly plan must have 6 package days")
+        if self.plan_type == 'monthly' and self.package_days != 26:
+            raise ValueError("Monthly plan must have 26 package days")
+        return self
     status: ProductStatus = ProductStatus.DRAFT
     availability: ProductAvailability = ProductAvailability.AVAILABLE
     display_order: int = 0
@@ -45,7 +55,9 @@ class ProductUpdate(BaseModel):
     category_id: Optional[uuid.UUID] = None
     name: Optional[str] = None
     description: Optional[str] = None
-    price: Optional[float] = None
+    plan_type: Optional[Literal['weekly', 'monthly']] = None
+    package_days: Optional[int] = None
+    package_price: Optional[float] = None
     discount_price: Optional[float] = None
     status: Optional[ProductStatus] = None
     availability: Optional[ProductAvailability] = None
@@ -55,16 +67,28 @@ class ProductUpdate(BaseModel):
     is_today_special: Optional[bool] = None
     is_active: Optional[bool] = None
     image_url: Optional[str] = None
+    
+    @model_validator(mode='after')
+    def validate_plan(self) -> 'ProductUpdate':
+        if self.plan_type == 'weekly' and self.package_days is not None and self.package_days != 6:
+            raise ValueError("Weekly plan must have 6 package days")
+        if self.plan_type == 'monthly' and self.package_days is not None and self.package_days != 26:
+            raise ValueError("Monthly plan must have 26 package days")
+        return self
 
 
 class ProductResponse(BaseModel):
     id: uuid.UUID
     category_id: uuid.UUID
+    category_name: Optional[str]
+    category: Optional[ProductCategoryResponse]
     name: str
     slug: str
     description: Optional[str]
     image_url: Optional[str]
-    price: float
+    plan_type: str
+    package_days: int
+    package_price: float
     discount_price: Optional[float]
     status: ProductStatus
     availability: ProductAvailability

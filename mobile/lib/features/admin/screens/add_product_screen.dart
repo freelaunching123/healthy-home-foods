@@ -26,11 +26,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
   // Form fields
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  final _priceCtrl = TextEditingController();
+  final _packagePriceCtrl = TextEditingController();
   final _discountPriceCtrl = TextEditingController();
+  final _packageDaysCtrl = TextEditingController();
   final _displayOrderCtrl = TextEditingController(text: '0');
 
   String? _selectedCategory;
+  String _planType = 'weekly';
   String _status = 'draft';
   String _availability = 'available';
   bool _isFeatured = false;
@@ -58,10 +60,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
         final p = prodRes.data;
         _nameCtrl.text = p['name'] ?? '';
         _descCtrl.text = p['description'] ?? '';
-        _priceCtrl.text = p['price']?.toString() ?? '';
+        _packagePriceCtrl.text = p['package_price']?.toString() ?? '';
         _discountPriceCtrl.text = p['discount_price']?.toString() ?? '';
+        _planType = p['plan_type'] ?? 'weekly';
+        _packageDaysCtrl.text = p['package_days']?.toString() ?? '';
         _displayOrderCtrl.text = p['display_order']?.toString() ?? '0';
         _selectedCategory = p['category_id'];
+        
+        if (_selectedCategory != null && !_categories.any((c) => c['id'] == _selectedCategory)) {
+          _categories.add({
+            'id': _selectedCategory,
+            'name': p['category_name'] ?? (p['category'] != null ? p['category']['name'] : 'Inactive Category')
+          });
+        }
         _status = p['status'] ?? 'draft';
         _availability = p['availability'] ?? 'available';
         _isFeatured = p['is_featured'] == true;
@@ -103,8 +114,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
         'name': _nameCtrl.text,
         'slug': uniqueSlug,
         'description': _descCtrl.text,
-        'price': double.parse(_priceCtrl.text),
+        'package_price': double.parse(_packagePriceCtrl.text),
         'discount_price': _discountPriceCtrl.text.isNotEmpty ? double.parse(_discountPriceCtrl.text) : null,
+        'plan_type': _planType,
+        'package_days': int.parse(_packageDaysCtrl.text),
         'category_id': _selectedCategory,
         'status': _status,
         'availability': _availability,
@@ -116,6 +129,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       String productId = widget.productId ?? '';
       
+      debugPrint('--- PRODUCT SAVE REQUEST ---');
+      debugPrint('URL: ${widget.productId == null ? ApiConstants.products : "${ApiConstants.products}/$productId"}');
+      debugPrint('Payload: $payload');
+      debugPrint('----------------------------');
+
       if (widget.productId == null) {
         final res = await _api.post(ApiConstants.products, data: payload);
         productId = res.data['id'];
@@ -135,8 +153,55 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Product saved successfully!')));
         context.pop();
       }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save product: $e')));
+    } on DioException catch (e) {
+      debugPrint('--- DIO ERROR in _saveProduct ---');
+      debugPrint('URL: ${e.requestOptions.uri}');
+      debugPrint('Method: ${e.requestOptions.method}');
+      debugPrint('Headers: ${e.requestOptions.headers}');
+      debugPrint('Payload: ${e.requestOptions.data}');
+      debugPrint('Response Status: ${e.response?.statusCode}');
+      debugPrint('Response Data: ${e.response?.data}');
+      debugPrint('Error Type: ${e.type}');
+      debugPrint('Error Message: ${e.message}');
+      if (e.stackTrace != null) debugPrint('Stacktrace: ${e.stackTrace}');
+      
+      String errorMsg = 'Network error occurred';
+      if (e.response?.data != null && e.response?.data is Map) {
+        final detail = e.response?.data['detail'] ?? e.response?.data['message'];
+        if (detail is List) {
+          errorMsg = detail.map((err) => err.toString()).join(', ');
+        } else if (detail != null) {
+          errorMsg = detail.toString();
+        } else {
+          errorMsg = 'Server error (${e.response?.statusCode})';
+        }
+      } else if (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.connectionTimeout) {
+        errorMsg = 'Connection error: Unable to reach the server. Please verify your internet connection and backend status.';
+      } else {
+        errorMsg = e.message ?? 'Unknown network error';
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg), 
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.red.shade800,
+          )
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('--- UNKNOWN ERROR in _saveProduct ---');
+      debugPrint('Error: $e');
+      debugPrint('Stacktrace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An unexpected error occurred: $e'),
+            backgroundColor: Colors.red.shade800,
+          )
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }
@@ -208,7 +273,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
               _buildSectionTitle('Pricing & Inventory'),
               Row(
                 children: [
-                  Expanded(child: _buildTextField('Price (₹)', _priceCtrl, isNumeric: true, isRequired: true)),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _planType,
+                      decoration: const InputDecoration(labelText: 'Plan Type', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                        DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                      ],
+                      onChanged: (v) {
+                        setState(() {
+                           _planType = v!;
+                           _packageDaysCtrl.text = v == 'weekly' ? '6' : '26';
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildTextField('Package Days', _packageDaysCtrl, isNumeric: true, isRequired: true, enabled: false)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildTextField('Package Price (₹)', _packagePriceCtrl, isNumeric: true, isRequired: true)),
                   const SizedBox(width: 16),
                   Expanded(child: _buildTextField('Discount Price (₹)', _discountPriceCtrl, isNumeric: true)),
                 ],
@@ -307,14 +395,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumeric = false, bool isRequired = false, int maxLines = 1}) {
+  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumeric = false, bool isRequired = false, int maxLines = 1, bool enabled = true}) {
     return TextFormField(
       controller: ctrl,
+      enabled: enabled,
       keyboardType: isNumeric ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
       maxLines: maxLines,
       decoration: InputDecoration(
         labelText: label + (isRequired ? ' *' : ''),
         border: const OutlineInputBorder(),
+        fillColor: enabled ? Colors.transparent : Colors.grey.shade100,
+        filled: !enabled,
       ),
       validator: isRequired ? (v) => v!.isEmpty ? 'Required field' : null : null,
     );

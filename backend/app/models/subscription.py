@@ -45,8 +45,8 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("customers.id", ondelete="CASCADE"),
         nullable=False, index=True
     )
-    plan_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("subscription_plans.id"), nullable=False
+    plan_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subscription_plans.id"), nullable=True
     )
     product_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("products.id"), nullable=True, index=True
@@ -75,7 +75,9 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     total_paused_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Pricing snapshot (at time of purchase)
-    price_per_delivery: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    plan_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True) # weekly or monthly
+    package_price: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    price_per_delivery: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True) # kept for backward compatibility
     total_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     delivery_charge: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
     tax_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0, nullable=False)
@@ -86,7 +88,7 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     # Relationships
     customer: Mapped["Customer"] = relationship("Customer", back_populates="subscriptions")
-    plan: Mapped["SubscriptionPlan"] = relationship("SubscriptionPlan", back_populates="subscriptions")
+    plan: Mapped[Optional["SubscriptionPlan"]] = relationship("SubscriptionPlan", back_populates="subscriptions")
     product: Mapped[Optional["Product"]] = relationship("Product", back_populates="subscriptions")
     address: Mapped["Address"] = relationship("Address", back_populates="subscriptions")
     deliveries: Mapped[List["SubscriptionDelivery"]] = relationship("SubscriptionDelivery", back_populates="subscription", cascade="all, delete-orphan")
@@ -117,7 +119,8 @@ class SubscriptionItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("products.id"), nullable=False, index=True
     )
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    price_per_delivery: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    price_per_delivery: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    package_price: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
 
     subscription: Mapped["Subscription"] = relationship("Subscription", back_populates="items")
     product: Mapped["Product"] = relationship("Product")

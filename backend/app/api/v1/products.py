@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
+from sqlalchemy.orm import joinedload
 
 from app.db.session import get_db
 from app.core.dependencies import get_current_user, require_super_admin
@@ -20,78 +21,9 @@ from app.core.config import settings
 router = APIRouter(prefix="/products", tags=["Products"])
 
 
-# ── Categories ─────────────────────────────────────────────────────────────────
-
-@router.get("/categories", response_model=list[ProductCategoryResponse])
-async def list_categories(
-    db: AsyncSession = Depends(get_db),
-    active_only: bool = Query(True),
-):
-    query = select(ProductCategory)
-    if active_only:
-        query = query.where(ProductCategory.is_active == True)
-    result = await db.execute(query.order_by(ProductCategory.sort_order))
-    return result.scalars().all()
-
-
-@router.post("/categories", response_model=ProductCategoryResponse)
-async def create_category(
-    payload: ProductCategoryCreate,
-    _: User = Depends(require_super_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    cat = ProductCategory(**payload.model_dump())
-    db.add(cat)
-    await db.commit()
-    await db.refresh(cat)
-    return cat
-
-
-@router.put("/categories/{cat_id}", response_model=ProductCategoryResponse)
-async def update_category(
-    cat_id: UUID,
-    payload: ProductCategoryCreate,
-    _: User = Depends(require_super_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(select(ProductCategory).where(ProductCategory.id == cat_id))
-    cat = result.scalar_one_or_none()
-    if not cat:
-        raise HTTPException(status_code=404, detail="Category not found")
-    for k, v in payload.model_dump(exclude_none=True).items():
-        setattr(cat, k, v)
-    await db.commit()
-    await db.refresh(cat)
-    return cat
-
-
-@router.delete("/categories/{cat_id}", response_model=MessageResponse)
-async def delete_category(
-    cat_id: UUID,
-    _: User = Depends(require_super_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(select(ProductCategory).where(ProductCategory.id == cat_id))
-    cat = result.scalar_one_or_none()
-    if not cat:
-        raise HTTPException(status_code=404, detail="Category not found")
-    
-    # Check if any products exist under this category
-    product_check = await db.execute(select(func.count(Product.id)).where(Product.category_id == cat_id))
-    if product_check.scalar_one() > 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot delete category because it contains products. Please delete or move the products first."
-        )
-        
-    await db.delete(cat)
-    await db.commit()
-    return MessageResponse(message="Category deleted successfully")
-
-
 # ── Products ──────────────────────────────────────────────────────────────────
 
-@router.get("/", response_model=ProductListResponse)
+@router.get("", response_model=ProductListResponse)
 async def list_products(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -105,7 +37,7 @@ async def list_products(
     active_only: bool = Query(True),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Product)
+    query = select(Product).options(joinedload(Product.category))
     if active_only:
         query = query.where(Product.is_active == True)
     if status:
@@ -151,24 +83,40 @@ async def get_product_analytics(
 
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product(product_id: UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Product).where(Product.id == product_id))
+    result = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product_id))
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
 
-@router.post("/", response_model=ProductResponse)
+from sqlalchemy.exc import IntegrityError
+
+@router.post("", response_model=ProductResponse)
 async def create_product(
     payload: ProductCreate,
     _: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     product = Product(**payload.model_dump())
+    cat_res = await db.execute(select(ProductCategory).where(ProductCategory.id == product.category_id))
+    cat = cat_res.scalar_one_or_none()
+    if cat:
+        product.category_name = cat.name
+
     db.add(product)
-    await db.commit()
-    await db.refresh(product)
-    return product
+    try:
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Database constraint violation: Check category or unique constraints. Details: {str(e)}"
+        )
+    
+    res = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product.id))
+    return res.scalar_one()
+
 
 
 @router.put("/{product_id}", response_model=ProductResponse)
@@ -184,9 +132,17 @@ async def update_product(
         raise HTTPException(status_code=404, detail="Product not found")
     for k, v in payload.model_dump(exclude_none=True).items():
         setattr(product, k, v)
+        
+    if payload.category_id:
+        cat_res = await db.execute(select(ProductCategory).where(ProductCategory.id == payload.category_id))
+        cat = cat_res.scalar_one_or_none()
+        if cat:
+            product.category_name = cat.name
+            
     await db.commit()
-    await db.refresh(product)
-    return product
+    
+    res = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product_id))
+    return res.scalar_one()
 
 
 @router.delete("/{product_id}", response_model=MessageResponse)
@@ -280,5 +236,5 @@ async def upload_product_image(
 
     product.image_url = f"/uploads/products/{filename}"
     await db.commit()
-    await db.refresh(product)
-    return product
+    res = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product_id))
+    return res.scalar_one()

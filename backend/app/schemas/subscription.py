@@ -14,13 +14,14 @@ class SubscriptionItemResponse(BaseModel):
     product_id: uuid.UUID
     product_name: Optional[str] = None
     quantity: int
-    price_per_delivery: float
+    price_per_delivery: Optional[float] = None
+    package_price: Optional[float] = None
 
     model_config = {"from_attributes": True}
 
 
 class SubscriptionCreate(BaseModel):
-    plan_id: uuid.UUID
+    plan_id: Optional[uuid.UUID] = None
     items: list[SubscriptionItemCreate]
     address_id: uuid.UUID
     preferred_delivery_time: Optional[str] = None
@@ -92,7 +93,7 @@ class SubscriptionPaymentHistoryResponse(BaseModel):
 
 class SubscriptionResponse(BaseModel):
     id: uuid.UUID
-    plan_id: uuid.UUID
+    plan_id: Optional[uuid.UUID] = None
     product_id: Optional[uuid.UUID] = None
     address_id: uuid.UUID
     status: str
@@ -101,7 +102,8 @@ class SubscriptionResponse(BaseModel):
     missed_deliveries: int
     start_date: Optional[date] = None
     expected_end_date: Optional[date] = None
-    price_per_delivery: float
+    package_price: Optional[float] = None
+    price_per_delivery: Optional[float] = None
     total_amount: float
     delivery_charge: float
     tax_amount: float
@@ -165,7 +167,8 @@ class CurrentSubscriptionResponse(BaseModel):
     missed_deliveries: int
     carry_forward_deliveries: int
     product_name: str
-    price_per_delivery: float
+    package_price: Optional[float] = None
+    price_per_delivery: Optional[float] = None
     total_amount: float
     next_delivery_date: Optional[date] = None
     today_delivery: Optional[TodayDeliveryInfo] = None

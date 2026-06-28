@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
@@ -27,6 +28,7 @@ class _CreateDeliveryPartnerScreenState extends State<CreateDeliveryPartnerScree
   
   String _gender = 'Male';
   XFile? _photoXFile;
+  Uint8List? _photoBytes;
   bool _isLoading = false;
   bool _obscurePassword = true;
   
@@ -40,8 +42,10 @@ class _CreateDeliveryPartnerScreenState extends State<CreateDeliveryPartnerScree
         imageQuality: 80,
       );
       if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
         setState(() {
           _photoXFile = pickedFile;
+          _photoBytes = bytes;
         });
       }
     } catch (e) {
@@ -174,9 +178,11 @@ class _CreateDeliveryPartnerScreenState extends State<CreateDeliveryPartnerScree
                         color: Colors.grey.shade100,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.grey.shade300, width: 2),
-                        image: _photoXFile != null
+                        image: _photoBytes != null
                             ? DecorationImage(
-                                image: kIsWeb ? NetworkImage(_photoXFile!.path) as ImageProvider : FileImage(File(_photoXFile!.path)),
+                                image: kIsWeb 
+                                    ? MemoryImage(_photoBytes!) as ImageProvider 
+                                    : FileImage(File(_photoXFile!.path)),
                                 fit: BoxFit.cover,
                               )
                             : null,

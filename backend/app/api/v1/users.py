@@ -302,11 +302,8 @@ async def list_users(
         from app.models.delivery_partner import DeliveryPartner
         query = query.join(DeliveryPartner, DeliveryPartner.user_id == User.id)
     elif role:
-        from app.models.role import Role, UserRole
         query = (
-            query.join(UserRole, UserRole.user_id == User.id)
-            .join(Role, Role.id == UserRole.role_id)
-            .where(Role.name == role)
+            query.where(User.role == role)
         )
 
     if search:
@@ -380,7 +377,6 @@ async def create_delivery_partner(
     db: AsyncSession = Depends(get_db),
 ):
     from app.models.delivery_partner import DeliveryPartner
-    from app.models.role import Role, UserRole
     import shortuuid
     import base64
     import os
@@ -402,10 +398,7 @@ async def create_delivery_partner(
     await db.flush()
 
     # Assign role
-    role_result = await db.execute(select(Role).where(Role.name == "delivery_partner"))
-    role = role_result.scalar_one_or_none()
-    if role:
-        db.add(UserRole(user_id=user.id, role_id=role.id))
+    
 
     # Save photo if provided
     photo_url = None

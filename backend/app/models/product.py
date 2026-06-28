@@ -49,11 +49,14 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     category_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("product_categories.id"), nullable=False, index=True
     )
+    category_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(300), unique=True, nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    plan_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    package_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    package_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     discount_price: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
     
     status: Mapped[ProductStatus] = mapped_column(
@@ -76,4 +79,4 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     subscriptions: Mapped[List["Subscription"]] = relationship("Subscription", back_populates="product")
 
     def __repr__(self) -> str:
-        return f"<Product name={self.name} price={self.price}>"
+        return f"<Product name={self.name} plan={self.plan_type} price={self.package_price}>"

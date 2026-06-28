@@ -1,7 +1,7 @@
 from app.db.base import Base  # noqa: F401 — import all models so Alembic sees them
 
 from app.models.user import User  # noqa
-from app.models.role import Role, UserRole  # noqa
+
 from app.models.customer import Customer  # noqa
 from app.models.admin import Admin  # noqa
 from app.models.delivery_partner import DeliveryPartner  # noqa

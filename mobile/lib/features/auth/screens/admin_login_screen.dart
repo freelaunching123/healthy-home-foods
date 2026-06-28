@@ -26,7 +26,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       await _authService.loginWithPassword(
         phone: _phoneController.text.trim(),
         password: _passwordController.text,
-        role: 'super_admin',
+        role: 'admin',
       );
 
       if (!mounted) return;

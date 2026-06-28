@@ -25,7 +25,6 @@ async def create_delivery_partner(
 ):
     """Create a new delivery partner. Super Admin only."""
     from app.models.delivery_partner import DeliveryPartner
-    from app.models.role import Role, UserRole
     import shortuuid, base64, os, uuid as uuid_lib
     from app.core.config import settings
 
@@ -42,10 +41,7 @@ async def create_delivery_partner(
     db.add(user)
     await db.flush()
 
-    role_result = await db.execute(select(Role).where(Role.name == "delivery_partner"))
-    role = role_result.scalar_one_or_none()
-    if role:
-        db.add(UserRole(user_id=user.id, role_id=role.id))
+    
 
     photo_url = None
     if payload.photo_base64:

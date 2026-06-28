@@ -9,7 +9,6 @@ from sqlalchemy import select
 from app.core.security import decode_token
 from app.db.session import get_db
 from app.models.user import User
-from app.models.role import UserRole, Role
 
 bearer_scheme = HTTPBearer(auto_error=True)
 
@@ -51,27 +50,15 @@ async def get_current_user_roles(
     db: AsyncSession = Depends(get_db),
 ) -> list[str]:
     """Returns list of role names for the current user."""
-    result = await db.execute(
-        select(Role.name)
-        .join(UserRole, UserRole.role_id == Role.id)
-        .where(UserRole.user_id == current_user.id)
-    )
-    return [row[0] for row in result.fetchall()]
+    return [current_user.role.value]
 
 
 def require_roles(*allowed_roles: str):
     """Dependency factory — raises 403 if user doesn't have any of the allowed roles."""
     async def _check(
         current_user: User = Depends(get_current_user),
-        db: AsyncSession = Depends(get_db),
     ) -> User:
-        result = await db.execute(
-            select(Role.name)
-            .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == current_user.id)
-        )
-        user_roles = [row[0] for row in result.fetchall()]
-        if not any(r in user_roles for r in allowed_roles):
+        if current_user.role.value not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied. Required role(s): {', '.join(allowed_roles)}",

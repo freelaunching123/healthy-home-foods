@@ -15,7 +15,7 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final _api = ApiClient();
   Map<String, dynamic>? _product;
-  String _selectedPlan = 'weekly';
+  String? _planType;
   bool _isLoading = true;
 
   @override
@@ -27,7 +27,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _loadProduct() async {
     try {
       final res = await _api.get('${ApiConstants.products}/${widget.productId}');
-      setState(() { _product = res.data; _isLoading = false; });
+      setState(() { 
+        _product = res.data; 
+        _planType = _product?['plan_type'];
+        _isLoading = false; 
+      });
     } catch (e) {
       setState(() => _isLoading = false);
     }
@@ -42,12 +46,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return Scaffold(appBar: AppBar(), body: const Center(child: Text('Product not found')));
     }
 
-    final double price = double.tryParse(_product!['price']?.toString() ?? '0') ?? 0;
+    final double packagePrice = double.tryParse(_product!['package_price']?.toString() ?? '0') ?? 0;
     final double? discountPrice = _product!['discount_price'] != null ? double.tryParse(_product!['discount_price'].toString()) : null;
-    final double effectivePrice = discountPrice ?? price;
     
-    final deliveries = _selectedPlan == 'weekly' ? 6 : 26;
-    final total = effectivePrice * deliveries;
+    final double effectiveCurrentPrice = discountPrice ?? packagePrice;
+    
+    final int packageDays = _product!['package_days'] ?? 6;
+    final total = effectiveCurrentPrice;
     final bool isOutOfStock = _product!['availability'] != 'available';
 
     return Scaffold(
@@ -94,10 +99,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Row(
                     children: [
                       if (discountPrice != null) ...[
-                        Text('₹${price.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, color: Colors.grey, decoration: TextDecoration.lineThrough)),
+                        Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, color: Colors.grey, decoration: TextDecoration.lineThrough)),
                         const SizedBox(width: 8),
                       ],
-                      Text('₹${effectivePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen)),
+                      Text('₹${effectiveCurrentPrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen)),
                       const Text(' /pack', style: TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
                       const Spacer(),
                       Container(
@@ -139,21 +144,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 20),
                   ],
 
-                  // Plan toggle
-                  const Text('Choose Your Plan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  const Text('Plan Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
                   Row(
                     children: [
                       _PlanCard(
-                        label: 'Weekly', deliveries: '6 deliveries', price: '₹${(effectivePrice * 6).toStringAsFixed(0)}',
-                        isSelected: _selectedPlan == 'weekly',
-                        onTap: () => setState(() => _selectedPlan = 'weekly'),
-                      ),
-                      const SizedBox(width: 12),
-                      _PlanCard(
-                        label: 'Monthly', deliveries: '26 deliveries', price: '₹${(effectivePrice * 26).toStringAsFixed(0)}',
-                        isSelected: _selectedPlan == 'monthly',
-                        onTap: () => setState(() => _selectedPlan = 'monthly'),
+                        label: '${_planType?.toUpperCase() ?? 'PLAN'} PACKAGE', deliveries: '$packageDays deliveries', price: '₹${effectiveCurrentPrice.toStringAsFixed(0)}',
+                        isSelected: true,
+                        onTap: () {},
                       ),
                     ],
                   ),
@@ -170,9 +168,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                     child: Column(
                       children: [
-                        _SummaryRow('Plan', _selectedPlan == 'weekly' ? 'Weekly' : 'Monthly'),
-                        _SummaryRow('Deliveries', '$deliveries days'),
-                        _SummaryRow('Price per delivery', '₹${effectivePrice.toStringAsFixed(0)}'),
+                        _SummaryRow('Plan', _planType?.toUpperCase() ?? 'PACKAGE'),
+                        _SummaryRow('Deliveries', '$packageDays days'),
+                        _SummaryRow('Package Price', '₹${effectiveCurrentPrice.toStringAsFixed(0)}'),
                         const Divider(),
                         _SummaryRow('Total', '₹${total.toStringAsFixed(0)}', isBold: true),
                       ],
@@ -194,7 +192,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         child: SafeArea(
           child: ElevatedButton(
-            onPressed: isOutOfStock ? null : () => context.push('/checkout?productId=${widget.productId}&plan=$_selectedPlan'),
+            onPressed: isOutOfStock ? null : () => context.push('/checkout?productId=${widget.productId}&plan=$_planType'),
             style: ElevatedButton.styleFrom(
               backgroundColor: isOutOfStock ? Colors.grey : AppTheme.primaryGreen,
               foregroundColor: Colors.white,

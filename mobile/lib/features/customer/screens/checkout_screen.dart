@@ -67,8 +67,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return widget.planType == 'weekly' ? 6 : 26;
   }
 
-  double get _pricePerDelivery => double.tryParse(_product?['price_per_unit']?.toString() ?? '0') ?? 0;
-  double get _subtotal => _pricePerDelivery * _deliveries;
+  double get _selectedPrice {
+    final double basePrice = double.tryParse(_product?['package_price']?.toString() ?? '0') ?? 0;
+    final double? discountPrice = _product?['discount_price'] != null ? double.tryParse(_product!['discount_price'].toString()) : null;
+    return discountPrice ?? basePrice;
+  }
+  double get _subtotal => _selectedPrice;
   double get _total => _subtotal + _deliveryCharge;
 
   Future<void> _selectStartDate() async {
@@ -204,12 +208,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(_product?['name'] ?? '', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                        Text('${widget.planType == 'weekly' ? 'Weekly' : 'Monthly'} Plan • $_deliveries deliveries',
+                        Text('${_product?['plan_type']?.toString().toUpperCase() ?? 'PACKAGE'} Plan • ${_product?['package_days'] ?? 6} deliveries',
                           style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
                       ],
                     ),
                   ),
-                  Text('₹${_pricePerDelivery.toStringAsFixed(0)}', style: const TextStyle(
+                  Text('₹${_selectedPrice.toStringAsFixed(0)}', style: const TextStyle(
                     fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen)),
                 ],
               ),
@@ -289,7 +293,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 children: [
                   const Text('Order Summary', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
-                  _Row('Subtotal ($_deliveries × ₹${_pricePerDelivery.toStringAsFixed(0)})', '₹${_subtotal.toStringAsFixed(0)}'),
+                  _Row('Package Price', '₹${_subtotal.toStringAsFixed(0)}'),
                   _Row('Delivery charge', _deliveryCharge > 0 ? '₹${_deliveryCharge.toStringAsFixed(0)}' : 'FREE'),
                   const Divider(),
                   _Row('Total', '₹${_total.toStringAsFixed(0)}', isBold: true),

@@ -18,13 +18,29 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
   String _searchQuery = '';
   String? _statusFilter;
   String? _availabilityFilter;
+  String? _selectedCategoryId;
+  List<dynamic> _categories = [];
   
   final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _initData();
+  }
+  
+  Future<void> _initData() async {
+    await _loadCategories();
     _loadProducts();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final res = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true});
+      if (mounted) setState(() => _categories = res.data ?? []);
+    } catch (e) {
+      debugPrint('Error loading categories: $e');
+    }
   }
   
   @override
@@ -42,6 +58,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
         if (_searchQuery.isNotEmpty) 'search': _searchQuery,
         if (_statusFilter != null) 'status': _statusFilter,
         if (_availabilityFilter != null) 'availability': _availabilityFilter,
+        if (_selectedCategoryId != null) 'category_id': _selectedCategoryId,
       });
       setState(() => _products = res.data['items'] ?? []);
     } catch (e) {
@@ -136,6 +153,34 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 12),
+                // Category Tabs
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _CategoryTab(
+                        label: 'All Categories',
+                        isSelected: _selectedCategoryId == null,
+                        onTap: () {
+                          setState(() => _selectedCategoryId = null);
+                          _loadProducts();
+                        },
+                      ),
+                      ..._categories.map((cat) => Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: _CategoryTab(
+                              label: cat['name'],
+                              isSelected: _selectedCategoryId == cat['id'],
+                              onTap: () {
+                                setState(() => _selectedCategoryId = cat['id']);
+                                _loadProducts();
+                              },
+                            ),
+                          )),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -187,6 +232,36 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
   }
 }
 
+class _CategoryTab extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _CategoryTab({required this.label, required this.isSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primaryGreen : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppTheme.textSecondary,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProductAdminCard extends StatelessWidget {
   final dynamic product;
   final VoidCallback onToggleActive;
@@ -201,6 +276,9 @@ class _ProductAdminCard extends StatelessWidget {
     final String status = product['status'] ?? 'unknown';
     final String availability = product['availability'] ?? 'unknown';
     final mediaBaseUrl = ApiClient().mediaBaseUrl;
+    
+    final imgUrl = product['image_url'] != null ? '$mediaBaseUrl${product['image_url']}' : null;
+    if (imgUrl != null) debugPrint('Flutter Image Render (_ProductAdminCard): $imgUrl');
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -223,8 +301,8 @@ class _ProductAdminCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    image: product['image_url'] != null 
-                        ? DecorationImage(image: NetworkImage('$mediaBaseUrl${product['image_url']}'), fit: BoxFit.cover)
+                    image: imgUrl != null 
+                        ? DecorationImage(image: NetworkImage(imgUrl), fit: BoxFit.cover)
                         : null,
                   ),
                   child: product['image_url'] == null ? const Icon(Icons.eco, color: AppTheme.primaryGreen) : null,
@@ -251,7 +329,7 @@ class _ProductAdminCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '₹${product['price']}',
+                        '${product['plan_type']?.toString().toUpperCase() ?? 'PLAN'} (${product['package_days']} Days): ₹${product['package_price']}',
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
                       ),
                       const SizedBox(height: 8),

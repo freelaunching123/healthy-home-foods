@@ -15,6 +15,13 @@ class UserStatus(str, enum.Enum):
     SUSPENDED = "suspended"
 
 
+class UserRoleEnum(str, enum.Enum):
+    CUSTOMER = "customer"
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+    DELIVERY_PARTNER = "delivery_partner"
+
+
 class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """Core identity table — shared by all user types."""
 
@@ -27,6 +34,11 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[UserStatus] = mapped_column(
         SAEnum(UserStatus, name="user_status_enum", values_callable=lambda x: [e.value for e in x]),
         default=UserStatus.ACTIVE,
+        nullable=False,
+    )
+    role: Mapped[UserRoleEnum] = mapped_column(
+        SAEnum(UserRoleEnum, name="user_role_enum", values_callable=lambda x: [e.value for e in x]),
+        default=UserRoleEnum.CUSTOMER,
         nullable=False,
     )
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -49,7 +61,6 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     token_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     # Relationships
-    user_roles: Mapped[List["UserRole"]] = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
     customer: Mapped[Optional["Customer"]] = relationship("Customer", back_populates="user", uselist=False)
     admin: Mapped[Optional["Admin"]] = relationship("Admin", back_populates="user", uselist=False)
     delivery_partner: Mapped[Optional["DeliveryPartner"]] = relationship("DeliveryPartner", back_populates="user", uselist=False)

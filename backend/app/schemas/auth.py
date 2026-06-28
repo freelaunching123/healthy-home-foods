@@ -58,6 +58,7 @@ class LoginPasswordRequest(BaseModel):
     """Phone + password login (for admin / seeded users)."""
     phone: str
     password: str
+    role: Optional[str] = None
 
 
 class TokenResponse(BaseModel):

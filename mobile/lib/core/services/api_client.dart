@@ -118,10 +118,6 @@ class ApiClient {
   }
 
   String get mediaBaseUrl {
-    final base = dio.options.baseUrl;
-    if (base.endsWith('/api/v1')) {
-      return base.substring(0, base.length - 8);
-    }
-    return base;
+    return dio.options.baseUrl.replaceAll('/api/v1', '');
   }
 }

@@ -87,7 +87,7 @@ async def get_subscription_dashboard_stats(
     }
 
 
-@router.post("/", response_model=SubscriptionResponse)
+@router.post("", response_model=SubscriptionResponse)
 async def create_subscription(
     payload: SubscriptionCreate,
     current_user: User = Depends(require_customer),
@@ -96,25 +96,31 @@ async def create_subscription(
     """Create a new multi-product subscription (pending payment)."""
     customer = await _get_customer(db, current_user.id)
 
-    # Validate plan
-    plan_result = await db.execute(select(SubscriptionPlan).where(SubscriptionPlan.id == payload.plan_id))
-    plan = plan_result.scalar_one_or_none()
-    if not plan or not plan.is_active:
-        raise HTTPException(status_code=404, detail="Subscription plan not found")
-
     if not payload.items:
         raise HTTPException(status_code=400, detail="Subscription must contain at least one product")
 
     # Validate products & compile items_data
     items_data = []
-    price_per_delivery = 0.0
+    selected_price = 0.0
+    first_plan_type = None
+    first_package_days = None
+
     for item in payload.items:
         prod_result = await db.execute(select(Product).where(Product.id == item.product_id))
         product = prod_result.scalar_one_or_none()
         if not product or not product.is_active:
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found or inactive")
-        items_data.append({"product": product, "quantity": item.quantity})
-        price_per_delivery += float(product.price) * item.quantity
+        
+        if first_plan_type is None:
+            first_plan_type = product.plan_type
+            first_package_days = product.package_days
+        elif first_plan_type != product.plan_type:
+            raise HTTPException(status_code=400, detail="All products in a subscription must have the same plan type")
+            
+        item_price = float(product.discount_price if product.discount_price else product.package_price)
+        
+        items_data.append({"product": product, "quantity": item.quantity, "package_price": item_price})
+        selected_price += item_price * item.quantity
 
     # Calculate delivery charge and tax from admin settings
     settings_result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
@@ -123,14 +129,15 @@ async def create_subscription(
     tax_amount = 0.0
     if settings:
         tax_rate = float(settings.tax_percentage) / 100
-        subtotal = price_per_delivery * plan.total_deliveries
-        tax_amount = round(subtotal * tax_rate, 2)
+        tax_amount = round(selected_price * tax_rate, 2)
 
     sub = await subscription_engine.create_subscription(
         db=db,
         customer=customer,
-        plan=plan,
         items_data=items_data,
+        plan_type=first_plan_type,
+        total_deliveries=first_package_days,
+        plan_id=payload.plan_id,
         address_id=payload.address_id,
         delivery_charge=delivery_charge,
         tax_amount=tax_amount,
@@ -170,9 +177,8 @@ async def update_subscription(
     db: AsyncSession = Depends(get_db),
 ):
     """Update subscription options and items."""
-    from app.models.role import Role, UserRole
     roles_res = await db.execute(
-        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+        select(User.role).where(User.id == current_user.id)
     )
     user_roles = [r[0] for r in roles_res.fetchall()]
     is_admin = "super_admin" in user_roles
@@ -198,29 +204,38 @@ async def update_subscription(
             await db.delete(existing)
         sub.items.clear()
 
-        price_per_delivery = 0.0
+        package_price = 0.0
+        first_plan_type = None
         for item in payload.items:
             p_res = await db.execute(select(Product).where(Product.id == item.product_id))
             prod = p_res.scalar_one_or_none()
             if not prod or not prod.is_active:
                 raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found or inactive")
+                
+            if first_plan_type is None:
+                first_plan_type = prod.plan_type
+            elif first_plan_type != prod.plan_type:
+                raise HTTPException(status_code=400, detail="All products in a subscription must have the same plan type")
+            
+            item_price = float(prod.discount_price if prod.discount_price else prod.package_price)
             
             sub_item = SubscriptionItem(
                 subscription_id=sub.id,
                 product_id=prod.id,
                 quantity=item.quantity,
-                price_per_delivery=float(prod.price)
+                package_price=item_price
             )
             db.add(sub_item)
-            price_per_delivery += float(prod.price) * item.quantity
+            package_price += item_price * item.quantity
 
-        sub.price_per_delivery = price_per_delivery
+        sub.package_price = package_price
+        sub.plan_type = first_plan_type
         
         # Recalculate totals
         settings_result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
         settings = settings_result.scalar_one_or_none()
         tax_rate = float(settings.tax_percentage) / 100 if settings else 0.0
-        subtotal = price_per_delivery * sub.total_deliveries
+        subtotal = package_price
         sub.tax_amount = round(subtotal * tax_rate, 2)
         sub.total_amount = subtotal + float(sub.delivery_charge) + sub.tax_amount
 
@@ -283,7 +298,7 @@ async def delete_subscription(
     return MessageResponse(message="Subscription permanently deleted")
 
 
-@router.get("/", response_model=list[SubscriptionResponse])
+@router.get("", response_model=list[SubscriptionResponse])
 async def list_subscriptions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -294,9 +309,8 @@ async def list_subscriptions(
     page_size: int = Query(10, ge=1, le=50),
 ):
     """List subscriptions with search, filtering and sorting."""
-    from app.models.role import Role, UserRole
     roles_res = await db.execute(
-        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+        select(User.role).where(User.id == current_user.id)
     )
     user_roles = [r[0] for r in roles_res.fetchall()]
     is_admin = "super_admin" in user_roles
@@ -488,9 +502,8 @@ async def get_subscription(
     db: AsyncSession = Depends(get_db),
 ):
     """Get rich subscription detail including history log lists."""
-    from app.models.role import Role, UserRole
     roles_res = await db.execute(
-        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+        select(User.role).where(User.id == current_user.id)
     )
     user_roles = [r[0] for r in roles_res.fetchall()]
     is_admin = "super_admin" in user_roles
@@ -536,9 +549,8 @@ async def pause_subscription(
     db: AsyncSession = Depends(get_db),
 ):
     """Pause an active subscription."""
-    from app.models.role import Role, UserRole
     roles_res = await db.execute(
-        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+        select(User.role).where(User.id == current_user.id)
     )
     user_roles = [r[0] for r in roles_res.fetchall()]
     is_admin = "super_admin" in user_roles
@@ -581,9 +593,8 @@ async def resume_subscription(
     db: AsyncSession = Depends(get_db),
 ):
     """Resume a paused subscription."""
-    from app.models.role import Role, UserRole
     roles_res = await db.execute(
-        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+        select(User.role).where(User.id == current_user.id)
     )
     user_roles = [r[0] for r in roles_res.fetchall()]
     is_admin = "super_admin" in user_roles
@@ -627,9 +638,8 @@ async def cancel_subscription(
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel a subscription."""
-    from app.models.role import Role, UserRole
     roles_res = await db.execute(
-        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+        select(User.role).where(User.id == current_user.id)
     )
     user_roles = [r[0] for r in roles_res.fetchall()]
     is_admin = "super_admin" in user_roles
@@ -674,9 +684,8 @@ async def renew_subscription(
     auto_renew: Optional[bool] = Query(None),
 ):
     """Renew a subscription manually."""
-    from app.models.role import Role, UserRole
     roles_res = await db.execute(
-        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+        select(User.role).where(User.id == current_user.id)
     )
     user_roles = [r[0] for r in roles_res.fetchall()]
     is_admin = "super_admin" in user_roles
@@ -733,9 +742,8 @@ async def get_subscription_deliveries(
     page_size: int = Query(20, ge=1, le=100),
     status: str = Query(None),
 ):
-    from app.models.role import Role, UserRole
     roles_res = await db.execute(
-        select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == current_user.id)
+        select(User.role).where(User.id == current_user.id)
     )
     user_roles = [r[0] for r in roles_res.fetchall()]
     is_admin = "super_admin" in user_roles
@@ -767,11 +775,9 @@ async def skip_delivery_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """Skip a specific delivery day. Triggers carry-forward extension and registers skipped status history."""
-    from app.models.role import Role, UserRole
     roles_res = await db.execute(
-        select(Role.name)
-        .join(UserRole, UserRole.role_id == Role.id)
-        .where(UserRole.user_id == current_user.id)
+        select(User.role)
+        .where(User.id == current_user.id)
     )
     user_roles = [r[0] for r in roles_res.fetchall()]
     is_admin = "super_admin" in user_roles

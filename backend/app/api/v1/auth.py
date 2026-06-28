@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.customer import Customer
-from app.models.role import Role, UserRole
+from app.models.customer import Customer
 from app.schemas.auth import (
     AdminLoginRequest, TokenResponse, RefreshTokenRequest,
     RegisterRequest, RegisterResponse, LoginPasswordRequest, ForgotPasswordRequest
@@ -43,11 +43,7 @@ async def register_customer(
     db.add(user)
     await db.flush()
 
-    # Assign customer role
-    role_result = await db.execute(select(Role).where(Role.name == "customer"))
-    role = role_result.scalar_one_or_none()
-    if role:
-        db.add(UserRole(user_id=user.id, role_id=role.id))
+    # Role is already set to CUSTOMER by default in the model
 
     customer_code = f"C{shortuuid.ShortUUID().random(length=8).upper()}"
     db.add(Customer(user_id=user.id, customer_code=customer_code))
@@ -83,13 +79,17 @@ async def admin_login(
     if user.status.value != "active":
         raise HTTPException(status_code=403, detail="Account is suspended")
 
-    role_result = await db.execute(
-        select(Role.name)
-        .join(UserRole, UserRole.role_id == Role.id)
-        .where(UserRole.user_id == user.id)
-        .limit(1)
-    )
-    user_role = role_result.scalar_one_or_none() or "customer"
+    user_role = user.role.value
+
+    if payload.role:
+        if payload.role == "customer" and user_role != "customer":
+            raise HTTPException(status_code=403, detail="Please use the correct login portal.")
+        elif payload.role == "admin" and user_role not in ["admin", "super_admin"]:
+            raise HTTPException(status_code=403, detail="Access denied. Admin account required.")
+        elif payload.role == "delivery_partner" and user_role != "delivery_partner":
+            raise HTTPException(status_code=403, detail="Access denied. Delivery Partner account required.")
+        elif payload.role not in ["customer", "admin", "delivery_partner"]:
+            raise HTTPException(status_code=400, detail="Invalid portal role specified.")
 
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
@@ -122,13 +122,7 @@ async def login_with_password(
     if user.status.value != "active":
         raise HTTPException(status_code=403, detail="Account is suspended")
 
-    role_result = await db.execute(
-        select(Role.name)
-        .join(UserRole, UserRole.role_id == Role.id)
-        .where(UserRole.user_id == user.id)
-        .limit(1)
-    )
-    user_role = role_result.scalar_one_or_none() or "customer"
+    user_role = user.role.value
 
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
@@ -172,13 +166,7 @@ async def refresh_token(
     if getattr(user, 'is_deleted', False):
         raise HTTPException(status_code=403, detail="Account is deleted")
 
-    role_result = await db.execute(
-        select(Role.name)
-        .join(UserRole, UserRole.role_id == Role.id)
-        .where(UserRole.user_id == user.id)
-        .limit(1)
-    )
-    user_role = role_result.scalar_one_or_none() or "customer"
+    user_role = user.role.value
     token_data = {"sub": str(user.id), "role": user_role, "version": user.token_version}
 
     return TokenResponse(

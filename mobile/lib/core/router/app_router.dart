@@ -25,7 +25,6 @@ import '../../features/customer/screens/my_subscription_detail_screen.dart';
 import '../../features/customer/screens/delivery_history_screen.dart';
 import '../../features/customer/screens/address_management_screen.dart';
 // Fruit screens (Customer)
-import '../../features/customer/screens/fruits_screen.dart';
 import '../../features/customer/screens/fruit_cart_screen.dart';
 import '../../features/customer/screens/fruit_checkout_screen.dart';
 import '../../features/customer/screens/fruit_order_history_screen.dart';
@@ -97,9 +96,7 @@ final GoRouter appRouter = GoRouter(
         StatefulShellBranch(routes: [
           GoRoute(path: '/subscriptions', builder: (_, __) => const SubscriptionsScreen()),
         ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/fruits', builder: (_, __) => const FruitsScreen()),
-        ]),
+
         StatefulShellBranch(routes: [
           GoRoute(path: '/payments', builder: (_, __) => const PaymentHistoryScreen()),
         ]),

@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.db.session import AsyncSessionLocal
-from app.models.role import Role, UserRole
+from app.models.user import User, UserStatus, UserRoleEnum
 from app.models.user import User
 from app.models.admin_settings import AdminSettings
 from app.models.product import ProductCategory, Product
@@ -23,37 +23,25 @@ def slugify(text: str) -> str:
 
 async def seed_data():
     async with AsyncSessionLocal() as db:
-        # 1. Seed Roles
-        roles = ["super_admin", "customer", "delivery_partner"]
-        for role_name in roles:
-            result = await db.execute(select(Role).where(Role.name == role_name))
-            if not result.scalar_one_or_none():
-                db.add(Role(name=role_name))
-                logger.info(f"Seeded role: {role_name}")
-        await db.commit()
+        # 1. Seed Admin User
+        admin_result = await db.execute(select(User).where(User.phone == "9999999999"))
+        admin = admin_result.scalar_one_or_none()
 
-        # 2. Seed Admin User
-        admin_phone = "9876543210"
-        result = await db.execute(select(User).where(User.phone == admin_phone))
-        admin = result.scalar_one_or_none()
         if not admin:
             admin = User(
-                phone=admin_phone,
+                phone="9876543210",
+                email="admin@healthyhomefoods.com",
                 full_name="Super Admin",
                 password_hash=hash_password("Admin123"),
                 is_verified=True,
+                status=UserStatus.ACTIVE,
+                role=UserRoleEnum.SUPER_ADMIN,
             )
             db.add(admin)
-            await db.flush()
-            
-            # Assign super_admin role
-            role_result = await db.execute(select(Role).where(Role.name == "super_admin"))
-            super_admin_role = role_result.scalar_one()
-            db.add(UserRole(user_id=admin.id, role_id=super_admin_role.id))
+            await db.commit()
             logger.info("Seeded super_admin user")
-        await db.commit()
 
-        # 3. Seed Admin Settings
+        # 2. Seed Admin Settings
         result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
         settings = result.scalar_one_or_none()
         if not settings:
@@ -128,7 +116,9 @@ async def seed_data():
                         name=p_data["name"],
                         slug=slugify(p_data["name"]),
                         description=f"Delicious {p_data['name']}",
-                        price=base_price,
+                        package_price=p_data["monthly"],
+                        plan_type="monthly",
+                        package_days=26,
                         status=ProductStatus.PUBLISHED,
                         availability=ProductAvailability.AVAILABLE
                     )
