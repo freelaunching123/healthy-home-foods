@@ -45,13 +45,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             icon: const Icon(Icons.settings),
             onPressed: () => context.push('/admin/settings'),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await AuthService().logout();
-              if (mounted) context.go('/role-selection');
-            },
-          ),
         ],
       ),
       body: _isLoading

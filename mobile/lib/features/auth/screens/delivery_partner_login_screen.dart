@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/theme/app_theme.dart';
@@ -172,8 +173,10 @@ class _DeliveryPartnerLoginScreenState extends State<DeliveryPartnerLoginScreen>
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     maxLength: 10,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
                       hintText: 'Enter 10-digit mobile number',
+                      helperText: 'Please enter a valid mobile number',
                       prefixIcon: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: const Row(

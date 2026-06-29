@@ -65,8 +65,11 @@ final GoRouter appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/splash',
   redirect: (context, state) async {
+    debugPrint('GoRouter redirect matching: ${state.matchedLocation}');
     final authService = AuthService();
+    debugPrint('Calling isLoggedIn...');
     final isLoggedIn = await authService.isLoggedIn();
+    debugPrint('isLoggedIn returned: $isLoggedIn');
     final isAuthRoute = state.matchedLocation == '/role-selection' ||
         state.matchedLocation == '/customer-login' ||
         state.matchedLocation == '/admin-login' ||
@@ -74,7 +77,11 @@ final GoRouter appRouter = GoRouter(
         state.matchedLocation == '/register' ||
         state.matchedLocation == '/splash';
 
-    if (!isLoggedIn && !isAuthRoute) return '/role-selection';
+    if (!isLoggedIn && !isAuthRoute) {
+      debugPrint('Redirecting to /role-selection');
+      return '/role-selection';
+    }
+    debugPrint('No redirection needed');
     return null;
   },
   routes: [

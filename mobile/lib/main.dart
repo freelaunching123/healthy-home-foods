@@ -5,21 +5,30 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 
 void main() async {
+  debugPrint('--- FLUTTER STARTUP MAIN ---');
   WidgetsFlutterBinding.ensureInitialized();
+  debugPrint('WidgetsFlutterBinding initialized');
   
   // Lock to portrait
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  try {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    debugPrint('Preferred orientations set');
+  } catch (e) {
+    debugPrint('Error setting preferred orientations: $e');
+  }
 
   // Status bar style
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
   ));
+  debugPrint('SystemUIOverlayStyle set');
 
   runApp(const ProviderScope(child: HealthyHomeFoodsApp()));
+  debugPrint('runApp called');
 }
 
 class HealthyHomeFoodsApp extends StatelessWidget {

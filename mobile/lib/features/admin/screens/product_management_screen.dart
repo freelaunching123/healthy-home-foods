@@ -97,13 +97,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
         title: const Text('Manage Products'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline, size: 28),
-            onPressed: () => context.push('/admin/products/add').then((_) => _loadProducts()),
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: Column(
         children: [
@@ -210,6 +203,12 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                   ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/admin/products/add').then((_) => _loadProducts()),
+        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        label: const Text('Add Product', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: AppTheme.primaryGreen,
       ),
     );
   }
