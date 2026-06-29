@@ -538,6 +538,45 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
     );
   }
 
+  Future<void> _cancelSubscription(String id) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Subscription'),
+        content: const Text('Are you sure you want to cancel? This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep it')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isActionInProgress = true);
+    try {
+      await _api.post(ApiConstants.cancelSubscription(id), data: {'reason': 'User requested via app'});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Subscription cancelled successfully'), backgroundColor: AppTheme.success),
+        );
+      }
+      await _loadAll();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to cancel: $e'), backgroundColor: AppTheme.error),
+        );
+      }
+    } finally {
+      setState(() => _isActionInProgress = false);
+    }
+  }
+
   Widget _buildActionButtons(Map<String, dynamic> sub, String? subId) {
     final status = (sub['status'] ?? '').toString().toLowerCase();
     if (subId == null) return const SizedBox.shrink();
@@ -590,12 +629,27 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
           ],
         ),
         const SizedBox(height: 8),
-        TextButton(
-          onPressed: () => context.push('/profile/subscription'),
-          child: const Text(
-            'View Full Details →',
-            style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.w600),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            if (status == 'active' || status == 'paused')
+              TextButton(
+                onPressed: () => _cancelSubscription(subId),
+                child: const Text(
+                  'Cancel Subscription',
+                  style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.w600),
+                ),
+              )
+            else
+              const SizedBox(),
+            TextButton(
+              onPressed: () => context.push('/profile/subscription'),
+              child: const Text(
+                'View Full Details →',
+                style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
         ),
       ],
     );

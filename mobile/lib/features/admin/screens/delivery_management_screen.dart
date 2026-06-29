@@ -131,20 +131,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
     }
   }
 
-  Future<void> _assignPartner(String deliveryId, String partnerId) async {
-    setState(() => _isActionInProgress = true);
-    try {
-      await _api.post('${ApiConstants.adminDeliveries}/$deliveryId/assign', data: {
-        'delivery_partner_id': partnerId,
-      });
-      _showSuccessSnackBar('Delivery partner assigned successfully');
-      await _loadAllData();
-    } catch (e) {
-      _showErrorSnackBar('Failed to assign partner: $e');
-    } finally {
-      if (mounted) setState(() => _isActionInProgress = false);
-    }
-  }
+  // Assignment removed as per requirements
 
   Future<void> _updateStatus(String deliveryId, String status, {String? reason}) async {
     setState(() => _isActionInProgress = true);
@@ -250,7 +237,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
         deliveryId: delivery['id'],
         partners: _partners,
         onStatusUpdate: (status, reason) => _updateStatus(delivery['id'], status, reason: reason),
-        onAssignPartner: (partnerId) => _assignPartner(delivery['id'], partnerId),
+        onAssignPartner: (_) {}, // Dummy callback to prevent hot reload issues
       ),
     );
   }
@@ -709,29 +696,6 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
                 const Divider(),
                 Row(
                   children: [
-                    Expanded(
-                      child: DropdownButton<String?>(
-                        value: partnerId,
-                        hint: const Text('Unassigned'),
-                        isExpanded: true,
-                        underline: const SizedBox(),
-                        items: [
-                          const DropdownMenuItem<String?>(
-                            value: null,
-                            child: Text('Unassigned'),
-                          ),
-                          ..._partners.map((p) => DropdownMenuItem<String?>(
-                                value: p['id'].toString(),
-                                child: Text(p['full_name'] ?? 'Driver'),
-                              )),
-                        ],
-                        onChanged: (val) {
-                          if (val != null && val != partnerId) {
-                            _assignPartner(d['id'], val);
-                          }
-                        },
-                      ),
-                    ),
                     const SizedBox(width: 10),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -773,7 +737,6 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
               DataColumn(label: Text('Scheduled', style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('Payment', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Driver Assignment', style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
             ],
@@ -807,26 +770,6 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
                   DataCell(_StatusBadge(
                     label: d['payment_status'] ?? 'Pending',
                     color: d['payment_status'] == 'Paid' ? AppTheme.success : AppTheme.warning,
-                  )),
-                  DataCell(DropdownButton<String?>(
-                    value: partnerId,
-                    hint: const Text('Unassigned'),
-                    underline: const SizedBox(),
-                    items: [
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('Unassigned'),
-                      ),
-                      ..._partners.map((p) => DropdownMenuItem<String?>(
-                            value: p['id'].toString(),
-                            child: Text(p['full_name'] ?? 'Driver'),
-                          )),
-                    ],
-                    onChanged: (val) {
-                      if (val != null && val != partnerId) {
-                        _assignPartner(d['id'], val);
-                      }
-                    },
                   )),
                   DataCell(_StatusBadge(
                     label: _formatStatus(displayStatus),
@@ -1325,35 +1268,6 @@ class _DeliveryDetailsSheetState extends State<_DeliveryDetailsSheet> {
                           widget.onStatusUpdate(val, null);
                           Navigator.pop(context);
                         }
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String?>(
-                    value: currentPartnerId,
-                    decoration: InputDecoration(
-                      labelText: 'Reassign Delivery Partner',
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('Unassigned')),
-                      ...widget.partners.map((p) => DropdownMenuItem<String?>(
-                            value: p['id'].toString(),
-                            child: Text(p['full_name'] ?? 'Driver'),
-                          )),
-                    ],
-                    onChanged: (val) {
-                      if (val != null && val != currentPartnerId) {
-                        widget.onAssignPartner(val);
-                        Navigator.pop(context);
                       }
                     },
                   ),

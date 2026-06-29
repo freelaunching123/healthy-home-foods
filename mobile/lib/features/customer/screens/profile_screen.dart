@@ -137,8 +137,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   _ProfileMenuItem(
                     icon: Icons.history_toggle_off_outlined,
-                    title: 'Delivery History',
+                    title: 'Subscription Deliveries',
                     onTap: () => context.push('/profile/delivery-history'),
+                  ),
+                  _ProfileMenuItem(
+                    icon: Icons.shopping_bag_outlined,
+                    title: 'Fruit Order History',
+                    onTap: () => context.push('/profile/fruit-orders'),
                   ),
                   _ProfileMenuItem(
                     icon: Icons.location_on_outlined,
@@ -152,20 +157,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: Icons.receipt_long_outlined,
                     title: 'Payment History',
                     onTap: () => context.push('/payments'),
-                  ),
-                  _ProfileMenuItem(
-                    icon: Icons.help_outline,
-                    title: 'Help & Support',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help & Support coming soon')));
-                    },
-                  ),
-                  _ProfileMenuItem(
-                    icon: Icons.info_outline,
-                    title: 'About Us',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('About Us coming soon')));
-                    },
                   ),
                   
                   const SizedBox(height: 32),

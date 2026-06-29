@@ -474,6 +474,69 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  // Manage Customers
+                  Card(
+                    child: ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.people_outline,
+                          color: AppTheme.primaryGreen,
+                        ),
+                      ),
+                      title: const Text(
+                        'Manage Customers',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text(
+                        'View, search, filter and manage all customers',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: AppTheme.textSecondary,
+                      ),
+                      onTap: () => context.push('/admin/customers'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Manage Delivery Partners
+                  Card(
+                    child: ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.info.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.local_shipping_outlined,
+                          color: AppTheme.info,
+                        ),
+                      ),
+                      title: const Text(
+                        'Manage Delivery Partners',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text(
+                        'View, assign, and manage delivery partners',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: AppTheme.textSecondary,
+                      ),
+                      onTap: () => context.push('/admin/delivery-partners'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+
                   // Logout Card
                   Card(
                     child: ListTile(

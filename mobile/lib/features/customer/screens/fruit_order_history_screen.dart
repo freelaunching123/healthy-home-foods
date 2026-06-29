@@ -214,6 +214,19 @@ class _OrderCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  // Delivery Date if available
+                  if (order['expected_delivery_date'] != null || order['delivery_date'] != null)
+                    Row(
+                      children: [
+                        const Icon(Icons.local_shipping_outlined, size: 14, color: AppTheme.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatDate(order['delivery_date'] ?? order['expected_delivery_date']),
+                          style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
                   const Spacer(),
                   Text(
                     '₹${total.toStringAsFixed(2)}',

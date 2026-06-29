@@ -32,11 +32,14 @@ async def create_delivery_partner(
     if user_result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Phone number already registered")
 
+    from app.models.user import UserRoleEnum
+
     user = User(
         phone=payload.mobile_number,
         full_name=payload.full_name,
         password_hash=hash_password(payload.password),
         is_verified=True,
+        role=UserRoleEnum.DELIVERY_PARTNER,
     )
     db.add(user)
     await db.flush()

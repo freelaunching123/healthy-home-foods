@@ -22,9 +22,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
   static const _categories = [
     {'label': 'All', 'key': null, 'icon': Icons.notifications_outlined},
-    {'label': 'Delivery', 'key': 'delivery', 'icon': Icons.local_shipping_outlined},
+    {'label': 'Promotions', 'key': 'promo', 'icon': Icons.local_offer_outlined},
     {'label': 'Subscription', 'key': 'subscription', 'icon': Icons.restaurant_menu_outlined},
-    {'label': 'Payment', 'key': 'payment', 'icon': Icons.payment_outlined},
+    {'label': 'Updates', 'key': 'system', 'icon': Icons.info_outline},
   ];
 
   @override

@@ -15,6 +15,7 @@ class FruitOrdersScreen extends StatefulWidget {
 class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
   final _api = ApiClient();
   List<Map<String, dynamic>> _orders = [];
+  List<Map<String, dynamic>> _partners = [];
   bool _loading = true;
   String? _error;
   String? _filterOrderStatus;
@@ -28,7 +29,23 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
   @override
   void initState() {
     super.initState();
+    _loadPartners();
     _loadOrders();
+  }
+
+  Future<void> _loadPartners() async {
+    try {
+      final res = await _api.get('/delivery-partners');
+      if (res.data is List) {
+        if (mounted) {
+          setState(() {
+            _partners = List<Map<String, dynamic>>.from(res.data);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading partners: $e');
+    }
   }
 
   @override
@@ -65,6 +82,20 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update status'), backgroundColor: AppTheme.error),
+      );
+    }
+  }
+
+  Future<void> _assignPartner(Map<String, dynamic> order, String? partnerId) async {
+    try {
+      await _api.post('${ApiConstants.adminFruitOrders}/${order['id']}/assign', data: {'delivery_partner_id': partnerId});
+      _loadOrders();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Delivery partner updated successfully'), backgroundColor: AppTheme.success),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update delivery partner'), backgroundColor: AppTheme.error),
       );
     }
   }
@@ -225,9 +256,11 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
                                 final order = _orders[i];
                                 return _AdminOrderCard(
                                   order: order,
+                                  partners: _partners,
                                   statusColor: _statusColor(order['order_status'] as String? ?? 'pending'),
                                   statusLabel: _statusLabel(order['order_status'] as String? ?? 'pending'),
                                   onUpdateStatus: () => _showStatusPicker(order),
+                                  onAssignPartner: (partnerId) => _assignPartner(order, partnerId),
                                 );
                               },
                             ),
@@ -242,13 +275,15 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
 
 class _AdminOrderCard extends StatelessWidget {
   final Map<String, dynamic> order;
+  final List<Map<String, dynamic>> partners;
   final Color statusColor;
   final String statusLabel;
   final VoidCallback onUpdateStatus;
+  final Function(String?) onAssignPartner;
 
   const _AdminOrderCard({
-    required this.order, required this.statusColor,
-    required this.statusLabel, required this.onUpdateStatus,
+    required this.order, required this.partners, required this.statusColor,
+    required this.statusLabel, required this.onUpdateStatus, required this.onAssignPartner,
   });
 
   @override
@@ -349,7 +384,37 @@ class _AdminOrderCard extends StatelessWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         textStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
                       ),
-                      child: const Text('Update Status'),
+                      child: const Text('Status'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.local_shipping_outlined, size: 16, color: AppTheme.textSecondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButton<String?>(
+                        value: order['assigned_partner_id']?.toString(),
+                        hint: Text('Assign Partner', style: GoogleFonts.inter(fontSize: 13)),
+                        isExpanded: true,
+                        isDense: true,
+                        underline: const SizedBox(),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                        items: [
+                          DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('Unassigned', style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic)),
+                          ),
+                          ...partners.map((p) => DropdownMenuItem<String?>(
+                                value: p['id'].toString(),
+                                child: Text(p['full_name'] ?? 'Driver', style: GoogleFonts.inter(fontSize: 13)),
+                              )),
+                        ],
+                        onChanged: onAssignPartner,
+                      ),
                     ),
                   ],
                 ),

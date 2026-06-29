@@ -238,3 +238,100 @@ async def upload_product_image(
     await db.commit()
     res = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product_id))
     return res.scalar_one()
+
+
+@router.get("/{product_id}/reviews", response_model=__import__('app.schemas.review', fromlist=['ReviewListResponse']).ReviewListResponse)
+async def list_product_reviews(
+    product_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.review import Review, ReviewItemType
+    from app.schemas.review import ReviewListResponse, ReviewResponse
+    
+    query = select(Review).options(joinedload(Review.customer).joinedload(Customer.user)).where(
+        Review.item_id == product_id,
+        Review.item_type == ReviewItemType.PRODUCT,
+        Review.is_visible == True
+    )
+    
+    total_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = total_result.scalar_one()
+    
+    # Calculate average
+    avg_result = await db.execute(select(func.avg(Review.rating)).where(
+        Review.item_id == product_id,
+        Review.item_type == ReviewItemType.PRODUCT,
+        Review.is_visible == True
+    ))
+    avg = avg_result.scalar() or 0.0
+    
+    result = await db.execute(query.order_by(Review.created_at.desc()).offset((page - 1) * page_size).limit(page_size))
+    items = result.scalars().all()
+    
+    formatted_items = []
+    for item in items:
+        formatted_items.append(ReviewResponse(
+            id=item.id,
+            customer_id=item.customer_id,
+            customer_name=item.customer.user.full_name if item.customer and item.customer.user else "Anonymous",
+            item_type=item.item_type,
+            item_id=item.item_id,
+            rating=item.rating,
+            review_text=item.review_text,
+            created_at=item.created_at
+        ))
+        
+    return ReviewListResponse(total=total, page=page, page_size=page_size, items=formatted_items, average_rating=float(avg))
+
+
+@router.post("/{product_id}/reviews", response_model=MessageResponse)
+async def create_product_review(
+    product_id: UUID,
+    payload: __import__('app.schemas.review', fromlist=['ReviewCreate']).ReviewCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.review import Review, ReviewItemType
+    from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionItem
+    from app.models.customer import Customer
+
+    # Get customer
+    result = await db.execute(select(Customer).where(Customer.user_id == current_user.id))
+    customer = result.scalar_one_or_none()
+    if not customer:
+        raise HTTPException(status_code=403, detail="Only customers can leave reviews")
+
+    # Verify they have completed a subscription for this product
+    sub_query = select(SubscriptionItem).join(Subscription, Subscription.id == SubscriptionItem.subscription_id).where(
+        Subscription.customer_id == customer.id,
+        SubscriptionItem.product_id == product_id,
+        Subscription.status == SubscriptionStatus.COMPLETED
+    ).limit(1)
+    
+    sub_res = await db.execute(sub_query)
+    if not sub_res.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="You can only review products you have completely subscribed to")
+
+    # Check for existing review
+    existing_res = await db.execute(select(Review).where(
+        Review.customer_id == customer.id,
+        Review.item_id == product_id,
+        Review.item_type == ReviewItemType.PRODUCT
+    ))
+    if existing_res.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="You have already reviewed this product")
+
+    # Create review
+    review = Review(
+        customer_id=customer.id,
+        item_type=ReviewItemType.PRODUCT,
+        item_id=product_id,
+        rating=payload.rating,
+        review_text=payload.review_text
+    )
+    db.add(review)
+    await db.commit()
+    return MessageResponse(message="Review submitted successfully")
+

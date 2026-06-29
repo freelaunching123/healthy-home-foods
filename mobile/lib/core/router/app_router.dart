@@ -24,7 +24,10 @@ import '../../features/customer/screens/edit_profile_screen.dart';
 import '../../features/customer/screens/my_subscription_detail_screen.dart';
 import '../../features/customer/screens/delivery_history_screen.dart';
 import '../../features/customer/screens/address_management_screen.dart';
+import '../../features/customer/screens/wishlist_screen.dart';
+import '../../features/customer/screens/reviews_screen.dart';
 // Fruit screens (Customer)
+import '../../features/customer/screens/fruit_detail_screen.dart';
 import '../../features/customer/screens/fruit_cart_screen.dart';
 import '../../features/customer/screens/fruit_checkout_screen.dart';
 import '../../features/customer/screens/fruit_order_history_screen.dart';
@@ -141,8 +144,20 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/profile/subscription', builder: (_, __) => const MySubscriptionDetailScreen()),
     GoRoute(path: '/profile/delivery-history', builder: (_, __) => const CustomerDeliveryHistoryScreen()),
     GoRoute(path: '/profile/addresses', builder: (_, __) => const AddressManagementScreen()),
+    GoRoute(path: '/wishlist', builder: (_, __) => const WishlistScreen()),
+    GoRoute(
+      path: '/reviews/:type/:id',
+      builder: (_, state) => ReviewsScreen(
+        type: state.pathParameters['type']!,
+        id: state.pathParameters['id']!,
+      ),
+    ),
 
     // ── Fruit customer routes ──────────────────────────────────────────────────
+    GoRoute(
+      path: '/fruits/:id',
+      builder: (_, state) => FruitDetailScreen(fruitId: state.pathParameters['id']!),
+    ),
     GoRoute(path: '/fruits/cart', builder: (_, __) => const FruitCartScreen()),
     GoRoute(path: '/fruits/checkout', builder: (_, __) => const FruitCheckoutScreen()),
     GoRoute(path: '/fruits/orders', builder: (_, __) => const FruitOrderHistoryScreen()),

@@ -251,6 +251,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: const Icon(Icons.chevron_right, color: AppTheme.error),
                   onTap: _logoutFromAllDevices,
                 ),
+                
+                const SizedBox(height: 32),
+                const Text('Support & Information', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.primaryGreen)),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.help_outline),
+                  title: const Text('Help & Support'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help & Support coming soon')));
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('About Us'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('About Us coming soon')));
+                  },
+                ),
+                const SizedBox(height: 24),
               ],
             ),
     );

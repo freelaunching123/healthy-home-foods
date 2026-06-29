@@ -57,7 +57,8 @@ class ApiConstants {
 
   // Admin
   static const String adminSettings = '/admin/settings';
-  static const String adminDashboard = '/admin/dashboard';
+  static const String adminDashboard = '/reports/dashboard';
+  static const String adminOverview = '/reports/admin-overview';
   static const String adminDeliveryPartners = '/admin/delivery-partners';
   static const String adminDeliveries = '/admin/deliveries';
   static const String adminDeliveriesAnalytics = '/admin/deliveries/analytics';
@@ -88,4 +89,11 @@ class ApiConstants {
   // Fruits (Admin)
   static const String adminFruits = '/fruits/admin/fruits';
   static const String adminFruitOrders = '/fruits/admin/orders';
+
+  // Reviews
+  static String productReviews(String id) => '/products/$id/reviews';
+  static String fruitReviews(String id) => '/fruits/$id/reviews';
+  
+  // Subscription
+  static String cancelSubscription(String id) => '/subscriptions/$id/cancel';
 }

@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/local_storage_service.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
@@ -17,6 +19,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Map<String, dynamic>? _product;
   String? _planType;
   bool _isLoading = true;
+  bool _isWishlisted = false;
+  
+  // Reviews state
+  List<dynamic> _reviews = [];
+  double _averageRating = 0.0;
+  int _totalReviews = 0;
 
   @override
   void initState() {
@@ -27,6 +35,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _loadProduct() async {
     try {
       final res = await _api.get('${ApiConstants.products}/${widget.productId}');
+      
+      _isWishlisted = await LocalStorageService.isInWishlist(widget.productId);
+      
+      if (res.data != null) {
+        LocalStorageService.addRecentlyViewed('package', res.data);
+      }
+      
+      try {
+        final reviewRes = await _api.get(ApiConstants.productReviews(widget.productId), queryParameters: {'page': 1, 'page_size': 3});
+        _reviews = reviewRes.data['items'] ?? [];
+        _averageRating = (reviewRes.data['average_rating'] as num?)?.toDouble() ?? 0.0;
+        _totalReviews = reviewRes.data['total'] ?? 0;
+      } catch (e) {
+        debugPrint('Failed to load reviews: $e');
+      }
+      
       setState(() { 
         _product = res.data; 
         _planType = _product?['plan_type'];
@@ -35,6 +59,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _toggleWishlist() async {
+    if (_product == null) return;
+    await LocalStorageService.toggleWishlist(_product!);
+    final isWishlisted = await LocalStorageService.isInWishlist(widget.productId);
+    setState(() => _isWishlisted = isWishlisted);
   }
 
   @override
@@ -71,6 +102,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               onPressed: () => context.pop(),
             ),
+            actions: [
+              IconButton(
+                icon: Icon(
+                  _isWishlisted ? Icons.favorite : Icons.favorite_border,
+                  color: _isWishlisted ? Colors.red : Colors.white,
+                ),
+                onPressed: _toggleWishlist,
+              ),
+              const SizedBox(width: 8),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: BoxDecoration(
@@ -177,6 +218,69 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                   ),
 
+                  const SizedBox(height: 24),
+                  const Divider(height: 1, color: Colors.black12),
+                  const SizedBox(height: 24),
+                  
+                  // Reviews Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Reviews', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+                      if (_totalReviews > 0)
+                        TextButton(
+                          onPressed: () => context.push('/reviews/product/${widget.productId}'),
+                          child: Text('See All', style: GoogleFonts.inter(color: AppTheme.primaryGreen, fontWeight: FontWeight.bold)),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  if (_totalReviews == 0)
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
+                      alignment: Alignment.center,
+                      child: Text('No reviews yet', style: GoogleFonts.inter(color: AppTheme.textSecondary)),
+                    )
+                  else
+                    ..._reviews.map((review) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.2),
+                                child: Text(review['customer_name']?.substring(0, 1).toUpperCase() ?? 'A', style: const TextStyle(color: AppTheme.primaryGreen, fontSize: 14, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(review['customer_name'] ?? 'Anonymous', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13)),
+                                    Row(
+                                      children: List.generate(5, (index) => Icon(
+                                        index < review['rating'] ? Icons.star_rounded : Icons.star_outline_rounded,
+                                        size: 14, color: Colors.amber,
+                                      )),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (review['review_text'] != null && review['review_text'].isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(review['review_text'], style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary)),
+                          ],
+                        ],
+                      ),
+                    )),
+                  
                   const SizedBox(height: 100),
                 ],
               ),

@@ -144,8 +144,15 @@ class FruitOrderResponse(BaseModel):
     # Customer info (admin view)
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
+    # Assigned partner (admin view)
+    assigned_partner_id: Optional[uuid.UUID] = None
+    assigned_partner_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class AdminFruitOrderAssignRequest(BaseModel):
+    delivery_partner_id: Optional[uuid.UUID] = None
 
 
 class FruitOrderStatusUpdate(BaseModel):

@@ -34,7 +34,7 @@ from app.schemas.fruit import (
     FruitCartAddRequest, FruitCartUpdateRequest, FruitCartItemResponse, FruitCartResponse,
     FruitCheckoutRequest,
     FruitOrderItemResponse, FruitOrderResponse,
-    FruitOrderStatusUpdate,
+    FruitOrderStatusUpdate, AdminFruitOrderAssignRequest,
     FruitPaymentVerifyRequest,
 )
 
@@ -82,6 +82,13 @@ def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None
         customer_name = customer.user.full_name
         customer_phone = customer.user.phone
 
+    assigned_partner_id = None
+    assigned_partner_name = None
+    if hasattr(order, "assignment") and order.assignment:
+        assigned_partner_id = order.assignment.delivery_partner_id
+        if order.assignment.delivery_partner and order.assignment.delivery_partner.user:
+            assigned_partner_name = order.assignment.delivery_partner.user.full_name
+
     return FruitOrderResponse(
         id=order.id,
         order_number=order.order_number,
@@ -99,6 +106,8 @@ def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None
         address_city=address.city if address else None,
         customer_name=customer_name,
         customer_phone=customer_phone,
+        assigned_partner_id=assigned_partner_id,
+        assigned_partner_name=assigned_partner_name,
     )
 
 
@@ -749,6 +758,9 @@ async def admin_list_fruit_orders(
             selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit),
             selectinload(FruitOrder.address),
             selectinload(FruitOrder.customer).selectinload(Customer.user),
+            selectinload(FruitOrder.assignment)
+                .selectinload(__import__('app.models.delivery_assignment', fromlist=['DeliveryAssignment']).DeliveryAssignment.delivery_partner)
+                .selectinload(__import__('app.models.delivery_partner', fromlist=['DeliveryPartner']).DeliveryPartner.user),
         )
         .order_by(FruitOrder.created_at.desc())
     )
@@ -788,6 +800,9 @@ async def admin_update_order_status(
             selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit),
             selectinload(FruitOrder.address),
             selectinload(FruitOrder.customer).selectinload(Customer.user),
+            selectinload(FruitOrder.assignment)
+                .selectinload(__import__('app.models.delivery_assignment', fromlist=['DeliveryAssignment']).DeliveryAssignment.delivery_partner)
+                .selectinload(__import__('app.models.delivery_partner', fromlist=['DeliveryPartner']).DeliveryPartner.user),
         )
     )
     order = result.scalar_one_or_none()
@@ -800,3 +815,148 @@ async def admin_update_order_status(
     await db.commit()
     await db.refresh(order)
     return _build_order_response(order, order.customer)
+
+
+@router.post("/admin/orders/{order_id}/assign", response_model=MessageResponse)
+async def admin_assign_fruit_order(
+    order_id: UUID,
+    payload: AdminFruitOrderAssignRequest,
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin: assign or unassign a delivery partner to a fruit order."""
+    from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
+    from app.models.delivery_partner import DeliveryPartner
+
+    # Get the order
+    order_result = await db.execute(select(FruitOrder).where(FruitOrder.id == order_id))
+    order = order_result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Fruit order not found")
+
+    # Get existing assignment
+    assignment_result = await db.execute(select(DeliveryAssignment).where(DeliveryAssignment.fruit_order_id == order_id))
+    assignment = assignment_result.scalar_one_or_none()
+
+    if payload.delivery_partner_id is None:
+        # Unassign
+        if assignment:
+            await db.delete(assignment)
+            await db.commit()
+        return MessageResponse(message="Delivery partner unassigned successfully")
+
+    # Assign
+    partner_result = await db.execute(select(DeliveryPartner).where(DeliveryPartner.id == payload.delivery_partner_id))
+    partner = partner_result.scalar_one_or_none()
+    if not partner:
+        raise HTTPException(status_code=404, detail="Delivery partner not found")
+
+    if assignment:
+        assignment.delivery_partner_id = partner.id
+        assignment.status = AssignmentStatus.PENDING
+        assignment.assigned_at = datetime.now(timezone.utc)
+    else:
+        assignment = DeliveryAssignment(
+            fruit_order_id=order.id,
+            delivery_partner_id=partner.id,
+            status=AssignmentStatus.PENDING,
+            assigned_at=datetime.now(timezone.utc),
+        )
+        db.add(assignment)
+
+    await db.commit()
+    return MessageResponse(message="Delivery partner assigned successfully")
+
+
+@router.get("/{fruit_id}/reviews", response_model=__import__('app.schemas.review', fromlist=['ReviewListResponse']).ReviewListResponse)
+async def list_fruit_reviews(
+    fruit_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.review import Review, ReviewItemType
+    from app.schemas.review import ReviewListResponse, ReviewResponse
+    from sqlalchemy import func
+    
+    query = select(Review).options(selectinload(Review.customer).selectinload(Customer.user)).where(
+        Review.item_id == fruit_id,
+        Review.item_type == ReviewItemType.FRUIT,
+        Review.is_visible == True
+    )
+    
+    total_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = total_result.scalar_one()
+    
+    avg_result = await db.execute(select(func.avg(Review.rating)).where(
+        Review.item_id == fruit_id,
+        Review.item_type == ReviewItemType.FRUIT,
+        Review.is_visible == True
+    ))
+    avg = avg_result.scalar() or 0.0
+    
+    result = await db.execute(query.order_by(Review.created_at.desc()).offset((page - 1) * page_size).limit(page_size))
+    items = result.scalars().all()
+    
+    formatted_items = []
+    for item in items:
+        formatted_items.append(ReviewResponse(
+            id=item.id,
+            customer_id=item.customer_id,
+            customer_name=item.customer.user.full_name if item.customer and item.customer.user else "Anonymous",
+            item_type=item.item_type,
+            item_id=item.item_id,
+            rating=item.rating,
+            review_text=item.review_text,
+            created_at=item.created_at
+        ))
+        
+    return ReviewListResponse(total=total, page=page, page_size=page_size, items=formatted_items, average_rating=float(avg))
+
+
+@router.post("/{fruit_id}/reviews", response_model=MessageResponse)
+async def create_fruit_review(
+    fruit_id: UUID,
+    payload: __import__('app.schemas.review', fromlist=['ReviewCreate']).ReviewCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models.review import Review, ReviewItemType
+    
+    # Get customer
+    result = await db.execute(select(Customer).where(Customer.user_id == current_user.id))
+    customer = result.scalar_one_or_none()
+    if not customer:
+        raise HTTPException(status_code=403, detail="Only customers can leave reviews")
+
+    # Verify they have completed an order for this fruit
+    order_query = select(FruitOrderItem).join(FruitOrder, FruitOrder.id == FruitOrderItem.order_id).where(
+        FruitOrder.customer_id == customer.id,
+        FruitOrderItem.fruit_id == fruit_id,
+        FruitOrder.order_status == FruitOrderStatus.DELIVERED
+    ).limit(1)
+    
+    order_res = await db.execute(order_query)
+    if not order_res.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="You can only review fruits that have been delivered to you")
+
+    # Check for existing review
+    existing_res = await db.execute(select(Review).where(
+        Review.customer_id == customer.id,
+        Review.item_id == fruit_id,
+        Review.item_type == ReviewItemType.FRUIT
+    ))
+    if existing_res.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="You have already reviewed this fruit")
+
+    # Create review
+    review = Review(
+        customer_id=customer.id,
+        item_type=ReviewItemType.FRUIT,
+        item_id=fruit_id,
+        rating=payload.rating,
+        review_text=payload.review_text
+    )
+    db.add(review)
+    await db.commit()
+    return MessageResponse(message="Review submitted successfully")

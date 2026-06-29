@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/local_storage_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -37,6 +38,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingFruits = true;
   int _cartCount = 0;
   final Map<String, double> _quantities = {};
+  
+  // -- Recently Viewed State --
+  List<Map<String, dynamic>> _recentlyViewedPackages = [];
+  List<Map<String, dynamic>> _recentlyViewedFruits = [];
 
   @override
   void initState() {
@@ -44,7 +49,19 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadPackages();
     _loadFruits();
     _loadCartCount();
+    _loadRecentlyViewed();
     _startPolling();
+  }
+
+  Future<void> _loadRecentlyViewed() async {
+    final packages = await LocalStorageService.getRecentlyViewed('package');
+    final fruits = await LocalStorageService.getRecentlyViewed('fruit');
+    if (mounted) {
+      setState(() {
+        _recentlyViewedPackages = packages;
+        _recentlyViewedFruits = fruits;
+      });
+    }
   }
 
   @override
@@ -296,6 +313,28 @@ class _HomeScreenState extends State<HomeScreen> {
   
   List<Widget> _buildPackagesSlivers() {
     return [
+      if (_recentlyViewedPackages.isNotEmpty && _searchQuery.isEmpty && _selectedCategoryId == null)
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Text("Recently Viewed", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+              ),
+              SizedBox(
+                height: 180,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _recentlyViewedPackages.length,
+                  itemBuilder: (ctx, i) => SizedBox(width: 150, child: Padding(padding: const EdgeInsets.only(right: 12), child: _ProductCard(product: _recentlyViewedPackages[i]))),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
       if (_todaySpecials.isNotEmpty && _searchQuery.isEmpty && _selectedCategoryId == null)
         SliverToBoxAdapter(
           child: Column(
@@ -374,6 +413,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Widget> _buildFruitsSlivers() {
     return [
+      if (_recentlyViewedFruits.isNotEmpty && _searchQuery.isEmpty)
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Text("Recently Viewed", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+              ),
+              SizedBox(
+                height: 190,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _recentlyViewedFruits.length,
+                  itemBuilder: (ctx, i) => SizedBox(width: 140, child: Padding(padding: const EdgeInsets.only(right: 12), child: _FruitCard(
+                    fruit: _recentlyViewedFruits[i],
+                    quantity: _quantities[_recentlyViewedFruits[i]['id'] as String] ?? 0,
+                    onQtyChanged: (newQty) => _onQtyChanged(_recentlyViewedFruits[i], newQty),
+                    baseUrl: _api.dio.options.baseUrl.replaceAll('/api/v1', ''),
+                  ))),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
       if (_isLoadingFruits)
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -509,7 +575,10 @@ class _ProductCard extends StatelessWidget {
     if (imgUrl != null) debugPrint('Flutter Image Render (_ProductCard): $imgUrl');
 
     return GestureDetector(
-      onTap: () => context.push('/product/${product['id']}'),
+      onTap: () {
+        LocalStorageService.addRecentlyViewed('package', product);
+        context.push('/product/${product['id']}');
+      },
       child: Opacity(
         opacity: isOutOfStock ? 0.6 : 1.0,
         child: Container(
@@ -540,22 +609,38 @@ class _ProductCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(product['name'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      Text(product['name'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      if (product['description'] != null)
+                        Text(product['description'], style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary), maxLines: 2, overflow: TextOverflow.ellipsis),
                       const Spacer(),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Starts at', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
-                          Row(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (discountPrice != null) ...[
-                                Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.lineThrough)),
-                                const SizedBox(width: 4),
-                                Text('₹${discountPrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen)),
-                              ] else ...[
-                                Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen)),
-                              ],
+                              Text('${product['package_days'] ?? 6} Days', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen)),
+                              Row(
+                                children: [
+                                  if (discountPrice != null) ...[
+                                    Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 10, color: Colors.grey, decoration: TextDecoration.lineThrough)),
+                                    const SizedBox(width: 4),
+                                    Text('₹${discountPrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                                  ] else ...[
+                                    Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                                  ],
+                                ],
+                              ),
                             ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isOutOfStock ? Colors.grey : AppTheme.primaryGreen,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text('Subscribe', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
                           ),
                         ],
                       ),
@@ -598,43 +683,49 @@ class _FruitCard extends StatelessWidget {
       statusColor = AppTheme.warning;
     }
 
-    return Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: AppTheme.primaryGreen.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))]),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            child: AspectRatio(
-              aspectRatio: 1.1,
-              child: fullImageUrl != null
-                  ? CachedNetworkImage(imageUrl: fullImageUrl, fit: BoxFit.cover, placeholder: (_, __) => Container(color: AppTheme.scaffoldBg, child: const Center(child: CircularProgressIndicator(strokeWidth: 2))), errorWidget: (_, __, ___) => _FruitPlaceholder(name: fruit['name'] as String))
-                  : _FruitPlaceholder(name: fruit['name'] as String),
+    return GestureDetector(
+      onTap: () {
+        LocalStorageService.addRecentlyViewed('fruit', fruit);
+        context.push('/fruits/${fruit['id']}');
+      },
+      child: Container(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: AppTheme.primaryGreen.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))]),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: AspectRatio(
+                aspectRatio: 1.1,
+                child: fullImageUrl != null
+                    ? CachedNetworkImage(imageUrl: fullImageUrl, fit: BoxFit.cover, placeholder: (_, __) => Container(color: AppTheme.scaffoldBg, child: const Center(child: CircularProgressIndicator(strokeWidth: 2))), errorWidget: (_, __, ___) => _FruitPlaceholder(name: fruit['name'] as String))
+                    : _FruitPlaceholder(name: fruit['name'] as String),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(fruit['name'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
-                Text('₹${price.toStringAsFixed(0)} / KG', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen)),
-                if (!available && statusLabel.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)), child: Text(statusLabel, style: GoogleFonts.inter(fontSize: 9, color: statusColor, fontWeight: FontWeight.w600))),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(fruit['name'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text('₹${price.toStringAsFixed(0)} / KG', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen)),
+                  if (!available && statusLabel.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)), child: Text(statusLabel, style: GoogleFonts.inter(fontSize: 9, color: statusColor, fontWeight: FontWeight.w600))),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const Spacer(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
-            child: available
-                ? _QtyStepper(quantity: quantity, onChanged: onQtyChanged)
-                : Center(child: Text(statusLabel.isEmpty ? 'Unavailable' : statusLabel, style: GoogleFonts.inter(fontSize: 10, color: AppTheme.textLight))),
-          ),
-        ],
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
+              child: available
+                  ? _QtyStepper(quantity: quantity, onChanged: onQtyChanged)
+                  : Center(child: Text(statusLabel.isEmpty ? 'Unavailable' : statusLabel, style: GoogleFonts.inter(fontSize: 10, color: AppTheme.textLight))),
+            ),
+          ],
+        ),
       ),
     );
   }
