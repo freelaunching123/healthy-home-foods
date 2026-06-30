@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:intl/intl.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -22,8 +23,13 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
   List<Map<String, dynamic>> _addresses = [];
   Map<String, dynamic>? _selectedAddress;
 
+  List<Map<String, dynamic>> _slots = [];
+  String? _selectedDate;
+  String? _selectedTimeSlot;
+
   bool _loadingCart = true;
   bool _loadingAddresses = true;
+  bool _loadingSlots = true;
   bool _placingOrder = false;
   bool _paymentProcessing = false;
   String? _pendingOrderId;
@@ -35,6 +41,7 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
     _setupRazorpay();
     _loadCart();
     _loadAddresses();
+    _loadSlots();
   }
 
   void _setupRazorpay() {
@@ -81,10 +88,37 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
     }
   }
 
+  Future<void> _loadSlots() async {
+    try {
+      final res = await _api.get(ApiConstants.fruitDeliverySlots);
+      final list = List<Map<String, dynamic>>.from(res.data as List);
+      setState(() {
+        _slots = list;
+        if (_slots.isNotEmpty) {
+          // Find first available slot or set selected date to the first date in list
+          final uniqueDates = _slots.map((s) => s['date'] as String).toSet().toList();
+          uniqueDates.sort();
+          if (uniqueDates.isNotEmpty) {
+            _selectedDate = uniqueDates[0];
+          }
+        }
+        _loadingSlots = false;
+      });
+    } catch (_) {
+      setState(() => _loadingSlots = false);
+    }
+  }
+
   Future<void> _placeOrder() async {
     if (_selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a delivery address'), backgroundColor: AppTheme.warning),
+      );
+      return;
+    }
+    if (_selectedDate == null || _selectedTimeSlot == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a delivery date and time slot'), backgroundColor: AppTheme.warning),
       );
       return;
     }
@@ -100,6 +134,8 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
       // Step 1: Create the order
       final orderRes = await _api.post(ApiConstants.fruitOrdersCheckout, data: {
         'address_id': _selectedAddress!['id'],
+        'delivery_date': _selectedDate,
+        'delivery_slot': _selectedTimeSlot,
       });
       final orderId = orderRes.data['id'] as String;
       _pendingOrderId = orderId;
@@ -222,6 +258,146 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
     );
   }
 
+  Widget _buildSchedulePicker() {
+    if (_loadingSlots) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+        ),
+      );
+    }
+    if (_slots.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+        child: const Text('No delivery slots available at the moment.', style: TextStyle(color: AppTheme.textSecondary)),
+      );
+    }
+
+    final uniqueDates = _slots.map((s) => s['date'] as String).toSet().toList();
+    uniqueDates.sort();
+
+    final timeSlots = _slots.where((s) => s['date'] == _selectedDate).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Select Delivery Date', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary)),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 64,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: uniqueDates.length,
+              itemBuilder: (ctx, i) {
+                final dateStr = uniqueDates[i];
+                final isSelected = dateStr == _selectedDate;
+                final parsed = DateTime.parse(dateStr);
+                final dayName = DateFormat('E').format(parsed).toUpperCase();
+                final dateNum = DateFormat('d MMM').format(parsed);
+
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedDate = dateStr;
+                      _selectedTimeSlot = null; // Reset slot when date changes
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    margin: const EdgeInsets.only(right: 10),
+                    width: 72,
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(dayName, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: isSelected ? Colors.white70 : AppTheme.textLight)),
+                        const SizedBox(height: 4),
+                        Text(dateNum, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: isSelected ? Colors.white : AppTheme.textPrimary)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text('Select Time Slot', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary)),
+          const SizedBox(height: 10),
+          if (timeSlots.isEmpty)
+            const Text('No slots available for this date.', style: TextStyle(color: AppTheme.textLight, fontSize: 13))
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: timeSlots.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (ctx, i) {
+                final slot = timeSlots[i];
+                final slotName = slot['time_slot'] as String;
+                final available = slot['is_available'] as bool? ?? true;
+                final isSelected = slotName == _selectedTimeSlot;
+
+                return GestureDetector(
+                  onTap: available
+                      ? () => setState(() => _selectedTimeSlot = slotName)
+                      : null,
+                  child: Opacity(
+                    opacity: available ? 1.0 : 0.4,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppTheme.primaryGreen.withValues(alpha: 0.06) : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade200,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+                            color: isSelected ? AppTheme.primaryGreen : AppTheme.textLight,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            slotName,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected ? AppTheme.primaryGreen : AppTheme.textPrimary,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (!available)
+                            Text('UNAVAILABLE', style: GoogleFonts.inter(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loading = _loadingCart || _loadingAddresses;
@@ -253,6 +429,13 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
                           selected: _selectedAddress,
                           onSelect: (a) => setState(() => _selectedAddress = a),
                         ),
+
+                  const SizedBox(height: 24),
+
+                  // Delivery Schedule
+                  _SectionHeader(icon: Icons.calendar_month_rounded, title: 'Delivery Schedule'),
+                  const SizedBox(height: 10),
+                  _buildSchedulePicker(),
 
                   const SizedBox(height: 24),
 

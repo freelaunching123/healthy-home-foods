@@ -85,6 +85,7 @@ class ApiConstants {
   static const String fruitOrdersCheckout = '/fruits/orders/checkout';
   static const String fruitOrdersHistory = '/fruits/orders/history';
   static const String fruitOrders = '/fruits/orders';
+  static const String fruitDeliverySlots = '/fruits/delivery-slots';
 
   // Fruits (Admin)
   static const String adminFruits = '/fruits/admin/fruits';

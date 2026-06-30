@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -285,6 +286,8 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _api = ApiClient();
 
+  late final TextEditingController _recipientNameController;
+  late final TextEditingController _recipientPhoneController;
   late final TextEditingController _labelController;
   late final TextEditingController _line1Controller;
   late final TextEditingController _line2Controller;
@@ -293,6 +296,8 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
   late final TextEditingController _pincodeController;
   late final TextEditingController _landmarkController;
 
+  double? _latitude;
+  double? _longitude;
   String _addressType = 'home';
   bool _isDefault = false;
   bool _isSaving = false;
@@ -301,6 +306,8 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
   void initState() {
     super.initState();
     final edit = widget.addressToEdit;
+    _recipientNameController = TextEditingController(text: edit?['recipient_name'] ?? '');
+    _recipientPhoneController = TextEditingController(text: edit?['recipient_phone'] ?? '');
     _labelController = TextEditingController(text: edit?['label'] ?? '');
     _line1Controller = TextEditingController(text: edit?['address_line1'] ?? '');
     _line2Controller = TextEditingController(text: edit?['address_line2'] ?? '');
@@ -308,6 +315,9 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
     _stateController = TextEditingController(text: edit?['state'] ?? '');
     _pincodeController = TextEditingController(text: edit?['pincode'] ?? '');
     _landmarkController = TextEditingController(text: edit?['landmark'] ?? '');
+
+    _latitude = edit?['latitude'] != null ? double.tryParse(edit!['latitude'].toString()) : null;
+    _longitude = edit?['longitude'] != null ? double.tryParse(edit!['longitude'].toString()) : null;
     
     if (edit?['address_type'] != null) {
       _addressType = (edit!['address_type'] as String).toLowerCase();
@@ -323,6 +333,8 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
 
   @override
   void dispose() {
+    _recipientNameController.dispose();
+    _recipientPhoneController.dispose();
     _labelController.dispose();
     _line1Controller.dispose();
     _line2Controller.dispose();
@@ -335,10 +347,19 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
 
   Future<void> _saveAddress() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    if (_latitude == null || _longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your location on the map'), backgroundColor: AppTheme.error),
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
     try {
       final payload = {
+        'recipient_name': _recipientNameController.text.trim(),
+        'recipient_phone': _recipientPhoneController.text.trim(),
         'label': _labelController.text.trim().isNotEmpty ? _labelController.text.trim() : null,
         'address_type': _addressType == 'work' ? 'work' : _addressType, // maps UI WORK to work enum
         'address_line1': _line1Controller.text.trim(),
@@ -347,6 +368,8 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
         'state': _stateController.text.trim(),
         'pincode': _pincodeController.text.trim(),
         'landmark': _landmarkController.text.trim().isNotEmpty ? _landmarkController.text.trim() : null,
+        'latitude': _latitude,
+        'longitude': _longitude,
         'is_default': _isDefault,
       };
 
@@ -432,6 +455,33 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
               ),
               const SizedBox(height: 16),
 
+              // Recipient Name
+              TextFormField(
+                controller: _recipientNameController,
+                decoration: InputDecoration(
+                  labelText: 'Recipient Name',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                validator: (val) => val == null || val.trim().isEmpty ? 'Recipient name is required' : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Recipient Phone
+              TextFormField(
+                controller: _recipientPhoneController,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'Recipient Mobile Number',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) return 'Recipient mobile number is required';
+                  if (!RegExp(r'^\+?[0-9]{10,15}$').hasMatch(val.trim())) return 'Invalid mobile number';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
               // Custom Label (Optional)
               TextFormField(
                 controller: _labelController,
@@ -442,22 +492,22 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
               ),
               const SizedBox(height: 16),
 
-              // Line 1
+              // Line 1 (Flat / House No.)
               TextFormField(
                 controller: _line1Controller,
                 decoration: InputDecoration(
-                  labelText: 'Flat / House No. / Street Address',
+                  labelText: 'Flat / House No. / Building Name',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                validator: (val) => val == null || val.trim().isEmpty ? 'Address is required' : null,
+                validator: (val) => val == null || val.trim().isEmpty ? 'House/Flat details are required' : null,
               ),
               const SizedBox(height: 16),
 
-              // Line 2
+              // Line 2 (Street / Area)
               TextFormField(
                 controller: _line2Controller,
                 decoration: InputDecoration(
-                  labelText: 'Area / Colony / Building Name (Optional)',
+                  labelText: 'Street Address / Area (Optional)',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
@@ -521,6 +571,60 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
                   ),
                 ],
               ),
+              const SizedBox(height: 20),
+
+              // Map Location Picker Button
+              Card(
+                elevation: 0,
+                color: _latitude != null && _longitude != null
+                    ? AppTheme.primaryGreen.withValues(alpha: 0.08)
+                    : Colors.red.withValues(alpha: 0.08),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: _latitude != null && _longitude != null
+                        ? AppTheme.primaryGreen
+                        : Colors.red,
+                  ),
+                ),
+                child: ListTile(
+                  leading: Icon(
+                    Icons.map_rounded,
+                    color: _latitude != null && _longitude != null ? AppTheme.primaryGreen : Colors.red,
+                  ),
+                  title: Text(
+                    _latitude != null && _longitude != null ? 'Location Pinned' : 'Pin Location on Map',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: _latitude != null && _longitude != null ? AppTheme.primaryGreen : Colors.red,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _latitude != null && _longitude != null
+                        ? 'Lat: ${_latitude!.toStringAsFixed(4)}, Lng: ${_longitude!.toStringAsFixed(4)}'
+                        : 'Required: Select delivery coordinates',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    final LatLng? result = await Navigator.push<LatLng>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => _MapLocationPickerDialog(
+                          initialLat: _latitude,
+                          initialLng: _longitude,
+                        ),
+                      ),
+                    );
+                    if (result != null) {
+                      setState(() {
+                        _latitude = result.latitude;
+                        _longitude = result.longitude;
+                      });
+                    }
+                  },
+                ),
+              ),
               const SizedBox(height: 10),
 
               // Default Toggle
@@ -556,6 +660,109 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MapLocationPickerDialog extends StatefulWidget {
+  final double? initialLat;
+  final double? initialLng;
+
+  const _MapLocationPickerDialog({this.initialLat, this.initialLng});
+
+  @override
+  State<_MapLocationPickerDialog> createState() => _MapLocationPickerDialogState();
+}
+
+class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> {
+  LatLng _selectedLatLng = const LatLng(12.9716, 77.5946); // Default Bangalore coordinates
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialLat != null && widget.initialLng != null) {
+      _selectedLatLng = LatLng(widget.initialLat!, widget.initialLng!);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Select Location'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, _selectedLatLng),
+            child: const Text('CONFIRM', style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _selectedLatLng,
+              zoom: 15,
+            ),
+            markers: {
+              Marker(
+                markerId: const MarkerId('selected_pos'),
+                position: _selectedLatLng,
+                draggable: true,
+                onDragEnd: (newPosition) {
+                  setState(() {
+                    _selectedLatLng = newPosition;
+                  });
+                },
+              ),
+            },
+            onTap: (latLng) {
+              setState(() {
+                _selectedLatLng = latLng;
+              });
+            },
+          ),
+          Positioned(
+            bottom: 24,
+            left: 24,
+            right: 24,
+            child: Card(
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.location_on, color: AppTheme.primaryGreen),
+                        SizedBox(width: 8),
+                        Text('Selected Coordinates', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Lat: ${_selectedLatLng.latitude.toStringAsFixed(6)}, Lng: ${_selectedLatLng.longitude.toStringAsFixed(6)}',
+                      style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Tap on the map or drag the marker to pin your exact delivery spot.',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textLight),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

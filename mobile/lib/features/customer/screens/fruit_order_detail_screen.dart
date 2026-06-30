@@ -20,10 +20,20 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
   bool _loading = true;
   String? _error;
 
+  int _selectedRating = 0;
+  final _reviewController = TextEditingController();
+  bool _submittingRating = false;
+
   @override
   void initState() {
     super.initState();
     _loadOrder();
+  }
+
+  @override
+  void dispose() {
+    _reviewController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadOrder() async {
@@ -33,6 +43,30 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
       setState(() { _order = Map<String, dynamic>.from(res.data as Map); _loading = false; });
     } catch (e) {
       setState(() { _error = 'Failed to load order details.'; _loading = false; });
+    }
+  }
+
+  Future<void> _submitRating() async {
+    if (_selectedRating <= 0) return;
+    setState(() => _submittingRating = true);
+    try {
+      await _api.post(
+        '${ApiConstants.fruitOrders}/${widget.orderId}/rate',
+        data: {
+          'rating': _selectedRating,
+          'review_text': _reviewController.text.trim().isNotEmpty ? _reviewController.text.trim() : null,
+        },
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Feedback submitted successfully!'), backgroundColor: AppTheme.success),
+      );
+      _loadOrder();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to submit feedback'), backgroundColor: AppTheme.error),
+      );
+    } finally {
+      setState(() => _submittingRating = false);
     }
   }
 
@@ -256,6 +290,119 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
                 ),
               ),
             ),
+
+          const SizedBox(height: 14),
+
+          // Delivery schedule card
+          if (order['delivery_date'] != null) ...[
+            _Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Delivery Schedule', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
+                    const SizedBox(height: 12),
+                    _InfoRow(label: 'Scheduled Date', value: _formatDate(order['delivery_date'] as String)),
+                    _InfoRow(label: 'Time Slot', value: order['delivery_slot'] ?? 'N/A'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Rating card
+          if (orderStatus == 'delivered') ...[
+            if (order['rating'] != null)
+              _Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Your Rating & Review', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: List.generate(5, (starIndex) {
+                          return Icon(
+                            starIndex < (order['rating'] as int) ? Icons.star_rounded : Icons.star_border_rounded,
+                            color: Colors.amber,
+                            size: 24,
+                          );
+                        }),
+                      ),
+                      if (order['review_text'] != null && (order['review_text'] as String).isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          '"${order['review_text']}"',
+                          style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              )
+            else
+              _Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Rate Your Order', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
+                      const SizedBox(height: 6),
+                      Text('How was your fruit order delivery?', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: List.generate(5, (starIndex) {
+                          final starVal = starIndex + 1;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedRating = starVal;
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: Icon(
+                                starVal <= _selectedRating ? Icons.star_rounded : Icons.star_border_rounded,
+                                color: Colors.amber,
+                                size: 32,
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                      if (_selectedRating > 0) ...[
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _reviewController,
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            hintText: 'Share your feedback (optional)...',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _submittingRating ? null : _submitRating,
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 40),
+                            backgroundColor: AppTheme.primaryGreen,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: _submittingRating
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Text('Submit Feedback'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 14),
+          ],
 
           SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
         ],

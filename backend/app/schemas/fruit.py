@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 from pydantic import BaseModel, field_validator
 
@@ -111,6 +111,8 @@ class FruitCartResponse(BaseModel):
 class FruitCheckoutRequest(BaseModel):
     address_id: uuid.UUID
     notes: Optional[str] = None
+    delivery_date: date
+    delivery_slot: str
 
 
 class FruitOrderItemResponse(BaseModel):
@@ -141,12 +143,23 @@ class FruitOrderResponse(BaseModel):
     # Address snapshot
     address_line1: Optional[str] = None
     address_city: Optional[str] = None
+    address_line2: Optional[str] = None
+    address_state: Optional[str] = None
+    address_pincode: Optional[str] = None
+    recipient_name: Optional[str] = None
+    recipient_phone: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     # Customer info (admin view)
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     # Assigned partner (admin view)
     assigned_partner_id: Optional[uuid.UUID] = None
     assigned_partner_name: Optional[str] = None
+    delivery_date: Optional[date] = None
+    delivery_slot: Optional[str] = None
+    rating: Optional[int] = None
+    review_text: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -163,3 +176,8 @@ class FruitPaymentVerifyRequest(BaseModel):
     razorpay_order_id: str
     razorpay_payment_id: str
     razorpay_signature: str
+
+
+class FruitOrderRateRequest(BaseModel):
+    rating: int
+    review_text: Optional[str] = None

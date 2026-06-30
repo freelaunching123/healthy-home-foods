@@ -40,6 +40,35 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
     }
   }
 
+  Future<void> _updateStatus(String assignmentId, String newStatus) async {
+    setState(() => _isLoading = true);
+    try {
+      await _api.put(ApiConstants.partnerUpdateStatus(assignmentId), data: {'status': newStatus});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Delivery started successfully!'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+      await _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to start delivery'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -62,14 +91,20 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Today\'s Performance', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      'Today\'s Performance',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 16),
-                    _buildStatsGrid(),
+                    _buildStatsSection(),
                     const SizedBox(height: 32),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Current Active Deliveries', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                        Text(
+                          'Current Active Deliveries',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                        ),
                         TextButton(
                           onPressed: () => context.push('/delivery/active'),
                           child: const Text('View All'),
@@ -85,44 +120,88 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
     );
   }
 
-  Widget _buildStatsGrid() {
+  Widget _buildStatsSection() {
     if (_stats == null) return const SizedBox.shrink();
     
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.5,
+    return Column(
       children: [
-        _buildStatCard('Assigned Today', _stats!['assigned_today']?.toString() ?? '0', Icons.assignment, Colors.blue),
-        _buildStatCard('Completed', _stats!['completed_today']?.toString() ?? '0', Icons.check_circle, Colors.green),
-        _buildStatCard('Pending', _stats!['pending_deliveries']?.toString() ?? '0', Icons.pending_actions, Colors.orange),
-        _buildStatCard('Success Rate', '${(_stats!['success_rate'] as num?)?.toStringAsFixed(1) ?? '0'}%', Icons.trending_up, Colors.purple),
+        _buildStatCard(
+          'Assigned Deliveries Today', 
+          _stats!['assigned_today']?.toString() ?? '0', 
+          Icons.assignment_outlined, 
+          Colors.blue,
+          isHero: true,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                'Completed Today', 
+                _stats!['completed_today']?.toString() ?? '0', 
+                Icons.check_circle_outline, 
+                AppTheme.primaryGreen,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                'Pending Today', 
+                _stats!['pending_deliveries']?.toString() ?? '0', 
+                Icons.pending_actions_outlined, 
+                Colors.orange,
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(String title, String value, IconData icon, Color color, {bool isHero = false}) {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade100, width: 1.5),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: isHero ? 20 : 16),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Icon(icon, size: 20, color: color),
-                const SizedBox(width: 8),
-                Expanded(child: Text(title, style: Theme.of(context).textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
-              ],
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
             ),
-            const Spacer(),
-            Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: isHero ? 28 : 22,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -133,8 +212,17 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
     if (_activeDeliveries.isEmpty) {
       return const Center(
         child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: Text('No active deliveries right now', style: TextStyle(color: Colors.grey)),
+          padding: EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
+          child: Column(
+            children: [
+              Icon(Icons.local_shipping_outlined, size: 48, color: Colors.grey),
+              SizedBox(height: 12),
+              Text(
+                'No active deliveries right now.',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -146,33 +234,143 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
       itemBuilder: (context, index) {
         final delivery = _activeDeliveries[index];
         final orderType = delivery['order_type'] == 'fruit' ? 'Fruit Order' : 'Subscription';
+        final statusVal = delivery['status'] as String? ?? '';
+        final isOutForDelivery = statusVal == 'out_for_delivery';
         
         return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            title: Text('${delivery['customer_name']} ($orderType)'),
-            subtitle: Column(
+          margin: const EdgeInsets.only(bottom: 16),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.grey.shade100, width: 1.5),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 4),
-                Text(delivery['delivery_address'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Order ID: ${delivery['order_id'] ?? ''}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isOutForDelivery 
+                            ? Colors.orange.withValues(alpha: 0.1) 
+                            : Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isOutForDelivery ? 'OUT FOR DELIVERY' : 'ASSIGNED',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isOutForDelivery ? Colors.orange : Colors.blue,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                      child: const Icon(Icons.person, color: AppTheme.primaryGreen),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            delivery['customer_name'] ?? 'Unknown',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            orderType,
+                            style: const TextStyle(
+                              color: AppTheme.textLight,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 18, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        delivery['delivery_address'] ?? '',
+                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryGreen.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    (delivery['status'] ?? '').toString().toUpperCase(),
-                    style: const TextStyle(fontSize: 10, color: AppTheme.primaryGreen, fontWeight: FontWeight.bold),
-                  ),
+                Row(
+                  children: [
+                    const Icon(Icons.access_time_outlined, size: 18, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Delivery Time: ${delivery['scheduled_time'] ?? 'Standard (9 AM - 6 PM)'}',
+                      style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => context.push('/delivery/order/${delivery['id']}'),
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: const BorderSide(color: AppTheme.primaryGreen),
+                        ),
+                        child: const Text('View Details', style: TextStyle(color: AppTheme.primaryGreen)),
+                      ),
+                    ),
+                    if (!isOutForDelivery) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _updateStatus(delivery['id'], 'out_for_delivery'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryGreen,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text('Start Delivery'),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/delivery/active'),
           ),
         );
       },

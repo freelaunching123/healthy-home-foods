@@ -16,6 +16,8 @@ class AddressCreate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     is_default: bool = False
+    recipient_name: Optional[str] = None
+    recipient_phone: Optional[str] = None
 
 
 class AddressUpdate(BaseModel):
@@ -30,6 +32,8 @@ class AddressUpdate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     is_default: Optional[bool] = None
+    recipient_name: Optional[str] = None
+    recipient_phone: Optional[str] = None
 
 
 class AddressResponse(BaseModel):
@@ -47,6 +51,8 @@ class AddressResponse(BaseModel):
     longitude: Optional[float]
     is_default: bool
     is_active: bool
+    recipient_name: Optional[str] = None
+    recipient_phone: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -150,6 +156,7 @@ class ActiveDeliveryResponse(BaseModel):
     items_summary: str
     total_amount: float
     delivery_instructions: Optional[str]
+    scheduled_time: Optional[str] = None
 
 
 class DeliveryRouteResponse(BaseModel):
@@ -281,5 +288,6 @@ class DeliveryHistoryResponse(BaseModel):
     order_type: str = "subscription"
     customer_name: str = ""
     delivery_time: Optional[datetime] = None
+    order_id: str = ""
 
     model_config = {"from_attributes": True}

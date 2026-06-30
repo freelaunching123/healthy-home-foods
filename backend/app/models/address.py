@@ -38,6 +38,8 @@ class Address(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     longitude: Mapped[Optional[float]] = mapped_column(Numeric(10, 7), nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    recipient_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    recipient_phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="addresses")

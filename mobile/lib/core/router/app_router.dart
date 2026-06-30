@@ -154,16 +154,16 @@ final GoRouter appRouter = GoRouter(
     ),
 
     // ── Fruit customer routes ──────────────────────────────────────────────────
-    GoRoute(
-      path: '/fruits/:id',
-      builder: (_, state) => FruitDetailScreen(fruitId: state.pathParameters['id']!),
-    ),
     GoRoute(path: '/fruits/cart', builder: (_, __) => const FruitCartScreen()),
     GoRoute(path: '/fruits/checkout', builder: (_, __) => const FruitCheckoutScreen()),
     GoRoute(path: '/fruits/orders', builder: (_, __) => const FruitOrderHistoryScreen()),
     GoRoute(
       path: '/fruits/orders/:id',
       builder: (_, state) => FruitOrderDetailScreen(orderId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/fruits/:id',
+      builder: (_, state) => FruitDetailScreen(fruitId: state.pathParameters['id']!),
     ),
 
     // Admin shell (5 tabs: Dashboard, Products, Fruits, Deliveries, Reports)

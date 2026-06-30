@@ -1,9 +1,9 @@
 import uuid
 import enum
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from sqlalchemy import (
-    String, Boolean, ForeignKey, Numeric, Text, Integer,
+    String, Boolean, ForeignKey, Numeric, Text, Integer, Date,
     DateTime, Enum as SAEnum, CheckConstraint, UniqueConstraint, func
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -129,6 +129,10 @@ class FruitOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=FruitOrderStatus.PENDING, nullable=False, index=True
     )
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    delivery_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    delivery_slot: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    review_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships
     customer: Mapped["Customer"] = relationship("Customer", back_populates="fruit_orders")

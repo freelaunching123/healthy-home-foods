@@ -35,7 +35,7 @@ from app.schemas.fruit import (
     FruitCheckoutRequest,
     FruitOrderItemResponse, FruitOrderResponse,
     FruitOrderStatusUpdate, AdminFruitOrderAssignRequest,
-    FruitPaymentVerifyRequest,
+    FruitPaymentVerifyRequest, FruitOrderRateRequest,
 )
 
 router = APIRouter(prefix="/fruits", tags=["Fruits"])
@@ -76,6 +76,9 @@ def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None
         ))
 
     address = order.address
+    if not customer and hasattr(order, "customer") and order.customer:
+        customer = order.customer
+
     customer_name = None
     customer_phone = None
     if customer and customer.user:
@@ -104,10 +107,21 @@ def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None
         items=items_out,
         address_line1=address.address_line1 if address else None,
         address_city=address.city if address else None,
+        address_line2=address.address_line2 if address else None,
+        address_state=address.state if address else None,
+        address_pincode=address.pincode if address else None,
+        recipient_name=address.recipient_name if address else None,
+        recipient_phone=address.recipient_phone if address else None,
+        latitude=float(address.latitude) if address and address.latitude is not None else None,
+        longitude=float(address.longitude) if address and address.longitude is not None else None,
         customer_name=customer_name,
         customer_phone=customer_phone,
         assigned_partner_id=assigned_partner_id,
         assigned_partner_name=assigned_partner_name,
+        delivery_date=order.delivery_date,
+        delivery_slot=order.delivery_slot,
+        rating=order.rating,
+        review_text=order.review_text,
     )
 
 
@@ -382,6 +396,8 @@ async def checkout(
         payment_status=FruitPaymentStatus.PENDING,
         order_status=FruitOrderStatus.PENDING,
         notes=payload.notes,
+        delivery_date=payload.delivery_date,
+        delivery_slot=payload.delivery_slot,
     )
     db.add(order)
     await db.flush()  # Get order.id
@@ -842,6 +858,7 @@ async def admin_assign_fruit_order(
         # Unassign
         if assignment:
             await db.delete(assignment)
+            order.order_status = FruitOrderStatus.READY
             await db.commit()
         return MessageResponse(message="Delivery partner unassigned successfully")
 
@@ -863,6 +880,8 @@ async def admin_assign_fruit_order(
             assigned_at=datetime.now(timezone.utc),
         )
         db.add(assignment)
+
+    order.order_status = FruitOrderStatus.OUT_FOR_DELIVERY
 
     await db.commit()
     return MessageResponse(message="Delivery partner assigned successfully")
@@ -960,3 +979,66 @@ async def create_fruit_review(
     db.add(review)
     await db.commit()
     return MessageResponse(message="Review submitted successfully")
+
+
+@router.get("/delivery-slots", response_model=list[dict])
+async def get_available_slots(db: AsyncSession = Depends(get_db)):
+    """Fetch available delivery dates and time slots."""
+    import datetime
+    from app.models.delivery_slot import DeliverySlot
+    from sqlalchemy import select
+
+    now = datetime.datetime.now(datetime.timezone.utc).date()
+    result = await db.execute(select(DeliverySlot).where(DeliverySlot.slot_date >= now))
+    slots = result.scalars().all()
+    
+    if not slots:
+        # Dynamically seed slots for the next 7 days starting tomorrow
+        default_slots = [
+            "6:00 AM – 7:00 AM",
+            "7:00 AM – 8:00 AM",
+            "8:00 AM – 9:00 AM",
+            "3:00 PM – 4:00 PM",
+            "4:00 PM – 5:00 PM",
+            "5:00 PM – 6:00 PM"
+        ]
+        for i in range(1, 8):
+            day = now + datetime.timedelta(days=i)
+            for time_slot in default_slots:
+                slot = DeliverySlot(slot_date=day, time_slot=time_slot, is_available=True)
+                db.add(slot)
+        await db.commit()
+        
+        result = await db.execute(select(DeliverySlot).where(DeliverySlot.slot_date >= now))
+        slots = result.scalars().all()
+        
+    return [{"id": str(s.id), "date": s.slot_date.isoformat(), "time_slot": s.time_slot, "is_available": s.is_available} for s in slots]
+
+
+@router.post("/orders/{order_id}/rate", response_model=MessageResponse)
+async def rate_fruit_order(
+    order_id: UUID,
+    payload: FruitOrderRateRequest,
+    current_user: User = Depends(require_customer),
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit a star rating and review comment for a delivered fruit order."""
+    customer = await _get_customer(db, current_user.id)
+    result = await db.execute(
+        select(FruitOrder).where(FruitOrder.id == order_id, FruitOrder.customer_id == customer.id)
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Fruit order not found")
+        
+    if order.order_status != FruitOrderStatus.DELIVERED:
+        raise HTTPException(status_code=400, detail="You can only rate orders that have been successfully delivered")
+        
+    if payload.rating < 1 or payload.rating > 5:
+        raise HTTPException(status_code=400, detail="Rating must be between 1 and 5 stars")
+        
+    order.rating = payload.rating
+    order.review_text = payload.review_text
+    
+    await db.commit()
+    return MessageResponse(message="Rating submitted successfully")

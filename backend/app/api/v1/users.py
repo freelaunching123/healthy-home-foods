@@ -160,6 +160,8 @@ async def add_address(
         latitude=payload.latitude,
         longitude=payload.longitude,
         is_default=payload.is_default,
+        recipient_name=payload.recipient_name,
+        recipient_phone=payload.recipient_phone,
     )
     db.add(address)
     await db.commit()

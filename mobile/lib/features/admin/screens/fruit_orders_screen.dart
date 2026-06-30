@@ -377,6 +377,19 @@ class _AdminOrderCard extends StatelessWidget {
                         style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.primaryGreen)),
                     const SizedBox(width: 12),
                     ElevatedButton(
+                      onPressed: () => _showOrderDetails(context, order),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(0, 32),
+                        backgroundColor: Colors.grey.shade100,
+                        foregroundColor: AppTheme.textPrimary,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        textStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+                      ),
+                      child: const Text('Details'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
                       onPressed: onUpdateStatus,
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(0, 32),
@@ -426,6 +439,106 @@ class _AdminOrderCard extends StatelessWidget {
     );
   }
 
+  void _showOrderDetails(BuildContext context, Map<String, dynamic> order) {
+    final items = order['items'] as List? ?? [];
+    final deliveryDate = order['delivery_date'] as String?;
+    final deliverySlot = order['delivery_slot'] as String?;
+    final rating = order['rating'] as int?;
+    final reviewText = order['review_text'] as String?;
+    final lat = order['latitude'] as double?;
+    final lng = order['longitude'] as double?;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        padding: const EdgeInsets.all(20),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Fruit Order Details', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18)),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const Divider(),
+              const SizedBox(height: 10),
+              
+              Text('Order Number: ${order['order_number']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 4),
+              Text('Status: ${order['order_status'].toString().toUpperCase()}', style: const TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 16),
+
+              const Text('Customer & Recipient Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(height: 8),
+              _DetailRow(label: 'Customer Name', value: order['customer_name'] ?? 'N/A'),
+              _DetailRow(label: 'Customer Phone', value: order['customer_phone'] ?? 'N/A'),
+              _DetailRow(label: 'Recipient Name', value: order['recipient_name'] ?? 'N/A'),
+              _DetailRow(label: 'Recipient Phone', value: order['recipient_phone'] ?? 'N/A'),
+              const SizedBox(height: 16),
+
+              const Text('Delivery Address & Schedule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(height: 8),
+              _DetailRow(label: 'Address', value: '${order['address_line1'] ?? ''} ${order['address_line2'] ?? ''}, ${order['address_city'] ?? ''}, ${order['address_state'] ?? ''} - ${order['address_pincode'] ?? ''}'),
+              _DetailRow(label: 'Coordinates (Lat, Lng)', value: lat != null && lng != null ? '$lat, $lng' : 'N/A'),
+              _DetailRow(label: 'Scheduled Date', value: deliveryDate ?? 'N/A'),
+              _DetailRow(label: 'Time Slot', value: deliverySlot ?? 'N/A'),
+              const SizedBox(height: 16),
+
+              const Text('Payment Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(height: 8),
+              _DetailRow(label: 'Payment Status', value: order['payment_status'] ?? 'pending'),
+              _DetailRow(label: 'Total Amount', value: '₹${(order['total_amount'] as num).toDouble().toStringAsFixed(2)}'),
+              const SizedBox(height: 16),
+
+              const Text('Items Ordered', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(height: 8),
+              ...items.map((item) {
+                final qty = (item['quantity_kg'] as num).toDouble();
+                final price = (item['price_per_kg'] as num).toDouble();
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(item['fruit_name'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  subtitle: Text('${qty % 1 == 0 ? qty.toInt() : qty} KG × ₹${price.toStringAsFixed(0)}'),
+                  trailing: Text('₹${(item['subtotal'] as num).toDouble().toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                );
+              }),
+              const SizedBox(height: 16),
+
+              if (rating != null) ...[
+                const Text('Customer Feedback', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.amber)),
+                const SizedBox(height: 8),
+                Row(
+                  children: List.generate(5, (starIdx) => Icon(
+                    starIdx < rating ? Icons.star_rounded : Icons.star_border_rounded,
+                    color: Colors.amber,
+                    size: 20,
+                  )),
+                ),
+                if (reviewText != null && reviewText.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text('"$reviewText"', style: const TextStyle(fontStyle: FontStyle.italic, color: AppTheme.textSecondary)),
+                ],
+                const SizedBox(height: 16),
+              ],
+
+              if (order['notes'] != null && (order['notes'] as String).trim().isNotEmpty) ...[
+                const Text('Special Notes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 8),
+                Text(order['notes'] as String, style: const TextStyle(color: AppTheme.textSecondary)),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   String _formatDate(String iso) {
     try {
       final dt = DateTime.parse(iso).toLocal();
@@ -434,6 +547,32 @@ class _AdminOrderCard extends StatelessWidget {
     } catch (_) { return ''; }
   }
 }
+
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _DetailRow({required this.label, required this.value});
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Spacer(), // dummy spacer just to match signature but we'll use expanded
+          SizedBox(
+            width: 130,
+            child: Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textLight)),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 
 class _FilterChip extends StatelessWidget {

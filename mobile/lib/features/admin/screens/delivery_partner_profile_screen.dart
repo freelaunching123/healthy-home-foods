@@ -23,7 +23,9 @@ class _DeliveryPartnerProfileScreenState
     with SingleTickerProviderStateMixin {
   final _api = ApiClient();
   Map<String, dynamic>? _data;
+  List<dynamic> _deliveries = [];
   bool _isLoading = true;
+  bool _isDeliveriesLoading = true;
   late TabController _tabController;
 
   @override
@@ -41,14 +43,32 @@ class _DeliveryPartnerProfileScreenState
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isDeliveriesLoading = true;
+    });
     try {
       final res = await _api.get('/delivery-partners/${widget.partnerId}');
       setState(() => _data = res.data as Map<String, dynamic>);
+      
+      // Fetch deliveries assigned to the partner
+      final delRes = await _api.get('/admin/deliveries', queryParameters: {
+        'delivery_partner_id': widget.partnerId,
+        'start_date': '2020-01-01',
+        'end_date': '2030-12-31',
+      });
+      setState(() {
+        _deliveries = delRes.data is List ? delRes.data : [];
+      });
     } catch (e) {
       debugPrint('Profile load error: $e');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isDeliveriesLoading = false;
+        });
+      }
     }
   }
 
@@ -110,10 +130,14 @@ class _DeliveryPartnerProfileScreenState
                         children: [
                           _OverviewTab(data: data),
                           _DeliveryListTab(
+                            deliveries: _deliveries.where((d) => d['status'] == 'delivered' || d['status'] == 'failed' || d['status'] == 'missed').toList(),
+                            isLoading: _isDeliveriesLoading,
                             label: 'completed',
                             color: AppTheme.success,
                           ),
                           _DeliveryListTab(
+                            deliveries: _deliveries.where((d) => d['status'] != 'delivered' && d['status'] != 'failed' && d['status'] != 'missed').toList(),
+                            isLoading: _isDeliveriesLoading,
                             label: 'pending',
                             color: AppTheme.warning,
                           ),
@@ -430,37 +454,135 @@ class _OverviewTab extends StatelessWidget {
 }
 
 class _DeliveryListTab extends StatelessWidget {
+  final List<dynamic> deliveries;
+  final bool isLoading;
   final String label;
   final Color color;
-  const _DeliveryListTab({required this.label, required this.color});
+  
+  const _DeliveryListTab({
+    required this.deliveries,
+    required this.isLoading,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.local_shipping_outlined,
-            size: 56,
-            color: color.withValues(alpha: 0.4),
+    if (isLoading) {
+      return Center(child: CircularProgressIndicator(color: color));
+    }
+
+    if (deliveries.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.local_shipping_outlined,
+              size: 56,
+              color: color.withValues(alpha: 0.4),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No $label deliveries',
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Delivery history will appear here',
+              style: TextStyle(fontSize: 13, color: AppTheme.textLight),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: deliveries.length,
+      itemBuilder: (context, index) {
+        final d = deliveries[index];
+        final isDelivered = d['status'] == 'delivered';
+        final isFailed = d['status'] == 'missed' || d['status'] == 'failed';
+        final statusText = d['status'].toString().toUpperCase();
+        
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey.shade100, width: 1.5),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'No $label deliveries',
-            style: const TextStyle(
-              fontSize: 16,
-              color: AppTheme.textSecondary,
-              fontWeight: FontWeight.w500,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        d['customer_name'] ?? 'Unknown Customer',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        d['delivery_address'] ?? '',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Date: ${d['scheduled_date'] ?? ''}',
+                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                          Text(
+                            'Slot: ${d['delivery_time'] ?? 'Standard'}',
+                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDelivered 
+                        ? AppTheme.primaryGreen.withValues(alpha: 0.1) 
+                        : isFailed 
+                            ? Colors.red.withValues(alpha: 0.1) 
+                            : Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDelivered 
+                          ? AppTheme.primaryGreen 
+                          : isFailed 
+                              ? Colors.red 
+                              : Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Delivery history will appear here',
-            style: const TextStyle(fontSize: 13, color: AppTheme.textLight),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

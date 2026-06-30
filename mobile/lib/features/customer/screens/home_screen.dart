@@ -147,7 +147,19 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final res = await _api.get(ApiConstants.fruitCart);
       final items = res.data['items'] as List? ?? [];
-      if (mounted) setState(() => _cartCount = items.length);
+      final Map<String, double> newQuantities = {};
+      for (var item in items) {
+        if (item['fruit_id'] != null) {
+          newQuantities[item['fruit_id'].toString()] = (item['quantity_kg'] as num).toDouble();
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _cartCount = items.length;
+          _quantities.clear();
+          _quantities.addAll(newQuantities);
+        });
+      }
     } catch (_) {}
   }
 
@@ -180,7 +192,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onQtyChanged(Map<String, dynamic> fruit, double newQty) {
-    final id = fruit['id'] as String;
+    final id = fruit['id']?.toString() ?? '';
+    if (id.isEmpty) return;
     setState(() => _quantities[id] = newQty < 0 ? 0 : newQty);
     if (newQty > 0) {
       _addToCart(fruit, newQty);
@@ -413,33 +426,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Widget> _buildFruitsSlivers() {
     return [
-      if (_recentlyViewedFruits.isNotEmpty && _searchQuery.isEmpty)
-        SliverToBoxAdapter(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: Text("Recently Viewed", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
-              ),
-              SizedBox(
-                height: 190,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _recentlyViewedFruits.length,
-                  itemBuilder: (ctx, i) => SizedBox(width: 140, child: Padding(padding: const EdgeInsets.only(right: 12), child: _FruitCard(
-                    fruit: _recentlyViewedFruits[i],
-                    quantity: _quantities[_recentlyViewedFruits[i]['id'] as String] ?? 0,
-                    onQtyChanged: (newQty) => _onQtyChanged(_recentlyViewedFruits[i], newQty),
-                    baseUrl: _api.dio.options.baseUrl.replaceAll('/api/v1', ''),
-                  ))),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
       if (_isLoadingFruits)
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -469,12 +455,15 @@ class _HomeScreenState extends State<HomeScreen> {
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.72, crossAxisSpacing: 12, mainAxisSpacing: 12),
             delegate: SliverChildBuilderDelegate(
-              (_, i) => _FruitCard(
-                fruit: _filteredFruits[i],
-                quantity: _quantities[_filteredFruits[i]['id'] as String] ?? 0,
-                onQtyChanged: (newQty) => _onQtyChanged(_filteredFruits[i], newQty),
-                baseUrl: _api.dio.options.baseUrl.replaceAll('/api/v1', ''),
-              ),
+              (_, i) {
+                final fruitId = _filteredFruits[i]['id']?.toString() ?? '';
+                return _FruitCard(
+                  fruit: _filteredFruits[i],
+                  quantity: _quantities[fruitId] ?? 0,
+                  onQtyChanged: (newQty) => _onQtyChanged(_filteredFruits[i], newQty),
+                  baseUrl: _api.dio.options.baseUrl.replaceAll('/api/v1', ''),
+                );
+              },
               childCount: _filteredFruits.length,
             ),
           ),
@@ -669,7 +658,7 @@ class _FruitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final available = fruit['availability_status'] == 'in_stock' && fruit['is_active'] == true;
-    final price = (fruit['price_per_kg'] as num).toDouble();
+    final price = (fruit['price_per_kg'] as num?)?.toDouble() ?? 0;
     final imageUrl = fruit['image_url'] as String?;
     final fullImageUrl = imageUrl != null ? '$baseUrl$imageUrl' : null;
 
@@ -686,7 +675,8 @@ class _FruitCard extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         LocalStorageService.addRecentlyViewed('fruit', fruit);
-        context.push('/fruits/${fruit['id']}');
+        final fruitId = fruit['id']?.toString() ?? '';
+        if (fruitId.isNotEmpty) context.push('/fruits/$fruitId');
       },
       child: Container(
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: AppTheme.primaryGreen.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))]),
@@ -698,8 +688,8 @@ class _FruitCard extends StatelessWidget {
               child: AspectRatio(
                 aspectRatio: 1.1,
                 child: fullImageUrl != null
-                    ? CachedNetworkImage(imageUrl: fullImageUrl, fit: BoxFit.cover, placeholder: (_, __) => Container(color: AppTheme.scaffoldBg, child: const Center(child: CircularProgressIndicator(strokeWidth: 2))), errorWidget: (_, __, ___) => _FruitPlaceholder(name: fruit['name'] as String))
-                    : _FruitPlaceholder(name: fruit['name'] as String),
+                    ? CachedNetworkImage(imageUrl: fullImageUrl, fit: BoxFit.cover, placeholder: (_, __) => Container(color: AppTheme.scaffoldBg, child: const Center(child: CircularProgressIndicator(strokeWidth: 2))), errorWidget: (_, __, ___) => _FruitPlaceholder(name: (fruit['name'] ?? 'Fruit').toString()))
+                    : _FruitPlaceholder(name: (fruit['name'] ?? 'Fruit').toString()),
               ),
             ),
             Padding(
@@ -707,7 +697,7 @@ class _FruitCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(fruit['name'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text((fruit['name'] ?? 'Fruit').toString(), style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 2),
                   Text('₹${price.toStringAsFixed(0)} / KG', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen)),
                   if (!available && statusLabel.isNotEmpty) ...[
