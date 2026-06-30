@@ -32,6 +32,8 @@ import '../../features/customer/screens/fruit_cart_screen.dart';
 import '../../features/customer/screens/fruit_checkout_screen.dart';
 import '../../features/customer/screens/fruit_order_history_screen.dart';
 import '../../features/customer/screens/fruit_order_detail_screen.dart';
+import '../../features/customer/screens/package_cart_screen.dart';
+import '../../features/customer/screens/package_checkout_screen.dart';
 
 // Admin screens
 import '../../features/admin/screens/admin_shell.dart';
@@ -48,6 +50,8 @@ import '../../features/admin/screens/create_delivery_partner_screen.dart';
 import '../../features/admin/screens/delivery_partner_profile_screen.dart';
 import '../../features/admin/screens/reports_screen.dart';
 import '../../features/admin/screens/admin_settings_screen.dart';
+import '../../features/admin/screens/delivery_settings_screen.dart';
+import '../../features/admin/screens/package_orders_screen.dart';
 // Fruit screens (Admin)
 import '../../features/admin/screens/fruit_management_screen.dart';
 import '../../features/admin/screens/add_edit_fruit_screen.dart';
@@ -165,6 +169,10 @@ final GoRouter appRouter = GoRouter(
       path: '/fruits/:id',
       builder: (_, state) => FruitDetailScreen(fruitId: state.pathParameters['id']!),
     ),
+    
+    // ── Package customer routes ────────────────────────────────────────────────
+    GoRoute(path: '/packages/cart', builder: (_, __) => const PackageCartScreen()),
+    GoRoute(path: '/packages/checkout', builder: (_, __) => const PackageCheckoutScreen()),
 
     // Admin shell (5 tabs: Dashboard, Products, Fruits, Deliveries, Reports)
     StatefulShellRoute.indexedStack(
@@ -206,6 +214,7 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(path: '/admin/settings', builder: (_, __) => const AdminSettingsScreen()),
+    GoRoute(path: '/admin/delivery-settings', builder: (_, __) => const DeliverySettingsScreen()),
 
     // ── Fruit admin routes ─────────────────────────────────────────────────────
     GoRoute(path: '/admin/fruits/add', builder: (_, __) => const AddEditFruitScreen()),
@@ -214,6 +223,9 @@ final GoRouter appRouter = GoRouter(
       builder: (_, state) => AddEditFruitScreen(fruitId: state.pathParameters['id']),
     ),
     GoRoute(path: '/admin/fruits/orders', builder: (_, __) => const FruitOrdersScreen()),
+    
+    // ── Package admin routes ───────────────────────────────────────────────────
+    GoRoute(path: '/admin/packages/orders', builder: (_, __) => const PackageOrdersScreen()),
 
     // Delivery boy shell
     StatefulShellRoute.indexedStack(

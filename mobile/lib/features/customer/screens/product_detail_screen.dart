@@ -26,6 +26,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   double _averageRating = 0.0;
   int _totalReviews = 0;
 
+  // Cart state
+  int _cartCount = 0;
+  int _productQty = 0;
+
   @override
   void initState() {
     super.initState();
@@ -56,8 +60,53 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         _planType = _product?['plan_type'];
         _isLoading = false; 
       });
+      _loadCartData();
     } catch (e) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadCartData() async {
+    try {
+      final res = await _api.get(ApiConstants.packageCart);
+      final items = res.data['items'] as List? ?? [];
+      int qty = 0;
+      for (var item in items) {
+        if (item['product_id'] == widget.productId) {
+          qty = (item['quantity'] as num).toInt();
+          break;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _cartCount = items.length;
+          _productQty = qty;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _updateQty(int newQty) async {
+    if (newQty < 0) newQty = 0;
+    setState(() => _productQty = newQty);
+    
+    try {
+      if (newQty == 0) {
+        final res = await _api.get(ApiConstants.packageCart);
+        final items = res.data['items'] as List? ?? [];
+        final cartItem = items.firstWhere((item) => item['product_id'] == widget.productId, orElse: () => null);
+        if (cartItem != null) {
+          await _api.delete('${ApiConstants.packageCart}/${cartItem['id']}');
+        }
+      } else {
+        await _api.post(ApiConstants.packageCartAdd, data: {
+          'product_id': widget.productId,
+          'quantity': newQty,
+        });
+      }
+      _loadCartData();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update cart: $e'), backgroundColor: AppTheme.error));
     }
   }
 
@@ -109,6 +158,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   color: _isWishlisted ? Colors.red : Colors.white,
                 ),
                 onPressed: _toggleWishlist,
+              ),
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.shopping_cart_rounded, color: Colors.white),
+                    onPressed: () => context.push('/packages/cart'),
+                    tooltip: 'Package Cart',
+                  ),
+                  if (_cartCount > 0)
+                    Positioned(
+                      top: 8, right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(color: AppTheme.error, shape: BoxShape.circle),
+                        child: Text('$_cartCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 8),
             ],
@@ -295,14 +363,65 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -5))],
         ),
         child: SafeArea(
-          child: ElevatedButton(
-            onPressed: isOutOfStock ? null : () => context.push('/checkout?productId=${widget.productId}&plan=$_planType'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isOutOfStock ? Colors.grey : AppTheme.primaryGreen,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(isOutOfStock ? 'Currently Unavailable' : 'Subscribe Now  •  ₹${total.toStringAsFixed(0)}'),
-          ),
+          child: isOutOfStock
+              ? ElevatedButton(
+                  onPressed: null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Currently Unavailable'),
+                )
+              : _productQty == 0
+                  ? ElevatedButton(
+                      onPressed: () => _updateQty(1),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryGreen,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text('Add to Cart  •  ₹${total.toStringAsFixed(0)}'),
+                    )
+                  : Row(
+                      children: [
+                        Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove, color: AppTheme.primaryGreen),
+                                onPressed: () => _updateQty(_productQty - 1),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text('$_productQty', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen)),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.add, color: AppTheme.primaryGreen),
+                                onPressed: () => _updateQty(_productQty + 1),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => context.push('/packages/cart'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryGreen,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(double.infinity, 48),
+                            ),
+                            child: const Text('View Cart'),
+                          ),
+                        ),
+                      ],
+                    ),
         ),
       ),
     );

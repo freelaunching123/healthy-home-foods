@@ -25,7 +25,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   Future<void> _loadCategories() async {
     setState(() => _isLoading = true);
     try {
-      final res = await _api.get(ApiConstants.categories, queryParameters: {'active_only': false});
+      final res = await _api.get(ApiConstants.categories, queryParameters: {
+        'active_only': false,
+      });
       setState(() => _categories = res.data is List ? res.data : []);
     } catch (e) {
       debugPrint('Error loading categories: $e');

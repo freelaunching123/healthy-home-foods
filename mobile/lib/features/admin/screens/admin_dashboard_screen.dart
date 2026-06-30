@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../widgets/admin_drawer.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -20,6 +21,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   bool _isLoading = true;
   String? _error;
   late AnimationController _shimmerController;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -58,7 +60,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final today = DateFormat('EEEE, MMM d').format(DateTime.now());
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.scaffoldBg,
+      drawer: const AdminDrawer(),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadOverview,
@@ -124,54 +128,40 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   Widget _buildHeader(String today) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFF0F0F0))),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppTheme.primaryGreen, AppTheme.primaryLight],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.menu, size: 28),
+                color: AppTheme.textPrimary,
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                tooltip: 'Menu',
               ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Admin Dashboard',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                  ),
+              const SizedBox(width: 8),
+              const Text(
+                'Admin Dashboard',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
                 ),
-                Text(
-                  today,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, size: 22),
-            color: AppTheme.textSecondary,
-            onPressed: () => context.push('/admin/settings'),
-            tooltip: 'Settings',
+          Text(
+            today,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),

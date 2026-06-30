@@ -52,7 +52,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Future<void> _initData() async {
     setState(() => _isInitLoading = true);
     try {
-      final catRes = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true});
+      final catRes = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true, 'category_type': 'package'});
       _categories = catRes.data is List ? catRes.data : [];
 
       if (widget.productId != null) {

@@ -45,6 +45,14 @@ class AuthService {
     await _storage.deleteAll();
   }
 
+  // Logout from all devices
+  Future<void> logoutAllDevices() async {
+    try {
+      await _api.post('/users/logout-all');
+    } catch (_) {}
+    await _storage.deleteAll();
+  }
+
   // Check if user is logged in
   Future<bool> isLoggedIn() async {
     final token = await _storage.read(key: 'access_token');

@@ -35,6 +35,7 @@ class ApiConstants {
   static const String deliveriesAssigned = '/deliveries/assigned';
   static const String gpsUpdate = '/deliveries/gps/update';
   static const String gpsTrack = '/deliveries/gps/track';
+  static const String deliveryCalculateCharge = '/delivery/calculate-charge';
 
   // Delivery Partner App
   static const String partnerDashboard = '/delivery-partner/dashboard';
@@ -95,6 +96,13 @@ class ApiConstants {
   static String productReviews(String id) => '/products/$id/reviews';
   static String fruitReviews(String id) => '/fruits/$id/reviews';
   
+  // Package Cart & Orders
+  static const String packageCart = '/packages/cart';
+  static const String packageCartAdd = '/packages/cart/add';
+  static const String packageOrdersCheckout = '/packages/orders/checkout';
+  static const String packageOrdersVerify = '/packages/orders/verify-payment';
+  static const String adminPackageOrders = '/packages/orders/admin/package-orders';
+
   // Subscription
   static String cancelSubscription(String id) => '/subscriptions/$id/cancel';
 }

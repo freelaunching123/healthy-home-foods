@@ -39,6 +39,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _cartCount = 0;
   final Map<String, double> _quantities = {};
   
+  // -- Package Cart State --
+  int _packageCartCount = 0;
+  final Map<String, int> _packageQuantities = {};
+  
   // -- Recently Viewed State --
   List<Map<String, dynamic>> _recentlyViewedPackages = [];
   List<Map<String, dynamic>> _recentlyViewedFruits = [];
@@ -49,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadPackages();
     _loadFruits();
     _loadCartCount();
+    _loadPackageCartCount();
     _loadRecentlyViewed();
     _startPolling();
   }
@@ -75,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadPackages(isSilent: true);
       _loadFruits(isSilent: true);
       _loadCartCount();
+      _loadPackageCartCount();
     });
   }
 
@@ -83,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadPackages({bool isSilent = false}) async {
     if (!isSilent) setState(() => _isLoadingPackages = true);
     try {
-      final catRes = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true});
+      final catRes = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true, 'category_type': 'package'});
       final prodRes = await _api.get(ApiConstants.products, queryParameters: {
         'page_size': 100,
         'status': 'published',
@@ -142,6 +148,69 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_searchQuery.isEmpty) return _fruits;
     return _fruits.where((f) => (f['name'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
   }
+
+  // ── PACKAGE CART LOGIC ──────────────────────────────────────────────────────
+
+  Future<void> _loadPackageCartCount() async {
+    try {
+      final res = await _api.get(ApiConstants.packageCart);
+      final items = res.data['items'] as List? ?? [];
+      final Map<String, int> newQuantities = {};
+      for (var item in items) {
+        if (item['product_id'] != null) {
+          newQuantities[item['product_id'].toString()] = (item['quantity'] as num).toInt();
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _packageCartCount = items.length;
+          _packageQuantities.clear();
+          _packageQuantities.addAll(newQuantities);
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _addToPackageCart(Map<String, dynamic> package, int qty) async {
+    if (qty <= 0) {
+      await _removeFromPackageCart(package);
+      return;
+    }
+    try {
+      await _api.post(ApiConstants.packageCartAdd, data: {
+        'product_id': package['id'],
+        'quantity': qty,
+      });
+      _loadPackageCartCount();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update cart: $e'), backgroundColor: AppTheme.error));
+    }
+  }
+
+  Future<void> _removeFromPackageCart(Map<String, dynamic> package) async {
+    try {
+      final res = await _api.get(ApiConstants.packageCart);
+      final items = res.data['items'] as List? ?? [];
+      final cartItem = items.firstWhere((item) => item['product_id'] == package['id'], orElse: () => null);
+      if (cartItem != null) {
+        await _api.delete('${ApiConstants.packageCart}/${cartItem['id']}');
+      }
+      _loadPackageCartCount();
+    } catch (_) {}
+  }
+
+  void _onPackageQtyChanged(Map<String, dynamic> package, int newQty) {
+    final id = package['id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    setState(() => _packageQuantities[id] = newQty < 0 ? 0 : newQty);
+    if (newQty > 0) {
+      _addToPackageCart(package, newQty);
+    } else {
+      _removeFromPackageCart(package);
+    }
+  }
+
+  // ── FRUIT CART LOGIC ────────────────────────────────────────────────────────
 
   Future<void> _loadCartCount() async {
     try {
@@ -213,13 +282,13 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
-          if (_selectedTabIndex == 1) // Show cart icon only on Fruits tab
+          if (_selectedTabIndex == 1) // Fruit Cart
             Stack(
               children: [
                 IconButton(
                   icon: const Icon(Icons.shopping_basket_rounded, color: AppTheme.primaryGreen),
                   onPressed: () => context.push('/fruits/cart'),
-                  tooltip: 'My Cart',
+                  tooltip: 'Fruit Cart',
                 ),
                 if (_cartCount > 0)
                   Positioned(
@@ -228,6 +297,25 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.all(4),
                       decoration: const BoxDecoration(color: AppTheme.error, shape: BoxShape.circle),
                       child: Text('$_cartCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+              ],
+            )
+          else // Package Cart
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.shopping_cart_rounded, color: AppTheme.primaryGreen),
+                  onPressed: () => context.push('/packages/cart'),
+                  tooltip: 'Package Cart',
+                ),
+                if (_packageCartCount > 0)
+                  Positioned(
+                    top: 6, right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: AppTheme.error, shape: BoxShape.circle),
+                      child: Text('$_packageCartCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
                     ),
                   ),
               ],
@@ -341,7 +429,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: _recentlyViewedPackages.length,
-                  itemBuilder: (ctx, i) => SizedBox(width: 150, child: Padding(padding: const EdgeInsets.only(right: 12), child: _ProductCard(product: _recentlyViewedPackages[i]))),
+                  itemBuilder: (ctx, i) {
+                    final product = _recentlyViewedPackages[i];
+                    final productId = product['id']?.toString() ?? '';
+                    return SizedBox(
+                      width: 150, 
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 12), 
+                        child: _ProductCard(
+                          product: product,
+                          quantity: _packageQuantities[productId] ?? 0,
+                          onQtyChanged: (newQty) => _onPackageQtyChanged(product, newQty),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 16),
@@ -416,7 +518,17 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.72, crossAxisSpacing: 12, mainAxisSpacing: 12),
-            delegate: SliverChildBuilderDelegate((_, i) => _ProductCard(product: _filteredPackages[i]), childCount: _filteredPackages.length),
+            delegate: SliverChildBuilderDelegate(
+              (_, i) {
+                final productId = _filteredPackages[i]['id']?.toString() ?? '';
+                return _ProductCard(
+                  product: _filteredPackages[i],
+                  quantity: _packageQuantities[productId] ?? 0,
+                  onQtyChanged: (newQty) => _onPackageQtyChanged(_filteredPackages[i], newQty),
+                );
+              },
+              childCount: _filteredPackages.length,
+            ),
           ),
         ),
     ];
@@ -552,7 +664,10 @@ class _CategoryChip extends StatelessWidget {
 
 class _ProductCard extends StatelessWidget {
   final dynamic product;
-  const _ProductCard({required this.product});
+  final int quantity;
+  final Function(int) onQtyChanged;
+  
+  const _ProductCard({required this.product, required this.quantity, required this.onQtyChanged});
   @override
   Widget build(BuildContext context) {
     final double packagePrice = double.tryParse(product['package_price']?.toString() ?? '0') ?? 0;
@@ -623,14 +738,56 @@ class _ProductCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isOutOfStock ? Colors.grey : AppTheme.primaryGreen,
-                              borderRadius: BorderRadius.circular(8),
+                          if (isOutOfStock)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.grey,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text('Add to Cart', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+                            )
+                          else if (quantity == 0)
+                            InkWell(
+                              onTap: () => onQtyChanged(1),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryGreen,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text('Add', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                              ),
+                            )
+                          else
+                            Container(
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  InkWell(
+                                    onTap: () => onQtyChanged(quantity - 1),
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      child: Icon(Icons.remove, size: 14, color: AppTheme.primaryGreen),
+                                    ),
+                                  ),
+                                  Text('$quantity', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen)),
+                                  InkWell(
+                                    onTap: () => onQtyChanged(quantity + 1),
+                                    child: const Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      child: Icon(Icons.add, size: 14, color: AppTheme.primaryGreen),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: const Text('Subscribe', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
-                          ),
                         ],
                       ),
                     ],

@@ -65,10 +65,11 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
         _isActive = data['is_active'] as bool? ?? true;
         _existingImageUrl = data['image_url'] as String?;
         _savedFruitId = widget.fruitId;
-        _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      // Error handling
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 

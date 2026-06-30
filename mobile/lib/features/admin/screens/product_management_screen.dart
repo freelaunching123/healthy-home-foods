@@ -96,7 +96,14 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: const Text('Manage Products'),
+        title: const Text('Manage Packages'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryGreen),
+            onPressed: () => context.push('/admin/packages/orders'),
+            tooltip: 'Package Orders',
+          ),
+        ],
       ),
       body: Column(
         children: [
