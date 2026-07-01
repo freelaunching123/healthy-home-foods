@@ -22,6 +22,8 @@ from app.schemas.subscription import (
 from app.schemas.common import MessageResponse
 from app.services import subscription_engine
 from app.services.notification_service import NotificationService
+from app.models.address import Address
+from app.services.delivery_engine import haversine
 import math
 
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
@@ -122,12 +124,36 @@ async def create_subscription(
         items_data.append({"product": product, "quantity": item.quantity, "package_price": item_price})
         selected_price += item_price * item.quantity
 
+    # Validate address
+    addr_result = await db.execute(
+        select(Address).where(Address.id == payload.address_id, Address.user_id == current_user.id)
+    )
+    address = addr_result.scalar_one_or_none()
+    if not address:
+        raise HTTPException(status_code=404, detail="Address not found")
+
     # Calculate delivery charge and tax from admin settings
     settings_result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
     settings = settings_result.scalar_one_or_none()
     delivery_charge = 0.0
     tax_amount = 0.0
+    
     if settings:
+        distance = 0.0
+        if settings.business_lat and settings.business_lng and address.latitude and address.longitude:
+            distance = haversine(
+                float(settings.business_lat), float(settings.business_lng),
+                float(address.latitude), float(address.longitude)
+            )
+        if distance > 15.0:
+            raise HTTPException(
+                status_code=400,
+                detail="There is no service beyond 15km. Please select an address within the range."
+            )
+            
+        charge_per_delivery = max(0.0, distance - float(settings.free_delivery_radius_km)) * float(settings.delivery_charge_per_km)
+        delivery_charge = first_package_days * charge_per_delivery
+        
         tax_rate = float(settings.tax_percentage) / 100
         tax_amount = round(selected_price * tax_rate, 2)
 

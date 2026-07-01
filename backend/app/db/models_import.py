@@ -18,5 +18,6 @@ from app.models.gps_tracking import GpsTrackingLog  # noqa
 from app.models.audit_log import AuditLog  # noqa
 from app.models.admin_settings import AdminSettings  # noqa
 from app.models.fruit import Fruit, FruitCart, FruitOrder, FruitOrderItem  # noqa
+from app.models.package_cart import PackageCart  # noqa
 from app.models.review import Review  # noqa
 from app.models.delivery_slot import DeliverySlot  # noqa

@@ -42,6 +42,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // -- Package Cart State --
   int _packageCartCount = 0;
   final Map<String, int> _packageQuantities = {};
+  double _packageCartTotal = 0;
+  double _fruitCartTotal = 0;
   
   // -- Recently Viewed State --
   List<Map<String, dynamic>> _recentlyViewedPackages = [];
@@ -155,6 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final res = await _api.get(ApiConstants.packageCart);
       final items = res.data['items'] as List? ?? [];
+      final total = (res.data['total_amount'] as num?)?.toDouble() ?? 0.0;
       final Map<String, int> newQuantities = {};
       for (var item in items) {
         if (item['product_id'] != null) {
@@ -164,6 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _packageCartCount = items.length;
+          _packageCartTotal = total;
           _packageQuantities.clear();
           _packageQuantities.addAll(newQuantities);
         });
@@ -216,6 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final res = await _api.get(ApiConstants.fruitCart);
       final items = res.data['items'] as List? ?? [];
+      final total = (res.data['total_amount'] as num?)?.toDouble() ?? 0.0;
       final Map<String, double> newQuantities = {};
       for (var item in items) {
         if (item['fruit_id'] != null) {
@@ -225,6 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _cartCount = items.length;
+          _fruitCartTotal = total;
           _quantities.clear();
           _quantities.addAll(newQuantities);
         });
@@ -277,6 +283,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
+      bottomNavigationBar: _buildBottomCheckoutBar(),
       appBar: AppBar(
         title: Text('🥗 Healthy Home Foods', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
         backgroundColor: Colors.white,
@@ -581,6 +588,79 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
     ];
+  }
+
+  Widget? _buildBottomCheckoutBar() {
+    if (_selectedTabIndex == 0 && _packageCartCount > 0) {
+      return _checkoutBarWidget(
+        itemCount: _packageCartCount,
+        total: _packageCartTotal,
+        onCheckout: () => context.push('/packages/checkout'),
+        label: 'Proceed to Checkout',
+      );
+    } else if (_selectedTabIndex == 1 && _cartCount > 0) {
+      return _checkoutBarWidget(
+        itemCount: _cartCount,
+        total: _fruitCartTotal,
+        onCheckout: () => context.push('/fruits/checkout'),
+        label: 'Proceed to Checkout',
+      );
+    }
+    return null;
+  }
+
+  Widget _checkoutBarWidget({
+    required int itemCount,
+    required double total,
+    required VoidCallback onCheckout,
+    required String label,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          )
+        ],
+      ),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 12),
+      child: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('$itemCount ${itemCount == 1 ? 'item' : 'items'}', style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
+              Text(
+                '₹${total.toStringAsFixed(2)}',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: AppTheme.primaryGreen),
+              ),
+            ],
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: onCheckout,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 46),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.shopping_bag_rounded, size: 16),
+                  const SizedBox(width: 8),
+                  Text(label, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

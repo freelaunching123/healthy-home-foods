@@ -52,9 +52,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (_addresses.isNotEmpty) _selectedAddressId = _addresses[0]['id'];
         _isLoading = false;
       });
+      if (_selectedAddressId != null) {
+        _calculateDeliveryCharge();
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       debugPrint('Checkout load error: $e');
+    }
+  }
+
+  Future<void> _calculateDeliveryCharge() async {
+    if (_selectedAddressId == null) return;
+    try {
+      final res = await _api.post(
+        ApiConstants.deliveryCalculateCharge,
+        data: {
+          'address_id': _selectedAddressId,
+          'order_type': 'package',
+        },
+      );
+      setState(() {
+        _deliveryCharge = (res.data['delivery_charge'] as num).toDouble();
+        _distance = (res.data['distance_km'] as num).toDouble();
+      });
+    } catch (e) {
+      setState(() {
+        _deliveryCharge = 0;
+        _distance = 0;
+      });
     }
   }
 
@@ -96,6 +121,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (_selectedPlanId == null || _selectedAddressId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a plan and address'), backgroundColor: AppTheme.warning),
+      );
+      return;
+    }
+
+    if (_distance > 15.0) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('No Service'),
+          content: const Text('There is no service beyond 15km. Please select an address within the range.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
       );
       return;
     }
@@ -244,7 +286,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(height: 20),
 
             // Address
-            const Text('Delivery Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Delivery Address', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                if (_addresses.isNotEmpty)
+                  TextButton.icon(
+                    icon: const Icon(Icons.edit_location_alt_rounded, size: 16, color: AppTheme.primaryGreen),
+                    label: const Text('Manage', style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.w700, fontSize: 13)),
+                    onPressed: () async {
+                      await context.push('/profile/addresses');
+                      _loadData();
+                    },
+                  ),
+              ],
+            ),
             const SizedBox(height: 8),
             if (_addresses.isEmpty)
               Container(
@@ -260,7 +316,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     TextButton.icon(
                       icon: const Icon(Icons.add, size: 16),
                       label: const Text('Add Address'),
-                      onPressed: () {/* TODO: Add address form */},
+                      onPressed: () async {
+                        await context.push('/profile/addresses');
+                        _loadData();
+                      },
                     ),
                   ],
                 ),
@@ -269,7 +328,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ..._addresses.map((addr) => RadioListTile(
                 value: addr['id'],
                 groupValue: _selectedAddressId,
-                onChanged: (v) => setState(() => _selectedAddressId = v),
+                onChanged: (v) {
+                  setState(() => _selectedAddressId = v);
+                  _calculateDeliveryCharge();
+                },
                 title: Text(addr['label'] ?? addr['address_type'] ?? 'Address',
                   style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text('${addr['address_line1'] ?? ''}, ${addr['city'] ?? ''}',

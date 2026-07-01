@@ -28,6 +28,8 @@ from app.models.fruit import (
 )
 from app.models.user import User
 from app.schemas.common import MessageResponse
+from app.models.admin_settings import AdminSettings
+from app.services.delivery_engine import haversine
 from app.schemas.fruit import (
     FruitCreate, FruitUpdate, FruitResponse,
     FruitAvailabilityUpdate,
@@ -357,6 +359,22 @@ async def checkout(
     address = addr_result.scalar_one_or_none()
     if not address:
         raise HTTPException(status_code=404, detail="Address not found")
+
+    # Validate distance (service range 15km)
+    settings_result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
+    settings_obj = settings_result.scalar_one_or_none()
+    distance = 0.0
+    if settings_obj:
+        if settings_obj.business_lat and settings_obj.business_lng and address.latitude and address.longitude:
+            distance = haversine(
+                float(settings_obj.business_lat), float(settings_obj.business_lng),
+                float(address.latitude), float(address.longitude)
+            )
+        if distance > 15.0:
+            raise HTTPException(
+                status_code=400,
+                detail="There is no service beyond 15km. Please select an address within the range."
+            )
 
     # Load cart
     cart_result = await db.execute(

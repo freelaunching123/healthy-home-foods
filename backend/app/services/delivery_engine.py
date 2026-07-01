@@ -8,7 +8,7 @@ import uuid
 from app.models.delivery_partner import DeliveryPartner
 from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
 from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
-from app.models.user_address import UserAddress
+from app.models.address import Address
 from app.models.subscription import Subscription
 from app.services.notification_service import NotificationService
 
@@ -49,8 +49,8 @@ async def auto_assign_delivery(
     
     # 1. Get destination coordinates from subscription -> address
     stmt = (
-        select(UserAddress.latitude, UserAddress.longitude)
-        .join(Subscription, Subscription.address_id == UserAddress.id)
+        select(Address.latitude, Address.longitude)
+        .join(Subscription, Subscription.address_id == Address.id)
         .where(Subscription.id == delivery.subscription_id)
     )
     result = await db.execute(stmt)

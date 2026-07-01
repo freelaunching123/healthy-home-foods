@@ -123,6 +123,22 @@ class _PackageCheckoutScreenState extends State<PackageCheckoutScreen> {
       );
       return;
     }
+    if (_deliveryDistance != null && _deliveryDistance! > 15.0) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('No Service'),
+          content: const Text('There is no service beyond 15km. Please select an address within the range.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     if (_cartItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Your cart is empty'), backgroundColor: AppTheme.error),
@@ -274,10 +290,30 @@ class _PackageCheckoutScreenState extends State<PackageCheckoutScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Delivery Address
-                  _SectionHeader(icon: Icons.location_on_rounded, title: 'Delivery Address'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SectionHeader(icon: Icons.location_on_rounded, title: 'Delivery Address'),
+                      ),
+                      if (_addresses.isNotEmpty)
+                        TextButton.icon(
+                          icon: const Icon(Icons.edit_location_alt_rounded, size: 16, color: AppTheme.primaryGreen),
+                          label: Text('Manage', style: GoogleFonts.inter(color: AppTheme.primaryGreen, fontWeight: FontWeight.w700, fontSize: 13)),
+                          onPressed: () async {
+                            await context.push('/profile/addresses');
+                            _loadAddresses();
+                          },
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   _addresses.isEmpty
-                      ? _AddressEmpty(onAdd: () => context.push('/profile/addresses'))
+                      ? _AddressEmpty(
+                          onAdd: () async {
+                            await context.push('/profile/addresses');
+                            _loadAddresses();
+                          },
+                        )
                       : _AddressPicker(
                           addresses: _addresses,
                           selected: _selectedAddress,

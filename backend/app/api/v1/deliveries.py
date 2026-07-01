@@ -388,3 +388,78 @@ async def websocket_track(
     finally:
         await pubsub.unsubscribe(f"gps:{assignment_id}")
         await redis.close()
+
+
+# ── Delivery Charge Router ───────────────────────────────────────────────────
+delivery_router = APIRouter(prefix="/delivery", tags=["Delivery Charge"])
+
+from app.services.delivery_engine import haversine
+from app.models.admin_settings import AdminSettings
+from app.models.address import Address
+from app.models.package_cart import PackageCart
+from app.models.product import Product
+
+@delivery_router.post("/calculate-charge")
+async def calculate_delivery_charge(
+    payload: dict,
+    current_user: User = Depends(require_customer),
+    db: AsyncSession = Depends(get_db),
+):
+    address_id_str = payload.get("address_id")
+    order_type = payload.get("order_type", "package")
+    
+    if not address_id_str:
+        raise HTTPException(status_code=400, detail="address_id is required")
+        
+    try:
+        address_id = UUID(address_id_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid address_id format")
+        
+    # Get address
+    addr_result = await db.execute(
+        select(Address).where(and_(Address.id == address_id, Address.user_id == current_user.id))
+    )
+    address = addr_result.scalar_one_or_none()
+    if not address:
+        raise HTTPException(status_code=404, detail="Address not found")
+        
+    # Get admin settings
+    settings_result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
+    settings_obj = settings_result.scalar_one_or_none()
+    
+    distance = 0.0
+    delivery_charge = 0.0
+    
+    if settings_obj:
+        if settings_obj.business_lat and settings_obj.business_lng and address.latitude and address.longitude:
+            distance = haversine(
+                float(settings_obj.business_lat), float(settings_obj.business_lng),
+                float(address.latitude), float(address.longitude)
+            )
+            
+        charge_per_delivery = max(0.0, distance - float(settings_obj.free_delivery_radius_km)) * float(settings_obj.delivery_charge_per_km)
+        
+        if order_type == "package":
+            customer_result = await db.execute(select(Customer).where(Customer.user_id == current_user.id))
+            customer = customer_result.scalar_one_or_none()
+            highest_days = 6
+            if customer:
+                cart_result = await db.execute(
+                    select(PackageCart)
+                    .where(PackageCart.customer_id == customer.id)
+                    .options(selectinload(PackageCart.product))
+                )
+                cart_items = cart_result.scalars().all()
+                for item in cart_items:
+                    if item.product.package_days > highest_days:
+                        highest_days = item.product.package_days
+            delivery_charge = highest_days * charge_per_delivery
+        else:
+            delivery_charge = 1 * charge_per_delivery
+            
+    return {
+        "delivery_charge": round(delivery_charge, 2),
+        "distance_km": round(distance, 2)
+    }
+

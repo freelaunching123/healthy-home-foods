@@ -24,6 +24,7 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     user: Mapped["User"] = relationship("User", back_populates="customer")
     subscriptions: Mapped[List["Subscription"]] = relationship("Subscription", back_populates="customer")
     fruit_cart_items: Mapped[List["FruitCart"]] = relationship("FruitCart", back_populates="customer", cascade="all, delete-orphan")
+    package_cart_items: Mapped[List["PackageCart"]] = relationship("PackageCart", back_populates="customer", cascade="all, delete-orphan")
     fruit_orders: Mapped[List["FruitOrder"]] = relationship("FruitOrder", back_populates="customer")
     reviews: Mapped[List["Review"]] = relationship("Review", back_populates="customer")
 
