@@ -24,7 +24,7 @@ def slugify(text: str) -> str:
 async def seed_data():
     async with AsyncSessionLocal() as db:
         # 1. Seed Admin User
-        admin_result = await db.execute(select(User).where(User.phone == "9999999999"))
+        admin_result = await db.execute(select(User).where(User.phone == "9876543210"))
         admin = admin_result.scalar_one_or_none()
 
         if not admin:
@@ -48,6 +48,10 @@ async def seed_data():
             settings = AdminSettings(
                 free_delivery_radius_km=5.0,
                 delivery_charge_per_km=10.0,
+                delivery_charge_0_to_5_km=0.0,
+                delivery_charge_5_to_10_km=15.0,
+                delivery_charge_10_to_15_km=25.0,
+                max_delivery_distance_km=15.0,
                 weekly_deliveries=6,
                 monthly_deliveries=26,
                 working_hours_start="07:00",

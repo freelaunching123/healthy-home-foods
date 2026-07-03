@@ -19,6 +19,10 @@ class AdminSettings(TimestampMixin, Base):
     # Delivery charges
     free_delivery_radius_km: Mapped[float] = mapped_column(Numeric(5, 2), default=5.0, nullable=False)
     delivery_charge_per_km: Mapped[float] = mapped_column(Numeric(8, 2), default=10.0, nullable=False)
+    delivery_charge_0_to_5_km: Mapped[float] = mapped_column(Numeric(8, 2), default=0.0, nullable=False)
+    delivery_charge_5_to_10_km: Mapped[float] = mapped_column(Numeric(8, 2), default=15.0, nullable=False)
+    delivery_charge_10_to_15_km: Mapped[float] = mapped_column(Numeric(8, 2), default=25.0, nullable=False)
+    max_delivery_distance_km: Mapped[float] = mapped_column(Numeric(5, 2), default=15.0, nullable=False)
 
     # Business info
     business_name: Mapped[str] = mapped_column(String(255), default="Healthy Home Foods", nullable=False)

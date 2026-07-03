@@ -16,6 +16,7 @@ class _DeliverySettingsScreenState extends State<DeliverySettingsScreen> {
   final _api = ApiClient();
   final _formKey = GlobalKey<FormState>();
 
+  final _charge0to5Controller = TextEditingController();
   final _charge5to10Controller = TextEditingController();
   final _charge10to15Controller = TextEditingController();
   
@@ -30,6 +31,7 @@ class _DeliverySettingsScreenState extends State<DeliverySettingsScreen> {
 
   @override
   void dispose() {
+    _charge0to5Controller.dispose();
     _charge5to10Controller.dispose();
     _charge10to15Controller.dispose();
     super.dispose();
@@ -41,6 +43,7 @@ class _DeliverySettingsScreenState extends State<DeliverySettingsScreen> {
       final res = await _api.get(ApiConstants.adminSettings);
       final data = res.data;
       setState(() {
+        _charge0to5Controller.text = data['delivery_charge_0_to_5_km']?.toString() ?? '0.00';
         _charge5to10Controller.text = data['delivery_charge_5_to_10_km']?.toString() ?? '';
         _charge10to15Controller.text = data['delivery_charge_10_to_15_km']?.toString() ?? '';
       });
@@ -94,6 +97,7 @@ class _DeliverySettingsScreenState extends State<DeliverySettingsScreen> {
     try {
       final payload = {
         'free_delivery_radius_km': 5.0, // Fixed as per requirements
+        'delivery_charge_0_to_5_km': double.tryParse(_charge0to5Controller.text),
         'delivery_charge_5_to_10_km': double.tryParse(_charge5to10Controller.text),
         'delivery_charge_10_to_15_km': double.tryParse(_charge10to15Controller.text),
         'max_delivery_distance_km': 15.0, // Fixed as per requirements
@@ -173,22 +177,18 @@ class _DeliverySettingsScreenState extends State<DeliverySettingsScreen> {
                               'Delivery Charges',
                               style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                             ),
-                            const SizedBox(height: 24),
-                            
-                            // Free Radius
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('0 km – 5 km', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppTheme.textPrimary, fontSize: 15)),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.success.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text('Free Delivery', style: GoogleFonts.inter(color: AppTheme.success, fontWeight: FontWeight.bold, fontSize: 13)),
-                                ),
-                              ],
+                            // 0 to 5 km
+                            Text('0 km – 5 km (from shop)', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: AppTheme.textPrimary, fontSize: 15)),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _charge0to5Controller,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: const InputDecoration(
+                                labelText: 'Delivery Charge (₹)',
+                                prefixIcon: Icon(Icons.currency_rupee_outlined),
+                                hintText: 'e.g. 0',
+                              ),
+                              validator: _validatePositiveNumber,
                             ),
                             const SizedBox(height: 24),
                             

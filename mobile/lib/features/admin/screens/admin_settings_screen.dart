@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
@@ -124,6 +125,36 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Delivery Settings Navigation Card
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.grey.shade200),
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.local_shipping_outlined, color: AppTheme.primaryGreen),
+                ),
+                title: Text(
+                  'Delivery Settings',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                subtitle: Text(
+                  'Configure delivery charges for different distance ranges',
+                  style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/admin/delivery-settings'),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Change Password Card
             Card(
               child: Padding(

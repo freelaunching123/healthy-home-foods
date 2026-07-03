@@ -141,17 +141,21 @@ async def create_subscription(
     if settings:
         distance = 0.0
         if address.latitude and address.longitude:
+            shop_lat = float(settings.business_lat) if settings.business_lat is not None else 9.919630
+            shop_lng = float(settings.business_lng) if settings.business_lng is not None else 78.094379
             distance = haversine(
-                9.919630, 78.094379,
+                shop_lat, shop_lng,
                 float(address.latitude), float(address.longitude)
             )
-        if distance > 15.0:
+        max_dist = float(getattr(settings, "max_delivery_distance_km", 15.0))
+        if distance > max_dist:
             raise HTTPException(
                 status_code=400,
-                detail="There is no service beyond 15km. Please select an address within the range."
+                detail=f"There is no service beyond {max_dist}km. Please select an address within the range."
             )
             
-        charge_per_delivery = max(0.0, distance - float(settings.free_delivery_radius_km)) * float(settings.delivery_charge_per_km)
+        from app.services.delivery_engine import calculate_charge_for_distance
+        charge_per_delivery = calculate_charge_for_distance(distance, settings)
         delivery_charge = first_package_days * charge_per_delivery
         
         tax_rate = float(settings.tax_percentage) / 100

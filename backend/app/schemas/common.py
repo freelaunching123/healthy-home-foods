@@ -190,6 +190,10 @@ class PartnerPasswordChange(BaseModel):
 class AdminSettingsUpdate(BaseModel):
     free_delivery_radius_km: Optional[float] = None
     delivery_charge_per_km: Optional[float] = None
+    delivery_charge_0_to_5_km: Optional[float] = None
+    delivery_charge_5_to_10_km: Optional[float] = None
+    delivery_charge_10_to_15_km: Optional[float] = None
+    max_delivery_distance_km: Optional[float] = None
     business_name: Optional[str] = None
     business_address: Optional[str] = None
     business_phone: Optional[str] = None
@@ -215,6 +219,10 @@ class AdminSettingsResponse(BaseModel):
     id: int
     free_delivery_radius_km: float
     delivery_charge_per_km: float
+    delivery_charge_0_to_5_km: float
+    delivery_charge_5_to_10_km: float
+    delivery_charge_10_to_15_km: float
+    max_delivery_distance_km: float
     business_name: str
     business_address: Optional[str]
     business_phone: Optional[str]

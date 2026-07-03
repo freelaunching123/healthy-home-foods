@@ -34,6 +34,20 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return distance
 
 
+def calculate_charge_for_distance(distance: float, settings_obj) -> float:
+    """Calculate delivery charge based on configured settings and distance tiers."""
+    charge_0_to_5 = float(getattr(settings_obj, "delivery_charge_0_to_5_km", 0.0))
+    charge_5_to_10 = float(getattr(settings_obj, "delivery_charge_5_to_10_km", 15.0))
+    charge_10_to_15 = float(getattr(settings_obj, "delivery_charge_10_to_15_km", 25.0))
+    
+    if distance <= 5.0:
+        return charge_0_to_5
+    elif distance <= 10.0:
+        return charge_5_to_10
+    else:
+        return charge_10_to_15
+
+
 async def auto_assign_delivery(
     db: AsyncSession,
     delivery: SubscriptionDelivery
