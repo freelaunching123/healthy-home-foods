@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/router/app_router.dart';
 
 class AdminDrawer extends StatelessWidget {
   const AdminDrawer({super.key});
@@ -10,47 +11,32 @@ class AdminDrawer extends StatelessWidget {
   Future<void> _handleLogout(BuildContext context) async {
     final authService = AuthService();
 
-    final result = await showDialog<String>(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Logout', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-        content: Text('Choose how you want to logout.', style: GoogleFonts.inter()),
+        content: Text('Are you sure you want to log out?', style: GoogleFonts.inter()),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            onPressed: () => Navigator.pop(ctx, false),
             child: Text('Cancel', style: GoogleFonts.inter()),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(ctx, 'device'),
-            child: Text('Logout from This Device', style: GoogleFonts.inter()),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.error,
               foregroundColor: Colors.white,
             ),
-            onPressed: () => Navigator.pop(ctx, 'all'),
-            child: Text('Logout from All Devices', style: GoogleFonts.inter()),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Logout', style: GoogleFonts.inter()),
           ),
         ],
       ),
     );
 
-    if (result == 'device') {
+    if (confirm == true) {
       await authService.logout();
-      if (context.mounted) {
-        context.go('/login');
-      }
-    } else if (result == 'all') {
-      await authService.logoutAllDevices();
-      if (context.mounted) {
-        context.go('/login');
-      }
+      appRouter.go('/role-selection');
     }
   }
 

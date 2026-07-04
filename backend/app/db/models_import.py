@@ -13,6 +13,7 @@ from app.models.delivery_assignment import DeliveryAssignment, DeliveryAssignmen
 from app.models.payment import Payment  # noqa
 from app.models.invoice import Invoice  # noqa
 from app.models.notification import Notification  # noqa
+from app.models.notification_history import NotificationHistory  # noqa
 from app.models.otp_log import OtpLog  # noqa
 from app.models.gps_tracking import GpsTrackingLog  # noqa
 from app.models.audit_log import AuditLog  # noqa

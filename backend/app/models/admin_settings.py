@@ -47,6 +47,7 @@ class AdminSettings(TimestampMixin, Base):
     sms_notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     email_notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     push_notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    delivery_boy_reminder_time: Mapped[Optional[time]] = mapped_column(Time, default=time(7, 0), nullable=True)
 
     # Maps & GPS
     maps_provider: Mapped[str] = mapped_column(String(50), default="google", nullable=False)

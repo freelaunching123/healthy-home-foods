@@ -479,7 +479,7 @@ async def get_current_subscription(
         from app.models.user import User as UserModel
         assignment_result = await db.execute(
             select(DeliveryAssignment)
-            .where(DeliveryAssignment.delivery_id == today_delivery.id)
+            .where(DeliveryAssignment.subscription_delivery_id == today_delivery.id)
         )
         assignment = assignment_result.scalar_one_or_none()
         if assignment:

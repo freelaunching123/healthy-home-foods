@@ -10,6 +10,7 @@ Enforces all subscription rules:
  - Subscription completes only when completed == total
 """
 import logging
+logger = logging.getLogger(__name__)
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
@@ -195,6 +196,49 @@ async def mark_delivered(db: AsyncSession, delivery: SubscriptionDelivery) -> No
     sub = await db.get(Subscription, delivery.subscription_id)
     sub.completed_deliveries += 1
 
+    # Send push notification when delivery is completed
+    try:
+        from app.models.customer import Customer
+        from app.models.user import User
+        from app.services.notification_service import NotificationService
+        
+        customer = await db.get(Customer, sub.customer_id)
+        if customer:
+            cust_user = await db.get(User, customer.user_id)
+            if cust_user:
+                await NotificationService.send_notification_to_user(
+                    db=db,
+                    user_id=cust_user.id,
+                    title="Delivery Completed",
+                    body=f"Your meal has been delivered successfully at {datetime.now().strftime('%H:%M')}.",
+                    notification_type="delivery",
+                    reference_id=str(delivery.id)
+                )
+    except Exception as e:
+        logger.error(f"Error sending delivery completion notification: {e}")
+
+    remaining = sub.total_deliveries - sub.completed_deliveries
+    if remaining == 2:
+        try:
+            from app.models.customer import Customer
+            from app.models.user import User
+            from app.services.notification_service import NotificationService
+            
+            customer = await db.get(Customer, sub.customer_id)
+            if customer:
+                cust_user = await db.get(User, customer.user_id)
+                if cust_user:
+                    await NotificationService.send_notification_to_user(
+                        db=db,
+                        user_id=cust_user.id,
+                        title="Subscription Expiring Soon",
+                        body=f"Your healthy meal subscription is expiring soon. Only {remaining} deliveries remaining. Renew now to avoid interruption!",
+                        notification_type="subscription",
+                        reference_id=str(sub.id)
+                    )
+        except Exception as e:
+            logger.error(f"Error sending subscription expiry warning notification: {e}")
+
     if sub.completed_deliveries >= sub.total_deliveries:
         await _complete_subscription(db, sub)
     else:
@@ -254,6 +298,84 @@ async def handle_missed_delivery(db: AsyncSession, delivery: SubscriptionDeliver
     await db.flush()
 
 
+async def _notify_subscription_change(db: AsyncSession, subscription: Subscription, action: str, reason: str = None):
+    try:
+        from app.models.customer import Customer
+        from app.models.user import User
+        from app.models.delivery_partner import DeliveryPartner
+        from app.models.delivery_assignment import DeliveryAssignment
+        from app.models.subscription_delivery import SubscriptionDelivery
+        from app.services.notification_service import NotificationService
+        from datetime import date
+        
+        customer = await db.get(Customer, subscription.customer_id)
+        if not customer:
+            return
+        cust_user = await db.get(User, customer.user_id)
+        if not cust_user:
+            return
+            
+        if action == "pause":
+            cust_title = "Subscription Paused"
+            cust_body = f"Your healthy meal subscription has been paused. Reason: {reason or 'Not specified'}"
+            admin_title = "Customer Paused Subscription"
+            admin_body = f"Customer: {cust_user.full_name} has paused their subscription."
+            partner_title = "Subscription Paused"
+            partner_body = f"Assigned delivery for customer {cust_user.full_name} has been paused."
+        else:
+            cust_title = "Subscription Resumed"
+            cust_body = "Your healthy meal subscription is now active! Deliveries will resume."
+            admin_title = "Customer Resumed Subscription"
+            admin_body = f"Customer: {cust_user.full_name} has resumed their subscription."
+            partner_title = "Subscription Resumed"
+            partner_body = f"Assigned delivery for customer {cust_user.full_name} has been resumed."
+            
+        await NotificationService.send_notification_to_user(
+            db=db,
+            user_id=cust_user.id,
+            title=cust_title,
+            body=cust_body,
+            notification_type="subscription",
+            reference_id=str(subscription.id)
+        )
+        
+        await NotificationService.send_notification_to_role(
+            db=db,
+            role="admin",
+            title=admin_title,
+            body=admin_body,
+            notification_type="subscription",
+            reference_id=str(subscription.id)
+        )
+        
+        delivery_res = await db.execute(
+            select(SubscriptionDelivery)
+            .where(
+                SubscriptionDelivery.subscription_id == subscription.id,
+                SubscriptionDelivery.scheduled_date == date.today()
+            )
+        )
+        delivery = delivery_res.scalar_one_or_none()
+        if delivery:
+            assign_res = await db.execute(
+                select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
+            )
+            assignment = assign_res.scalar_one_or_none()
+            if assignment:
+                partner = await db.get(DeliveryPartner, assignment.delivery_partner_id)
+                if partner:
+                    await NotificationService.send_notification_to_user(
+                        db=db,
+                        user_id=partner.user_id,
+                        title=partner_title,
+                        body=partner_body,
+                        notification_type="delivery",
+                        reference_id=str(delivery.id)
+                    )
+    except Exception as e:
+        logger.error(f"Error sending subscription change notification: {e}")
+
+
 async def pause_subscription(
     db: AsyncSession,
     subscription: Subscription,
@@ -288,6 +410,8 @@ async def pause_subscription(
         pause_reason=reason,
     )
     db.add(pause_log)
+    
+    await _notify_subscription_change(db, subscription, "pause", reason)
 
     return subscription
 
@@ -334,6 +458,9 @@ async def resume_subscription(db: AsyncSession, subscription: Subscription) -> S
 
     # Generate next delivery from today
     await _generate_next_delivery(db, subscription)
+    
+    await _notify_subscription_change(db, subscription, "resume")
+    
     return subscription
 
 
@@ -403,7 +530,7 @@ async def skip_delivery(db: AsyncSession, delivery: SubscriptionDelivery) -> Sub
     # Remove active assignment if exists
     from app.models.delivery_assignment import DeliveryAssignment
     assignment_res = await db.execute(
-        select(DeliveryAssignment).where(DeliveryAssignment.delivery_id == delivery.id)
+        select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
     )
     assignment = assignment_res.scalar_one_or_none()
     if assignment:
@@ -458,6 +585,27 @@ async def _complete_subscription(db: AsyncSession, subscription: Subscription) -
     )
     db.add(history)
     logger.info(f"Subscription {subscription.id} completed after {subscription.completed_deliveries} deliveries")
+
+    # Notify Customer of completion
+    try:
+        from app.models.customer import Customer
+        from app.models.user import User
+        from app.services.notification_service import NotificationService
+        
+        customer = await db.get(Customer, subscription.customer_id)
+        if customer:
+            cust_user = await db.get(User, customer.user_id)
+            if cust_user:
+                await NotificationService.send_notification_to_user(
+                    db=db,
+                    user_id=cust_user.id,
+                    title="Subscription Completed",
+                    body=f"Your healthy meal subscription has completed. Total deliveries completed: {subscription.completed_deliveries}.",
+                    notification_type="subscription",
+                    reference_id=str(subscription.id)
+                )
+    except Exception as e:
+        logger.error(f"Error sending subscription completion notification: {e}")
 
 
 async def renew_subscription(

@@ -105,7 +105,7 @@ async def delivery_partner_performance(
         )
         delivered = await db.execute(
             select(func.count(DeliveryAssignment.id))
-            .join(SubscriptionDelivery, DeliveryAssignment.delivery_id == SubscriptionDelivery.id)
+            .join(SubscriptionDelivery, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
             .where(and_(DeliveryAssignment.delivery_partner_id == partner.id,
                         SubscriptionDelivery.status == DeliveryStatus.DELIVERED,
                         func.date(DeliveryAssignment.created_at) >= since))

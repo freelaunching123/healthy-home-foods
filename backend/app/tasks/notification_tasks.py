@@ -73,3 +73,71 @@ def send_expiry_reminders():
                     message=f"Hi {user.full_name}, your Healthy Home Foods subscription expires in 2 days. Renew via the app to keep receiving fresh meals!"
                 )
     asyncio.run(_run())
+
+
+@celery_app.task(name="app.tasks.notification_tasks.send_scheduled_notification_task")
+def send_scheduled_notification_task(user_id: str, title: str, body: str, notification_type: str, reference_id: str = None):
+    """Celery task to send scheduled notification to a user."""
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            await NotificationService.send_notification_to_user(
+                db=db,
+                user_id=user_id,
+                title=title,
+                body=body,
+                notification_type=notification_type,
+                reference_id=reference_id
+            )
+            await db.commit()
+    asyncio.run(_run())
+
+
+@celery_app.task(name="app.tasks.notification_tasks.send_delivery_boy_morning_reminders")
+def send_delivery_boy_morning_reminders():
+    """Send morning reminder to all active delivery partners with today's count."""
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            from app.models.delivery_partner import DeliveryPartner
+            from app.models.delivery_assignment import DeliveryAssignment
+            from app.models.subscription_delivery import SubscriptionDelivery
+            from app.models.fruit import FruitOrder
+            from sqlalchemy import func
+            
+            result = await db.execute(
+                select(DeliveryPartner).where(DeliveryPartner.is_available == True)
+            )
+            partners = result.scalars().all()
+            today = date.today()
+            
+            for partner in partners:
+                sub_count = await db.scalar(
+                    select(func.count(DeliveryAssignment.id))
+                    .join(SubscriptionDelivery, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
+                    .where(
+                        DeliveryAssignment.delivery_partner_id == partner.id,
+                        SubscriptionDelivery.scheduled_date == today
+                    )
+                ) or 0
+                
+                fruit_count = await db.scalar(
+                    select(func.count(DeliveryAssignment.id))
+                    .join(FruitOrder, DeliveryAssignment.fruit_order_id == FruitOrder.id)
+                    .where(
+                        DeliveryAssignment.delivery_partner_id == partner.id,
+                        func.date(FruitOrder.created_at) == today
+                    )
+                ) or 0
+                
+                total_today = sub_count + fruit_count
+                
+                user = await db.get(User, partner.user_id)
+                if user:
+                    await NotificationService.send_notification_to_user(
+                        db=db,
+                        user_id=user.id,
+                        title="Morning Delivery Reminder",
+                        body=f"Good morning! You have {total_today} deliveries scheduled for today.",
+                        notification_type="morning_reminder"
+                    )
+            await db.commit()
+    asyncio.run(_run())

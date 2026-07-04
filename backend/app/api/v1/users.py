@@ -212,6 +212,55 @@ async def edit_address(
 
     await db.commit()
     await db.refresh(address)
+
+    # Notify Delivery Boy of address change if they have active delivery for this customer today
+    try:
+        from app.models.customer import Customer
+        from app.models.subscription import Subscription, SubscriptionStatus
+        from app.models.subscription_delivery import SubscriptionDelivery
+        from app.models.delivery_assignment import DeliveryAssignment
+        from app.models.delivery_partner import DeliveryPartner
+        from app.services.notification_service import NotificationService
+        from datetime import date
+        
+        cust_res = await db.execute(select(Customer).where(Customer.user_id == current_user.id))
+        customer = cust_res.scalar_one_or_none()
+        if customer:
+            sub_res = await db.execute(
+                select(Subscription).where(
+                    Subscription.customer_id == customer.id,
+                    Subscription.status == SubscriptionStatus.ACTIVE
+                )
+            )
+            for sub in sub_res.scalars().all():
+                del_res = await db.execute(
+                    select(SubscriptionDelivery).where(
+                        SubscriptionDelivery.subscription_id == sub.id,
+                        SubscriptionDelivery.scheduled_date == date.today()
+                    )
+                )
+                delivery = del_res.scalar_one_or_none()
+                if delivery:
+                    assign_res = await db.execute(
+                        select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
+                    )
+                    assignment = assign_res.scalar_one_or_none()
+                    if assignment:
+                        partner = await db.get(DeliveryPartner, assignment.delivery_partner_id)
+                        if partner:
+                            addr_details = f"{address.address_line1}, {address.city}, {address.pincode}"
+                            await NotificationService.send_notification_to_user(
+                                db=db,
+                                user_id=partner.user_id,
+                                title="Customer Address Changed",
+                                body=f"Customer {current_user.full_name} changed address: {addr_details}",
+                                notification_type="delivery",
+                                reference_id=str(delivery.id)
+                            )
+    except Exception as e:
+        # Avoid crashing address update if notification fails
+        pass
+
     return address
 
 

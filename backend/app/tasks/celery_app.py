@@ -36,5 +36,10 @@ celery_app.conf.update(
             "task": "app.tasks.notification_tasks.send_expiry_reminders",
             "schedule": crontab(hour=21, minute=0),
         },
+        # Delivery partner morning reminder — runs at 7:00 AM IST every day
+        "delivery-partner-morning-reminder": {
+            "task": "app.tasks.notification_tasks.send_delivery_boy_morning_reminders",
+            "schedule": crontab(hour=7, minute=0),
+        },
     },
 )

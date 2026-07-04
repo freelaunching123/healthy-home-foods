@@ -95,7 +95,7 @@ from sqlalchemy.exc import IntegrityError
 @router.post("", response_model=ProductResponse)
 async def create_product(
     payload: ProductCreate,
-    _: User = Depends(require_super_admin),
+    current_user: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
     product = Product(**payload.model_dump())
@@ -113,6 +113,29 @@ async def create_product(
             status_code=400,
             detail=f"Database constraint violation: Check category or unique constraints. Details: {str(e)}"
         )
+    
+    # Send Notifications
+    from app.services.notification_service import NotificationService
+    
+    # 1. Notify all admins
+    await NotificationService.send_notification_to_role(
+        db=db,
+        role="admin",
+        title="Product Added Successfully",
+        body=f"Product '{product.name}' has been successfully added to the catalog.",
+        notification_type="system",
+        reference_id=str(product.id)
+    )
+    
+    # 2. Notify all customers
+    body_text = f"{product.name}\n₹{product.package_price}\n{product.plan_type.capitalize()} Plan ({product.package_days} Deliveries)\nTap to view."
+    await NotificationService.send_notification_to_all_customers(
+        db=db,
+        title="New Healthy Pack Available",
+        body=body_text,
+        notification_type="promo",
+        reference_id=str(product.id)
+    )
     
     res = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product.id))
     return res.scalar_one()

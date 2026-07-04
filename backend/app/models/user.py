@@ -44,6 +44,9 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     profile_photo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     fcm_token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Firebase push
+    device_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    last_token_update: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    notification_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="true")
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

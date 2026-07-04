@@ -136,7 +136,7 @@ async def auto_assign_delivery(
     
     # 6. Create Assignment
     assignment = DeliveryAssignment(
-        delivery_id=delivery.id,
+        subscription_delivery_id=delivery.id,
         delivery_partner_id=best_match.id,
         status=AssignmentStatus.PENDING,
         assigned_at=datetime.now(timezone.utc),

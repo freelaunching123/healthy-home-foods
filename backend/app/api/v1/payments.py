@@ -143,23 +143,53 @@ async def verify_payment(
     db.add(invoice)
     
     # Send Notifications
-    await NotificationService.create_in_app_notification(
+    product_name = "Healthy Food Plan"
+    if sub.product_id:
+        from app.models.product import Product
+        prod_res = await db.execute(select(Product).where(Product.id == sub.product_id))
+        prod = prod_res.scalar_one_or_none()
+        if prod:
+            product_name = prod.name
+
+    payment_date_str = payment.paid_at.strftime('%Y-%m-%d %H:%M:%S') if payment.paid_at else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 1. Customer: Payment Successful
+    await NotificationService.send_notification_to_user(
         db=db,
         user_id=current_user.id,
         title="Payment Successful",
-        body=f"Your payment of ₹{payment.amount} was successful.",
-        category="payment",
-        action_type="payment",
+        body=f"Your payment of ₹{payment.amount} was successful.\nTransaction ID: {payment.gateway_payment_id}\nDate: {payment_date_str}",
+        notification_type="payment",
         reference_id=str(payment.id)
     )
     
-    await NotificationService.create_in_app_notification(
+    # 2. Customer: Subscription Activated
+    await NotificationService.send_notification_to_user(
         db=db,
         user_id=current_user.id,
         title="Subscription Activated",
         body="Your meal plan subscription has been activated! Your deliveries will begin as scheduled.",
-        category="subscription",
-        action_type="subscription",
+        notification_type="subscription",
+        reference_id=str(sub.id)
+    )
+    
+    # 3. Admins: Payment Successful
+    await NotificationService.send_notification_to_role(
+        db=db,
+        role="admin",
+        title="Payment Successful",
+        body=f"Customer Name: {current_user.full_name}\nAmount: ₹{payment.amount}\nTransaction ID: {payment.gateway_payment_id}",
+        notification_type="payment",
+        reference_id=str(payment.id)
+    )
+    
+    # 4. Admins: New Subscription Purchased
+    await NotificationService.send_notification_to_role(
+        db=db,
+        role="admin",
+        title="New Subscription Purchased",
+        body=f"Customer: {current_user.full_name}\nProduct: {product_name}\nAmount: ₹{sub.total_amount}",
+        notification_type="subscription",
         reference_id=str(sub.id)
     )
     

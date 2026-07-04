@@ -213,6 +213,7 @@ class AdminSettingsUpdate(BaseModel):
     tax_percentage: Optional[float] = None
     service_available: Optional[bool] = None
     maintenance_message: Optional[str] = None
+    delivery_boy_reminder_time: Optional[str] = None
 
 
 class AdminSettingsResponse(BaseModel):
@@ -242,6 +243,7 @@ class AdminSettingsResponse(BaseModel):
     tax_percentage: float
     service_available: bool
     maintenance_message: Optional[str]
+    delivery_boy_reminder_time: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

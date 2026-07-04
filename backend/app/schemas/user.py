@@ -31,6 +31,8 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     profile_photo_url: Optional[str] = None
     fcm_token: Optional[str] = None
+    device_type: Optional[str] = None
+    notification_enabled: Optional[bool] = None
     gender: Optional[str] = None
     dob: Optional[date] = None
     delivery_notifications_enabled: Optional[bool] = None
@@ -53,6 +55,10 @@ class UserResponse(BaseModel):
     delivery_notifications_enabled: bool = True
     payment_notifications_enabled: bool = True
     promotional_notifications_enabled: bool = True
+    fcm_token: Optional[str] = None
+    device_type: Optional[str] = None
+    notification_enabled: bool = True
+    last_token_update: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

@@ -66,7 +66,7 @@ async def get_filtered_deliveries_query(
         .join(Customer, Customer.id == Subscription.customer_id)
         .join(CustomerUser, CustomerUser.id == Customer.user_id)
         .join(Address, Address.id == Subscription.address_id)
-        .outerjoin(DeliveryAssignment, DeliveryAssignment.delivery_id == SubscriptionDelivery.id)
+        .outerjoin(DeliveryAssignment, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
         .outerjoin(DeliveryPartner, DeliveryPartner.id == DeliveryAssignment.delivery_partner_id)
         .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
     )
@@ -206,7 +206,7 @@ async def get_analytics(
     # 2. Average delivery time in minutes (out_at to delivered_at)
     time_stmt = (
         select(DeliveryAssignment.out_at, DeliveryAssignment.delivered_at)
-        .join(SubscriptionDelivery, SubscriptionDelivery.id == DeliveryAssignment.delivery_id)
+        .join(SubscriptionDelivery, SubscriptionDelivery.id == DeliveryAssignment.subscription_delivery_id)
         .where(
             and_(
                 *base_filters,
@@ -233,7 +233,7 @@ async def get_analytics(
         select(PartnerUser.full_name, func.count(DeliveryAssignment.id))
         .join(DeliveryPartner, DeliveryPartner.id == DeliveryAssignment.delivery_partner_id)
         .join(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
-        .join(SubscriptionDelivery, SubscriptionDelivery.id == DeliveryAssignment.delivery_id)
+        .join(SubscriptionDelivery, SubscriptionDelivery.id == DeliveryAssignment.subscription_delivery_id)
         .where(
             and_(
                 *base_filters,
@@ -372,7 +372,7 @@ async def get_delivery_details(
         .join(Customer, Customer.id == Subscription.customer_id)
         .join(CustomerUser, CustomerUser.id == Customer.user_id)
         .join(Address, Address.id == Subscription.address_id)
-        .outerjoin(DeliveryAssignment, DeliveryAssignment.delivery_id == SubscriptionDelivery.id)
+        .outerjoin(DeliveryAssignment, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
         .outerjoin(DeliveryPartner, DeliveryPartner.id == DeliveryAssignment.delivery_partner_id)
         .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
         .where(SubscriptionDelivery.id == id)
@@ -567,7 +567,7 @@ async def assign_or_reassign_partner(
 
     partner_user = await db.get(User, partner.user_id)
 
-    assignment_stmt = select(DeliveryAssignment).where(DeliveryAssignment.delivery_id == delivery.id)
+    assignment_stmt = select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
     assignment_result = await db.execute(assignment_stmt)
     assignment = assignment_result.scalar_one_or_none()
 
@@ -584,7 +584,7 @@ async def assign_or_reassign_partner(
         assignment.failure_reason = None
     else:
         assignment = DeliveryAssignment(
-            delivery_id=delivery.id,
+            subscription_delivery_id=delivery.id,
             delivery_partner_id=partner.id,
             status=AssignmentStatus.PENDING,
             assigned_at=datetime.now(timezone.utc),
@@ -617,13 +617,24 @@ async def assign_or_reassign_partner(
     await db.commit()
 
     # Notification
-    await NotificationService.create_in_app_notification(
+    if prev_partner_id:
+        prev_dp = await db.get(DeliveryPartner, prev_partner_id)
+        if prev_dp:
+            await NotificationService.send_notification_to_user(
+                db=db,
+                user_id=prev_dp.user_id,
+                title="Delivery Reassigned",
+                body="A delivery previously assigned to you has been reassigned to another partner.",
+                notification_type="delivery",
+                reference_id=str(delivery.id)
+            )
+
+    await NotificationService.send_notification_to_user(
         db=db,
         user_id=partner.user_id,
         title="New Delivery Assigned",
-        body=f"You have been assigned a new delivery for today.",
-        category="delivery",
-        action_type="delivery",
+        body="You have been assigned a new delivery for today.",
+        notification_type="delivery",
         reference_id=str(delivery.id)
     )
 
@@ -645,7 +656,7 @@ async def update_status(
     old_status_val = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
     new_status_val = payload.status
 
-    assignment_stmt = select(DeliveryAssignment).where(DeliveryAssignment.delivery_id == delivery.id)
+    assignment_stmt = select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
     assignment_result = await db.execute(assignment_stmt)
     assignment = assignment_result.scalar_one_or_none()
 

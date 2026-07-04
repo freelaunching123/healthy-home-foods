@@ -1,6 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_client.dart';
 import '../constants/api_constants.dart';
+import 'fcm_service.dart';
 
 class AuthService {
   final ApiClient _api = ApiClient();
@@ -34,6 +35,13 @@ class AuthService {
       'role': role,
     });
     await _saveTokens(response.data);
+    
+    // Sync FCM Token
+    try {
+      final fcmService = FcmService();
+      await fcmService.syncTokenToBackend();
+    } catch (_) {}
+
     return response.data;
   }
 

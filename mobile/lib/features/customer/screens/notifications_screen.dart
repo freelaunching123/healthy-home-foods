@@ -101,6 +101,30 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
   }
 
+  Future<void> _clearAll() async {
+    final originalList = List.from(_notifications);
+    setState(() => _notifications = []);
+    try {
+      await _api.delete('${ApiConstants.notifications}/clear-all');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All notifications cleared'),
+            backgroundColor: AppTheme.primaryGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error clearing all notifications: $e');
+      setState(() => _notifications = originalList);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to clear notifications'), backgroundColor: AppTheme.error),
+        );
+      }
+    }
+  }
+
   Future<void> _deleteNotification(String id, int index) async {
     final removed = _notifications[index];
     setState(() => _notifications.removeAt(index));
@@ -179,6 +203,33 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 'Read All',
                 style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.w600, fontSize: 13),
               ),
+            ),
+          if (_notifications.isNotEmpty)
+            IconButton(
+              tooltip: 'Clear All',
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Clear All Notifications'),
+                    content: const Text('Are you sure you want to clear all notifications?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _clearAll();
+                        },
+                        child: const Text('Clear', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              icon: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
             ),
           const SizedBox(width: 4),
         ],

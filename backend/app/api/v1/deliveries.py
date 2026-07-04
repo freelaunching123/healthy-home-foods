@@ -118,7 +118,7 @@ async def assign_delivery(
 
     # Check if a delivery assignment already exists for this delivery (to overwrite)
     assignment_result = await db.execute(
-        select(DeliveryAssignment).where(DeliveryAssignment.delivery_id == delivery.id)
+        select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
     )
     assignment = assignment_result.scalar_one_or_none()
 
@@ -135,7 +135,7 @@ async def assign_delivery(
     else:
         # Create a new assignment
         assignment = DeliveryAssignment(
-            delivery_id=delivery.id,
+            subscription_delivery_id=delivery.id,
             delivery_partner_id=partner.id,
             status=AssignmentStatus.PENDING,
             assigned_at=datetime.now(timezone.utc),
@@ -165,7 +165,7 @@ async def get_my_assignments(
 
     result = await db.execute(
         select(DeliveryAssignment)
-        .join(SubscriptionDelivery, DeliveryAssignment.delivery_id == SubscriptionDelivery.id)
+        .join(SubscriptionDelivery, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
         .where(
             and_(
                 DeliveryAssignment.delivery_partner_id == partner.id,
