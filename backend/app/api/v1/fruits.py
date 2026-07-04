@@ -28,6 +28,7 @@ from app.models.fruit import (
 )
 from app.models.user import User
 from app.schemas.common import MessageResponse
+from app.services.payment_service import PaymentService
 from app.models.admin_settings import AdminSettings
 from app.services.delivery_engine import haversine
 from app.schemas.fruit import (
@@ -442,6 +443,9 @@ async def checkout(
         .options(
             selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit),
             selectinload(FruitOrder.address),
+            selectinload(FruitOrder.assignment)
+                .selectinload(__import__('app.models.delivery_assignment', fromlist=['DeliveryAssignment']).DeliveryAssignment.delivery_partner)
+                .selectinload(__import__('app.models.delivery_partner', fromlist=['DeliveryPartner']).DeliveryPartner.user),
         )
     )
     order = reload_result.scalar_one()
@@ -454,7 +458,7 @@ async def initiate_fruit_payment(
     current_user: User = Depends(require_customer),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a Razorpay order for a pending fruit order."""
+    """Create a mock order for a pending fruit order."""
     customer = await _get_customer(db, current_user.id)
 
     order_result = await db.execute(
@@ -466,24 +470,15 @@ async def initiate_fruit_payment(
     if order.payment_status not in (FruitPaymentStatus.PENDING, FruitPaymentStatus.INITIATED):
         raise HTTPException(status_code=400, detail="Order payment is not in a payable state")
 
-    client = _razorpay_client()
-    amount_paise = int(float(order.total_amount) * 100)
-    rz_order = client.order.create({
-        "amount": amount_paise,
-        "currency": "INR",
-        "receipt": str(order.id)[:30],
-        "notes": {"fruit_order_id": str(order.id), "order_number": order.order_number},
-    })
-
-    order.gateway_order_id = rz_order["id"]
+    order.gateway_order_id = f"mock_order_fruit_{order.id}"
     order.payment_status = FruitPaymentStatus.INITIATED
     await db.commit()
 
     return {
-        "order_id": rz_order["id"],
-        "amount": amount_paise,
+        "order_id": order.gateway_order_id,
+        "amount": int(float(order.total_amount) * 100),
         "currency": "INR",
-        "key_id": settings.RAZORPAY_KEY_ID,
+        "key_id": "mock_key",
         "fruit_order_id": str(order.id),
         "order_number": order.order_number,
     }
@@ -496,45 +491,8 @@ async def verify_fruit_payment(
     current_user: User = Depends(require_customer),
     db: AsyncSession = Depends(get_db),
 ):
-    """Verify Razorpay payment, mark order paid, and clear the cart."""
-    customer = await _get_customer(db, current_user.id)
-
-    # Verify HMAC signature
-    expected_sig = hmac.new(
-        settings.RAZORPAY_KEY_SECRET.encode(),
-        f"{payload.razorpay_order_id}|{payload.razorpay_payment_id}".encode(),
-        hashlib.sha256,
-    ).hexdigest()
-    if not hmac.compare_digest(expected_sig, payload.razorpay_signature):
-        # Save failed status
-        order_result = await db.execute(
-            select(FruitOrder).where(FruitOrder.id == order_id, FruitOrder.customer_id == customer.id)
-        )
-        order = order_result.scalar_one_or_none()
-        if order:
-            order.payment_status = FruitPaymentStatus.FAILED
-            await db.commit()
-        raise HTTPException(status_code=400, detail="Invalid payment signature")
-
-    order_result = await db.execute(
-        select(FruitOrder).where(FruitOrder.id == order_id, FruitOrder.customer_id == customer.id)
-    )
-    order = order_result.scalar_one_or_none()
-    if not order:
-        raise HTTPException(status_code=404, detail="Fruit order not found")
-
-    order.gateway_payment_id = payload.razorpay_payment_id
-    order.gateway_signature = payload.razorpay_signature
-    order.payment_status = FruitPaymentStatus.SUCCESS
-    order.paid_at = datetime.now(timezone.utc)
-    order.order_status = FruitOrderStatus.PENDING  # Admin will then change to Preparing → etc.
-
-    # Clear the customer's fruit cart
-    cart_result = await db.execute(select(FruitCart).where(FruitCart.customer_id == customer.id))
-    for item in cart_result.scalars().all():
-        await db.delete(item)
-
-    await db.commit()
+    """Verify mock payment, mark order paid, and clear the cart."""
+    await PaymentService.verify_mock_fruit_payment(db, order_id, current_user)
     return MessageResponse(message="Payment verified. Your fruit order has been placed successfully!")
 
 
@@ -552,6 +510,9 @@ async def fruit_order_history(
         .options(
             selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit),
             selectinload(FruitOrder.address),
+            selectinload(FruitOrder.assignment)
+                .selectinload(__import__('app.models.delivery_assignment', fromlist=['DeliveryAssignment']).DeliveryAssignment.delivery_partner)
+                .selectinload(__import__('app.models.delivery_partner', fromlist=['DeliveryPartner']).DeliveryPartner.user),
         )
         .order_by(FruitOrder.created_at.desc())
     )
@@ -574,6 +535,9 @@ async def get_fruit_order(
         .options(
             selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit),
             selectinload(FruitOrder.address),
+            selectinload(FruitOrder.assignment)
+                .selectinload(__import__('app.models.delivery_assignment', fromlist=['DeliveryAssignment']).DeliveryAssignment.delivery_partner)
+                .selectinload(__import__('app.models.delivery_partner', fromlist=['DeliveryPartner']).DeliveryPartner.user),
         )
     )
     order = result.scalar_one_or_none()

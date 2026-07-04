@@ -52,17 +52,17 @@ async def get_dashboard_stats(
     
     assigned_today = len(assignments)
     completed_today = sum(1 for a in assignments if a.status == AssignmentStatus.DELIVERED)
-    pending_deliveries = sum(1 for a in assignments if a.status in [AssignmentStatus.PENDING, AssignmentStatus.PICKED_UP, AssignmentStatus.OUT_FOR_DELIVERY])
+    pending_deliveries = sum(1 for a in assignments if a.status in [AssignmentStatus.PENDING, AssignmentStatus.ACCEPTED, AssignmentStatus.OUT_FOR_DELIVERY])
     failed_deliveries = sum(1 for a in assignments if a.status == AssignmentStatus.FAILED)
     
     success_rate = 0.0
     if assigned_today > 0:
         success_rate = (completed_today / assigned_today) * 100.0
         
-    # Active deliveries: pending/picked_up/out across any date (if not finished)
+    # Active deliveries: pending/accepted/out across any date (if not finished)
     active_query = select(func.count(DeliveryAssignment.id)).where(
         DeliveryAssignment.delivery_partner_id == partner.id,
-        DeliveryAssignment.status.in_([AssignmentStatus.PENDING, AssignmentStatus.PICKED_UP, AssignmentStatus.OUT_FOR_DELIVERY])
+        DeliveryAssignment.status.in_([AssignmentStatus.PENDING, AssignmentStatus.ACCEPTED, AssignmentStatus.OUT_FOR_DELIVERY])
     )
     active_count = await db.scalar(active_query)
 
@@ -86,7 +86,7 @@ async def get_active_deliveries(
     # Get active assignments
     query = select(DeliveryAssignment).where(
         DeliveryAssignment.delivery_partner_id == partner.id,
-        DeliveryAssignment.status.in_([AssignmentStatus.PENDING, AssignmentStatus.PICKED_UP, AssignmentStatus.OUT_FOR_DELIVERY])
+        DeliveryAssignment.status.in_([AssignmentStatus.PENDING, AssignmentStatus.ACCEPTED, AssignmentStatus.OUT_FOR_DELIVERY])
     ).order_by(DeliveryAssignment.assigned_at.asc())
     
     result = await db.execute(query)
@@ -112,7 +112,7 @@ async def get_active_deliveries(
                 order_id=str(sd.id)[-8:].upper(),
                 order_type="subscription",
                 customer_name=u.full_name,
-                customer_phone=u.mobile_number,
+                customer_phone=u.phone,
                 delivery_address=f"{addr.address_line1}, {addr.city}, {addr.pincode}",
                 latitude=float(addr.latitude) if addr.latitude else None,
                 longitude=float(addr.longitude) if addr.longitude else None,
@@ -139,7 +139,7 @@ async def get_active_deliveries(
                 order_id=fo.order_number,
                 order_type="fruit",
                 customer_name=u.full_name,
-                customer_phone=u.mobile_number,
+                customer_phone=u.phone,
                 delivery_address=f"{addr.address_line1}, {addr.city}, {addr.pincode}",
                 latitude=float(addr.latitude) if addr.latitude else None,
                 longitude=float(addr.longitude) if addr.longitude else None,
@@ -325,7 +325,7 @@ async def get_assignment_details(
             order_id=str(sd.id)[-8:].upper(),
             order_type="subscription",
             customer_name=u.full_name,
-            customer_phone=u.mobile_number,
+            customer_phone=u.phone,
             delivery_address=f"{addr.address_line1}, {addr.city}, {addr.pincode}",
             latitude=float(addr.latitude) if addr.latitude else None,
             longitude=float(addr.longitude) if addr.longitude else None,
@@ -361,7 +361,7 @@ async def get_assignment_details(
             order_id=fo.order_number,
             order_type="fruit",
             customer_name=u.full_name,
-            customer_phone=u.mobile_number,
+            customer_phone=u.phone,
             delivery_address=f"{addr.address_line1}, {addr.city}, {addr.pincode}",
             latitude=float(addr.latitude) if addr.latitude else None,
             longitude=float(addr.longitude) if addr.longitude else None,
@@ -406,8 +406,8 @@ async def update_delivery_status(
         cust = cust_res.scalar_one()
         user_id = cust.user_id
 
-    if payload.status == "picked_up":
-        assignment.status = AssignmentStatus.PICKED_UP
+    if payload.status == "accepted":
+        assignment.status = AssignmentStatus.ACCEPTED
         assignment.picked_up_at = now
     elif payload.status == "out_for_delivery":
         assignment.status = AssignmentStatus.OUT_FOR_DELIVERY

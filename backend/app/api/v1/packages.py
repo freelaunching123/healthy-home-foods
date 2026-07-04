@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 import razorpay
 
 from app.db.session import get_db
-from app.core.dependencies import get_current_user, require_customer
+from app.core.dependencies import get_current_user, require_customer, require_super_admin
 from app.models.user import User
 from app.models.customer import Customer
 from app.models.product import Product
@@ -25,13 +25,14 @@ from app.schemas.common import MessageResponse
 from app.services import subscription_engine
 from app.services.notification_service import NotificationService
 from app.services.delivery_engine import haversine
+from app.services.payment_service import PaymentService
 from app.core.config import settings
 
 router = APIRouter(prefix="/packages", tags=["Package Cart & Orders"])
 
 
 def _razorpay_client():
-    return razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+    return razorpay.Client(auth=(settings.RAZORPAY_KEY_ID or "mock", settings.RAZORPAY_KEY_SECRET or "mock"))
 
 
 async def _get_customer(db: AsyncSession, user_id: UUID) -> Customer:
@@ -333,30 +334,17 @@ async def checkout(
         tax_amount=tax_amount
     )
     
-    # 5. Create Razorpay order
-    client = _razorpay_client()
-    amount_paise = int(float(sub.total_amount) * 100) # Razorpay uses paise
-    order = client.order.create({
-        "amount": amount_paise,
-        "currency": "INR",
-        "receipt": str(sub.id)[:30],
-        "notes": {"subscription_id": str(sub.id)},
-    })
-    
-    # 6. Save Payment record
-    payment = Payment(
-        subscription_id=sub.id,
+    # 5. Save Payment record using PaymentService
+    payment = await PaymentService.initiate_mock_payment(
+        db=db,
         customer_id=customer.id,
-        gateway_order_id=order["id"],
-        amount=float(sub.total_amount),
-        status=PaymentStatus.INITIATED,
+        subscription_id=sub.id,
+        amount=float(sub.total_amount)
     )
-    db.add(payment)
-    await db.commit()
     
     return {
-        "gateway_order_id": order["id"],
-        "razorpay_key_id": settings.RAZORPAY_KEY_ID,
+        "gateway_order_id": payment.gateway_order_id,
+        "razorpay_key_id": "mock_key",
         "total_amount": float(sub.total_amount),
         "order_number": str(sub.id)[:8].upper()
     }
@@ -371,62 +359,17 @@ async def verify_payment(
     """Verify payment signature, activate subscription and clear package cart."""
     razorpay_order_id = payload.get("razorpay_order_id")
     razorpay_payment_id = payload.get("razorpay_payment_id")
-    razorpay_signature = payload.get("razorpay_signature")
     
-    if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
+    if not all([razorpay_order_id, razorpay_payment_id]):
         raise HTTPException(status_code=400, detail="Missing payment verification fields")
         
-    # Verify signature
-    expected_signature = hmac.new(
-        settings.RAZORPAY_KEY_SECRET.encode(),
-        f"{razorpay_order_id}|{razorpay_payment_id}".encode(),
-        hashlib.sha256,
-    ).hexdigest()
-    if not hmac.compare_digest(expected_signature, razorpay_signature):
-        raise HTTPException(status_code=400, detail="Invalid payment signature")
-        
-    # Find Payment
-    pay_result = await db.execute(
-        select(Payment).where(Payment.gateway_order_id == razorpay_order_id)
+    # Verify and activate subscription via PaymentService
+    await PaymentService.verify_mock_payment(
+        db=db,
+        gateway_order_id=razorpay_order_id,
+        gateway_payment_id=razorpay_payment_id,
+        user=current_user
     )
-    payment = pay_result.scalar_one_or_none()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment record not found")
-        
-    # Update Payment
-    payment.gateway_payment_id = razorpay_payment_id
-    payment.gateway_signature = razorpay_signature
-    payment.status = PaymentStatus.SUCCESS
-    payment.payment_method = PaymentMethod.RAZORPAY
-    payment.paid_at = datetime.now(timezone.utc)
-    
-    # Load subscription and activate
-    sub = await db.get(Subscription, payment.subscription_id)
-    if not sub:
-        raise HTTPException(status_code=404, detail="Subscription not found")
-        
-    await subscription_engine.activate_subscription(db, sub)
-    
-    # Generate invoice
-    invoice_number = f"INV-{datetime.now().strftime('%Y%m')}-{str(payment.id)[:8].upper()}"
-    invoice = Invoice(
-        payment_id=payment.id,
-        invoice_number=invoice_number,
-        customer_name=current_user.full_name or "Customer",
-        customer_phone=current_user.phone,
-        customer_email=current_user.email,
-        billing_address="",
-        product_name="Multi-package subscription",
-        plan_name=f"{sub.plan_type.upper()} Plan",
-        total_deliveries=sub.total_deliveries,
-        price_per_delivery=0.0, # not applicable for combined checkout
-        subtotal=float(sub.package_price),
-        delivery_charge=float(sub.delivery_charge),
-        tax_percentage=0.0,
-        tax_amount=float(sub.tax_amount),
-        total_amount=float(sub.total_amount)
-    )
-    db.add(invoice)
     
     # Clear cart
     customer = await _get_customer(db, current_user.id)
@@ -434,26 +377,68 @@ async def verify_payment(
     for item in cart_result.scalars().all():
         await db.delete(item)
         
-    # Send Notifications
-    await NotificationService.create_in_app_notification(
-        db=db,
-        user_id=current_user.id,
-        title="Payment Successful",
-        body=f"Your payment of ₹{payment.amount} was successful.",
-        category="payment",
-        action_type="payment",
-        reference_id=str(payment.id)
-    )
-    
-    await NotificationService.create_in_app_notification(
-        db=db,
-        user_id=current_user.id,
-        title="Subscription Activated",
-        body="Your package subscription has been activated! Deliveries will begin as scheduled.",
-        category="subscription",
-        action_type="subscription",
-        reference_id=str(sub.id)
-    )
-    
     await db.commit()
     return MessageResponse(message="Payment verified and subscription activated")
+
+
+@router.get("/orders/admin/package-orders", response_model=list)
+async def list_admin_package_orders(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Retrieve all package orders (subscriptions) for admin view."""
+    stmt = (
+        select(Subscription)
+        .options(
+            selectinload(Subscription.customer).selectinload(Customer.user),
+            selectinload(Subscription.items).selectinload(SubscriptionItem.product),
+            selectinload(Subscription.payments),
+        )
+        .order_by(Subscription.created_at.desc())
+    )
+    result = await db.execute(stmt)
+    subscriptions = result.scalars().all()
+
+    orders_list = []
+    for sub in subscriptions:
+        latest_payment = None
+        if sub.payments:
+            sorted_payments = sorted(sub.payments, key=lambda p: p.created_at or datetime.min, reverse=True)
+            latest_payment = sorted_payments[0]
+            
+        c_user = sub.customer.user if sub.customer else None
+        
+        items_list = []
+        for item in sub.items:
+            items_list.append({
+                "product_name": item.product.name if item.product else "Unknown Product",
+                "quantity": item.quantity,
+                "package_price": float(item.package_price) if item.package_price else 0.0,
+                "subtotal": float(item.package_price or 0.0) * item.quantity,
+            })
+            
+        if not items_list and sub.product_id:
+            from app.models.product import Product
+            prod = await db.get(Product, sub.product_id)
+            items_list.append({
+                "product_name": prod.name if prod else "Meal Plan",
+                "quantity": 1,
+                "package_price": float(sub.package_price) if sub.package_price else float(sub.total_amount),
+                "subtotal": float(sub.total_amount),
+            })
+
+        orders_list.append({
+            "order_number": f"PKG-{str(sub.id)[:8].upper()}",
+            "customer_name": c_user.full_name if c_user else "Unknown Customer",
+            "customer_phone": c_user.phone if c_user else "N/A",
+            "payment_status": "success" if sub.status != SubscriptionStatus.PENDING_PAYMENT else "pending",
+            "gateway_order_id": latest_payment.gateway_order_id if latest_payment else "N/A",
+            "gateway_payment_id": latest_payment.gateway_payment_id if latest_payment else "N/A",
+            "total_amount": float(sub.total_amount),
+            "created_at": sub.created_at.isoformat() if sub.created_at else datetime.now().isoformat(),
+            "items": items_list,
+        })
+        
+    return orders_list
+
+

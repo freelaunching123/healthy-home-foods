@@ -131,10 +131,40 @@ class AdminDrawer extends StatelessWidget {
                     context: context,
                     icon: Icons.local_shipping_outlined,
                     title: 'Manage Delivery Partners',
-                    isSelected: currentRoute == '/admin/partners',
+                    isSelected: currentRoute == '/admin/delivery-partners',
                     onTap: () {
                       context.pop();
-                      if (currentRoute != '/admin/partners') context.push('/admin/partners');
+                      if (currentRoute != '/admin/delivery-partners') context.push('/admin/delivery-partners');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.card_membership_outlined,
+                    title: 'Manage Subscriptions',
+                    isSelected: currentRoute == '/admin/subscriptions',
+                    onTap: () {
+                      context.pop();
+                      if (currentRoute != '/admin/subscriptions') context.push('/admin/subscriptions');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Package Orders',
+                    isSelected: currentRoute == '/admin/packages/orders',
+                    onTap: () {
+                      context.pop();
+                      if (currentRoute != '/admin/packages/orders') context.push('/admin/packages/orders');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.shopping_bag_outlined,
+                    title: 'Fruit Orders',
+                    isSelected: currentRoute == '/admin/fruits/orders',
+                    onTap: () {
+                      context.pop();
+                      if (currentRoute != '/admin/fruits/orders') context.push('/admin/fruits/orders');
                     },
                   ),
                   _buildDrawerItem(

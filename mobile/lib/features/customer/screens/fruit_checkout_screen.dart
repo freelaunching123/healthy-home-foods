@@ -191,30 +191,62 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
       final orderId = orderRes.data['id'] as String;
       _pendingOrderId = orderId;
 
-      // Step 2: Initiate Razorpay payment
+      // Step 2: Initiate mock payment
       final payRes = await _api.post(
         '${ApiConstants.fruitOrders}/$orderId/payment/initiate',
         data: {},
       );
 
-      final options = {
-        'key': payRes.data['key_id'],
-        'amount': payRes.data['amount'],
-        'currency': 'INR',
-        'name': 'Healthy Home Foods',
-        'description': 'Fresh Fruit Order ${orderRes.data['order_number']}',
-        'order_id': payRes.data['order_id'],
-        'prefill': {
-          'contact': '',
-          'email': '',
-        },
-        'theme': {'color': '#2E7D32'},
-      };
+      // Show Mock Payment Successful confirmation
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 28),
+                SizedBox(width: 10),
+                Text('Payment Successful'),
+              ],
+            ),
+            content: const Text(
+              'Mock Payment Successful!\nYour transaction has been processed.',
+              style: TextStyle(fontSize: 15),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
 
       setState(() { _placingOrder = false; _paymentProcessing = true; });
-      _razorpay.open(options);
+      
+      // Call verification directly on backend
+      await _api.post(
+        '${ApiConstants.fruitOrders}/$_pendingOrderId/payment/verify',
+        data: {
+          'razorpay_order_id': payRes.data['order_id'] ?? 'mock_order',
+          'razorpay_payment_id': 'mock_pay_fruit_${DateTime.now().millisecondsSinceEpoch}',
+          'razorpay_signature': 'mock_signature',
+        },
+      );
+      
+      setState(() => _paymentProcessing = false);
+      if (mounted) {
+        _showSuccessDialog();
+      }
     } catch (e) {
-      setState(() { _placingOrder = false; _error = 'Order placement failed. Please try again.'; });
+      setState(() { 
+        _placingOrder = false; 
+        _paymentProcessing = false;
+        _error = 'Order placement failed. Please try again.'; 
+      });
     }
   }
 

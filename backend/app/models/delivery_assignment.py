@@ -12,7 +12,8 @@ from app.db.mixins import UUIDPrimaryKeyMixin, TimestampMixin
 
 class AssignmentStatus(str, enum.Enum):
     PENDING = "pending"
-    PICKED_UP = "picked_up"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
     OUT_FOR_DELIVERY = "out_for_delivery"
     DELIVERED = "delivered"
     FAILED = "failed"

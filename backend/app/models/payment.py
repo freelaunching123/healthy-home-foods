@@ -25,6 +25,7 @@ class PaymentMethod(str, enum.Enum):
     NETBANKING = "netbanking"
     WALLET = "wallet"
     CASH = "cash"
+    MOCK_PAYMENT = "mock_payment"
 
 
 class Payment(UUIDPrimaryKeyMixin, TimestampMixin, Base):

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/api_error_handler.dart';
 
 class DeliveryPartnerManagementScreen extends StatefulWidget {
   const DeliveryPartnerManagementScreen({super.key});
@@ -50,7 +51,7 @@ class _DeliveryPartnerManagementScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load: $e'),
+            content: Text('Failed to load: ${ApiErrorHandler.getMessage(e)}'),
             backgroundColor: AppTheme.error,
           ),
         );
@@ -95,7 +96,10 @@ class _DeliveryPartnerManagementScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e'), backgroundColor: AppTheme.error),
+          SnackBar(
+            content: Text('Failed: ${ApiErrorHandler.getMessage(e)}'),
+            backgroundColor: AppTheme.error,
+          ),
         );
       }
     }
@@ -160,7 +164,7 @@ class _DeliveryPartnerManagementScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed: $e'),
+            content: Text('Failed: ${ApiErrorHandler.getMessage(e)}'),
             backgroundColor: AppTheme.error,
             duration: const Duration(seconds: 4),
           ),

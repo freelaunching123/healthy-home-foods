@@ -161,6 +161,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'subscription_id': subId,
         });
 
+        // Show Mock Payment Successful confirmation
+        if (mounted) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 28),
+                  SizedBox(width: 10),
+                  Text('Payment Successful'),
+                ],
+              ),
+              content: const Text(
+                'Mock Payment Successful!\nYour transaction has been processed.',
+                style: TextStyle(fontSize: 15),
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+
         // For mock: directly verify with mock data
         await _api.post(ApiConstants.paymentVerify, data: {
           'razorpay_order_id': payRes.data['order_id'] ?? 'mock_order',
