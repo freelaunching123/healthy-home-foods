@@ -10,6 +10,8 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/auth_service.dart'; // To get Dio instance if needed
+import '../../../core/utils/password_rules.dart';
+import '../../auth/widgets/password_validation_rules_widget.dart';
 
 class CreateDeliveryPartnerScreen extends StatefulWidget {
   const CreateDeliveryPartnerScreen({super.key});
@@ -31,8 +33,21 @@ class _CreateDeliveryPartnerScreenState extends State<CreateDeliveryPartnerScree
   Uint8List? _photoBytes;
   bool _isLoading = false;
   bool _obscurePassword = true;
+  String _passwordText = '';
   
   final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_onPasswordChanged);
+  }
+
+  void _onPasswordChanged() {
+    setState(() {
+      _passwordText = _passwordController.text;
+    });
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -142,6 +157,7 @@ class _CreateDeliveryPartnerScreenState extends State<CreateDeliveryPartnerScree
 
   @override
   void dispose() {
+    _passwordController.removeListener(_onPasswordChanged);
     _nameController.dispose();
     _ageController.dispose();
     _mobileController.dispose();
@@ -317,17 +333,21 @@ class _CreateDeliveryPartnerScreenState extends State<CreateDeliveryPartnerScree
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Password is required';
-                    if (v.length < 6) return 'Min 6 characters';
+                    if (!PasswordRules.isValid(v)) return 'Password does not meet rules';
                     return null;
                   },
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 12),
+                PasswordValidationRulesWidget(password: _passwordText),
+                const SizedBox(height: 30),
 
                 // Submit button
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _submitForm,
+                  onPressed: (_isLoading || !PasswordRules.isValid(_passwordText)) ? null : _submitForm,
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 54),
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    disabledForegroundColor: Colors.grey.shade600,
                   ),
                   child: _isLoading
                       ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))

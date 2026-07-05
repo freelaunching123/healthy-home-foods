@@ -36,7 +36,7 @@ class AdminDrawer extends StatelessWidget {
 
     if (confirm == true) {
       await authService.logout();
-      appRouter.go('/role-selection');
+      appRouter.go('/login');
     }
   }
 

@@ -132,12 +132,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => context.pop(),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadDetails,
-          ),
-        ],
+
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),

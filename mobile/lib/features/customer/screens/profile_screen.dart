@@ -54,7 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () async {
               Navigator.pop(context);
               await _authService.logout();
-              if (mounted) context.go('/role-selection');
+              if (mounted) context.go('/login');
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             child: const Text('Logout'),

@@ -43,6 +43,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       if (!mounted) return;
       switch (role) {
         case 'super_admin':
+        case 'admin':
           context.go('/admin');
           break;
         case 'delivery_partner':
@@ -53,7 +54,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
     } else {
       if (!mounted) return;
-      context.go('/role-selection');
+      context.go('/login');
     }
   }
 

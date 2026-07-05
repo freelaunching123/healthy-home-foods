@@ -27,12 +27,10 @@ class AuthService {
   Future<Map<String, dynamic>> loginWithPassword({
     required String phone,
     required String password,
-    required String role,
   }) async {
     final response = await _api.post(ApiConstants.loginAdmin, data: {
       'mobile_number': phone,
       'password': password,
-      'role': role,
     });
     await _saveTokens(response.data);
     

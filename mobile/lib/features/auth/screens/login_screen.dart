@@ -5,14 +5,14 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/api_error_handler.dart';
 
-class DeliveryPartnerLoginScreen extends StatefulWidget {
-  const DeliveryPartnerLoginScreen({super.key});
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
 
   @override
-  State<DeliveryPartnerLoginScreen> createState() => _DeliveryPartnerLoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _DeliveryPartnerLoginScreenState extends State<DeliveryPartnerLoginScreen> {
+class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -25,14 +25,21 @@ class _DeliveryPartnerLoginScreenState extends State<DeliveryPartnerLoginScreen>
 
     setState(() => _isLoading = true);
     try {
-      await _authService.loginWithPassword(
+      final res = await _authService.loginWithPassword(
         phone: _phoneController.text.trim(),
         password: _passwordController.text,
-        role: 'delivery_partner',
       );
 
       if (!mounted) return;
-      context.go('/delivery');
+      
+      final String role = res['role'] ?? 'customer';
+      if (role == 'super_admin' || role == 'admin') {
+        context.go('/admin');
+      } else if (role == 'delivery_partner') {
+        context.go('/delivery');
+      } else {
+        context.go('/home');
+      }
     } catch (e) {
       if (!mounted) return;
       final msg = ApiErrorHandler.getMessage(e);
@@ -57,108 +64,72 @@ class _DeliveryPartnerLoginScreenState extends State<DeliveryPartnerLoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    final Color accentColor = Colors.blue.shade700;
+    const Color accentColor = AppTheme.primaryGreen;
 
-    return Theme(
-      data: Theme.of(context).copyWith(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: accentColor,
-          primary: accentColor,
-          secondary: Colors.blue,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: accentColor,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 52),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-        ),
-        inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: accentColor, width: 2),
-          ),
-        ),
-      ),
-      child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded),
-            onPressed: () => context.go('/role-selection'),
-          ),
-        ),
-        body: SafeArea(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FBF8),
+      body: SafeArea(
+        child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Badge
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: accentColor, width: 1.5),
-                      ),
-                      child: Text(
-                        'Delivery Partner Login',
-                        style: TextStyle(
-                          color: accentColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
                   // Logo
                   Center(
                     child: Container(
-                      width: 80,
-                      height: 80,
+                      width: 90,
+                      height: 90,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                            color: Colors.green.withValues(alpha: 0.08),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
                           ),
                         ],
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.all(12.0),
                         child: Image.asset('assets/logo.png', fit: BoxFit.contain),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
+                  
                   const Center(
                     child: Text(
-                      'Delivery Portal',
-                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
+                      'Welcome Back!',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                        letterSpacing: -0.5,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Center(
                     child: Text(
-                      'Sign in to view your deliveries',
-                      style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                      'Sign in to your Healthy Home Foods account',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 36),
 
                   // Phone field
-                  const Text('Mobile Number', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const Text(
+                    'Mobile Number',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textPrimary),
+                  ),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _phoneController,
@@ -167,7 +138,6 @@ class _DeliveryPartnerLoginScreenState extends State<DeliveryPartnerLoginScreen>
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
                       hintText: 'Enter 10-digit mobile number',
-                      helperText: 'Please enter a valid mobile number',
                       prefixIcon: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: const Row(
@@ -191,7 +161,10 @@ class _DeliveryPartnerLoginScreenState extends State<DeliveryPartnerLoginScreen>
                   const SizedBox(height: 20),
 
                   // Password field
-                  const Text('Password', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  const Text(
+                    'Password',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textPrimary),
+                  ),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _passwordController,
@@ -206,18 +179,67 @@ class _DeliveryPartnerLoginScreenState extends State<DeliveryPartnerLoginScreen>
                     ),
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Password is required';
-                      if (v.length < 8) return 'Min 8 characters';
                       return null;
                     },
                   ),
-                  const SizedBox(height: 32),
+                  
+                  // Forgot password
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: TextButton(
+                        onPressed: () => context.push('/forgot-password'),
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            color: accentColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
 
                   // Login button
                   ElevatedButton(
                     onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: accentColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
                     child: _isLoading
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                        : const Text('Sign In'),
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                          )
+                        : const Text(
+                            'Sign In',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Register link
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("Don't have an account? ", style: TextStyle(color: AppTheme.textSecondary)),
+                      GestureDetector(
+                        onTap: () => context.go('/register'),
+                        child: const Text(
+                          'Register',
+                          style: TextStyle(color: accentColor, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

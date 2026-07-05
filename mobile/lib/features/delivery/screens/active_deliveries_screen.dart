@@ -206,12 +206,7 @@ class _ActiveDeliveriesScreenState extends State<ActiveDeliveriesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Active Deliveries'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadDeliveries,
-          ),
-        ],
+
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))

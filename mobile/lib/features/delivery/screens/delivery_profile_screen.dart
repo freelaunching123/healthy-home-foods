@@ -150,9 +150,7 @@ class _DeliveryProfileScreenState extends State<DeliveryProfileScreen> {
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
         title: const Text('Profile'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadProfile),
-        ],
+
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
@@ -237,7 +235,7 @@ class _DeliveryProfileScreenState extends State<DeliveryProfileScreen> {
                           onPressed: () async {
                             await AuthService().logout();
                             if (context.mounted) {
-                              context.go('/role-selection');
+                              context.go('/login');
                             }
                           },
                         ),

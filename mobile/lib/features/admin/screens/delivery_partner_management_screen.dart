@@ -4,9 +4,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
-import '../../../core/services/api_client.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/api_client.dart';
+import '../../../core/utils/password_rules.dart';
 import '../../../core/utils/api_error_handler.dart';
+import '../../auth/widgets/password_validation_rules_widget.dart';
 
 class DeliveryPartnerManagementScreen extends StatefulWidget {
   const DeliveryPartnerManagementScreen({super.key});
@@ -1080,19 +1083,33 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
   final _confirmCtrl = TextEditingController();
   bool _obscure = true;
   bool _isLoading = false;
+  String _passwordText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _pwdCtrl.addListener(_onPasswordChanged);
+  }
+
+  void _onPasswordChanged() {
+    setState(() {
+      _passwordText = _pwdCtrl.text;
+    });
+  }
 
   @override
   void dispose() {
+    _pwdCtrl.removeListener(_onPasswordChanged);
     _pwdCtrl.dispose();
     _confirmCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _reset() async {
-    if (_pwdCtrl.text.length < 6) {
+    if (!PasswordRules.isValid(_pwdCtrl.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Min 6 characters'),
+          content: Text('Password does not meet validation rules'),
           backgroundColor: AppTheme.error,
         ),
       );
@@ -1180,9 +1197,14 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
               ),
             ),
             const SizedBox(height: 12),
+            PasswordValidationRulesWidget(password: _passwordText),
+            const SizedBox(height: 12),
             TextField(
               controller: _confirmCtrl,
               obscureText: _obscure,
+              onChanged: (val) {
+                setState(() {});
+              },
               decoration: const InputDecoration(
                 labelText: 'Confirm Password',
                 prefixIcon: Icon(Icons.lock_outline),
@@ -1192,9 +1214,11 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _reset,
+                onPressed: (_isLoading || !PasswordRules.isValid(_passwordText) || _passwordText != _confirmCtrl.text) ? null : _reset,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.info,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  disabledForegroundColor: Colors.grey.shade600,
                 ),
                 child: _isLoading
                     ? const SizedBox(

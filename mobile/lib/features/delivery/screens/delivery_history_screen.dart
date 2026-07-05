@@ -123,9 +123,7 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
         title: const Text('Delivery History'),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadHistory),
-        ],
+
       ),
       body: Column(
         children: [

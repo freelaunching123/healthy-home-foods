@@ -4,10 +4,8 @@ import '../services/auth_service.dart';
 
 // Customer screens
 import '../../features/auth/screens/splash_screen.dart';
-import '../../features/auth/screens/role_selection_screen.dart';
-import '../../features/auth/screens/customer_login_screen.dart';
-import '../../features/auth/screens/admin_login_screen.dart';
-import '../../features/auth/screens/delivery_partner_login_screen.dart';
+import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/customer/screens/customer_shell.dart';
 import '../../features/customer/screens/home_screen.dart';
@@ -77,27 +75,35 @@ final GoRouter appRouter = GoRouter(
     debugPrint('Calling isLoggedIn...');
     final isLoggedIn = await authService.isLoggedIn();
     debugPrint('isLoggedIn returned: $isLoggedIn');
-    final isAuthRoute = state.matchedLocation == '/role-selection' ||
-        state.matchedLocation == '/customer-login' ||
-        state.matchedLocation == '/admin-login' ||
-        state.matchedLocation == '/delivery-login' ||
+    final isAuthRoute = state.matchedLocation == '/login' ||
         state.matchedLocation == '/register' ||
+        state.matchedLocation == '/forgot-password' ||
         state.matchedLocation == '/splash';
 
     if (!isLoggedIn && !isAuthRoute) {
-      debugPrint('Redirecting to /role-selection');
-      return '/role-selection';
+      debugPrint('Redirecting to /login');
+      return '/login';
     }
+
+    if (isLoggedIn && isAuthRoute && state.matchedLocation != '/splash') {
+      final role = await authService.getUserRole();
+      if (role == 'super_admin' || role == 'admin') {
+        return '/admin';
+      } else if (role == 'delivery_partner') {
+        return '/delivery';
+      } else {
+        return '/home';
+      }
+    }
+
     debugPrint('No redirection needed');
     return null;
   },
   routes: [
     // Auth routes
     GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
-    GoRoute(path: '/role-selection', builder: (_, __) => const RoleSelectionScreen()),
-    GoRoute(path: '/customer-login', builder: (_, __) => const CustomerLoginScreen()),
-    GoRoute(path: '/admin-login', builder: (_, __) => const AdminLoginScreen()),
-    GoRoute(path: '/delivery-login', builder: (_, __) => const DeliveryPartnerLoginScreen()),
+    GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+    GoRoute(path: '/forgot-password', builder: (_, __) => const ForgotPasswordScreen()),
     GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
 
     // Customer shell with bottom nav (6 tabs: Home, Plans, Fruits, Payments, Alerts, Profile)

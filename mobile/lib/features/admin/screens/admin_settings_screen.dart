@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/utils/password_rules.dart';
+import '../../auth/widgets/password_validation_rules_widget.dart';
 
 class AdminSettingsScreen extends StatefulWidget {
   const AdminSettingsScreen({super.key});
@@ -25,9 +27,23 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   bool _obscureOldPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
+  String _newPasswordText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _newPasswordController.addListener(_onPasswordChanged);
+  }
+
+  void _onPasswordChanged() {
+    setState(() {
+      _newPasswordText = _newPasswordController.text;
+    });
+  }
 
   @override
   void dispose() {
+    _newPasswordController.removeListener(_onPasswordChanged);
     _oldPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
@@ -217,16 +233,21 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Please enter a new password';
                           }
-                          if (value.length < 8) {
-                            return 'Password must be at least 8 characters';
+                          if (!PasswordRules.isValid(value)) {
+                            return 'Password does not meet rules';
                           }
                           return null;
                         },
                       ),
+                      const SizedBox(height: 12),
+                      PasswordValidationRulesWidget(password: _newPasswordText),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
+                        onChanged: (val) {
+                          setState(() {});
+                        },
                         decoration: InputDecoration(
                           labelText: 'Confirm New Password',
                           prefixIcon: const Icon(Icons.lock_outline),
@@ -261,8 +282,12 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
+                            disabledBackgroundColor: Colors.grey.shade300,
+                            disabledForegroundColor: Colors.grey.shade600,
                           ),
-                          onPressed: _isSavingPassword ? null : _showConfirmationDialog,
+                          onPressed: (_isSavingPassword || !PasswordRules.isValid(_newPasswordText) || _newPasswordText != _confirmPasswordController.text)
+                              ? null
+                              : _showConfirmationDialog,
                           child: _isSavingPassword
                               ? const SizedBox(
                                   height: 20,

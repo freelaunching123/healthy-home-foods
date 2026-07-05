@@ -97,12 +97,7 @@ class _RouteScreenState extends State<RouteScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Route Optimization'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadRoute,
-          ),
-        ],
+
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
@@ -161,11 +156,7 @@ class _RouteScreenState extends State<RouteScreen> {
                 'Stops in Optimized Order',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
-              TextButton.icon(
-                onPressed: _loadRoute,
-                icon: const Icon(Icons.refresh, size: 16, color: AppTheme.primaryGreen),
-                label: const Text('Refresh Route', style: TextStyle(color: AppTheme.primaryGreen, fontSize: 13)),
-              ),
+              const SizedBox.shrink(),
             ],
           ),
         ),

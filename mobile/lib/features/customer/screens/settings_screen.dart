@@ -4,6 +4,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/utils/password_rules.dart';
+import '../../auth/widgets/password_validation_rules_widget.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -74,6 +76,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final bool isNewPasswordValid = PasswordRules.isValid(newPasswordController.text);
+            final bool passwordsMatch = newPasswordController.text.isNotEmpty && newPasswordController.text == confirmPasswordController.text;
+            final bool isChangeEnabled = isNewPasswordValid && passwordsMatch && !isSubmitting;
+
             return AlertDialog(
               title: const Text('Change Password'),
               content: Form(
@@ -92,17 +98,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       TextFormField(
                         controller: newPasswordController,
                         obscureText: true,
+                        onChanged: (val) => setDialogState(() {}),
                         decoration: const InputDecoration(labelText: 'New Password'),
                         validator: (v) {
                           if (v == null || v.isEmpty) return 'New password required';
-                          if (v.length < 6) return 'Password must be at least 6 characters';
+                          if (!PasswordRules.isValid(v)) return 'Password does not meet rules';
                           return null;
                         },
                       ),
+                      const SizedBox(height: 8),
+                      PasswordValidationRulesWidget(password: newPasswordController.text),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: confirmPasswordController,
                         obscureText: true,
+                        onChanged: (val) => setDialogState(() {}),
                         decoration: const InputDecoration(labelText: 'Confirm New Password'),
                         validator: (v) {
                           if (v != newPasswordController.text) return 'Passwords do not match';
@@ -119,9 +129,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: isSubmitting
-                      ? null
-                      : () async {
+                  onPressed: isChangeEnabled
+                      ? () async {
                           if (!formKey.currentState!.validate()) return;
                           setDialogState(() => isSubmitting = true);
                           try {
@@ -144,8 +153,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           } finally {
                             setDialogState(() => isSubmitting = false);
                           }
-                        },
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen, foregroundColor: Colors.white),
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryGreen,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    disabledForegroundColor: Colors.grey.shade600,
+                  ),
                   child: isSubmitting
                       ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                       : const Text('Change'),
@@ -182,7 +197,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _api.post(ApiConstants.logoutAll);
       await _authService.logout(); // Clears storage locally
       if (mounted) {
-        context.go('/role-selection');
+        context.go('/login');
       }
     } catch (e) {
       if (mounted) {
