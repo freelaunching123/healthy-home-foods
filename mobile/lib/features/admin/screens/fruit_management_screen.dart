@@ -7,6 +7,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../widgets/admin_drawer.dart';
 
 class FruitManagementScreen extends StatefulWidget {
   const FruitManagementScreen({super.key});
@@ -24,6 +25,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
   String _searchQuery = '';
   String? _filterAvailability;
   bool? _filterActive;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -136,10 +138,29 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.scaffoldBg,
+      drawer: const AdminDrawer(),
       appBar: AppBar(
-        title: Text('Fruit Management', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        leading: IconButton(
+          icon: const Icon(Icons.menu, size: 28),
+          color: AppTheme.textPrimary,
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
+        title: const Text(
+          'Admin Dashboard',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
+          ),
+        ),
         backgroundColor: Colors.white,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFF0F0F0), height: 1),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryGreen),
@@ -159,6 +180,33 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
       ),
       body: Column(
         children: [
+          // Page Header
+          Container(
+            width: double.infinity,
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Fruit Management',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Configure seasonal fruits, availability, and active stock.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
           // Search + Filters
           Container(
             color: Colors.white,
@@ -316,11 +364,12 @@ class _FruitTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               child: SizedBox(
                 width: 60, height: 60,
-                child: imageUrl != null
-                    ? CachedNetworkImage(imageUrl: '$baseUrl$imageUrl', fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Container(color: AppTheme.scaffoldBg,
-                          child: const Center(child: Text('🍑', style: TextStyle(fontSize: 28)))))
-                    : Container(color: AppTheme.scaffoldBg, child: const Center(child: Text('🍑', style: TextStyle(fontSize: 28)))),
+                child: Container(
+                  color: Colors.grey.shade100,
+                  child: const Center(
+                    child: Icon(Icons.image_outlined, color: Colors.grey, size: 24),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 12),

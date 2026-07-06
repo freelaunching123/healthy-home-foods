@@ -101,7 +101,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
                 // ── Revenue Chart ────────────────────────────────────────
                 SliverToBoxAdapter(
-                  child: _buildSectionLabel('Revenue — Last 7 Days'),
+                  child: _buildRevenueHeader('Revenue — Last 7 Days'),
                 ),
                 SliverToBoxAdapter(
                   child: _buildRevenueChart(),
@@ -198,28 +198,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       _SummaryCardData(
         title: "Today's Revenue",
         value: '₹${_formatRevenue(todaysRevenue)}',
-        icon: Icons.currency_rupee_rounded,
+        icon: Icons.wallet_outlined,
         color: AppTheme.primaryGreen,
         bgColor: const Color(0xFFE8F5E9),
       ),
       _SummaryCardData(
         title: 'Orders Today',
         value: '$ordersToday',
-        icon: Icons.receipt_long_rounded,
-        color: AppTheme.info,
-        bgColor: const Color(0xFFE3F2FD),
+        icon: Icons.receipt_outlined,
+        color: AppTheme.primaryGreen,
+        bgColor: const Color(0xFFE8F5E9),
       ),
       _SummaryCardData(
         title: 'Active Subscribers',
         value: '$activeSubscribers',
-        icon: Icons.card_membership_rounded,
-        color: AppTheme.success,
+        icon: Icons.assignment_ind_outlined,
+        color: AppTheme.primaryGreen,
         bgColor: const Color(0xFFE8F5E9),
       ),
       _SummaryCardData(
         title: 'Pending Deliveries',
         value: '$pendingDeliveries',
-        icon: Icons.local_shipping_rounded,
+        icon: Icons.local_shipping_outlined,
         color: AppTheme.warning,
         bgColor: const Color(0xFFFFF8E1),
       ),
@@ -251,61 +251,85 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     String? lowStockSubtitle;
     if (firstLowStock != null) {
       final status = firstLowStock['status'] as String? ?? '';
-      lowStockSubtitle = status == 'out_of_stock' ? 'Out of stock' : 'Low stock';
+      lowStockSubtitle = status == 'out_of_stock' ? 'No low stock alerts' : 'Low stock';
     }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: _InsightCard(
-                icon: Icons.star_rounded,
-                iconColor: const Color(0xFFF59E0B),
-                iconBg: const Color(0xFFFFF8E1),
-                title: 'Top Package',
-                name: topPackage != null ? (topPackage['name'] as String?) ?? '—' : null,
-                subtitle: topPackage != null
-                    ? '${topPackage['count']} Orders'
-                    : null,
-                emptyText: 'No package sales yet',
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _InsightCard(
-                icon: Icons.local_grocery_store_rounded,
-                iconColor: const Color(0xFF10B981),
-                iconBg: const Color(0xFFE8F5E9),
-                title: 'Top Fruit',
-                name: topFruit != null ? (topFruit['name'] as String?) ?? '—' : null,
-                subtitle: topFruit != null
-                    ? '${topFruit['count']} Orders'
-                    : null,
-                emptyText: 'No fruit orders yet',
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _InsightCard(
-                icon: Icons.warning_amber_rounded,
-                iconColor: AppTheme.error,
-                iconBg: const Color(0xFFFEE2E2),
-                title: 'Low Stock',
-                name: firstLowStock != null ? (firstLowStock['name'] as String?) ?? '—' : null,
-                subtitle: lowStockSubtitle,
-                emptyText: 'No low stock alerts',
-              ),
-            ),
-          ],
-        ),
+      child: Column(
+        children: [
+          _InsightCard(
+            icon: Icons.star_rounded,
+            iconColor: const Color(0xFFF59E0B),
+            iconBg: const Color(0xFFFFF8E1),
+            title: 'Top Package',
+            name: topPackage != null ? (topPackage['name'] as String?) ?? '—' : null,
+            subtitle: topPackage != null
+                ? '${topPackage['count']} Orders'
+                : null,
+            emptyText: 'No package sales yet',
+          ),
+          _InsightCard(
+            icon: Icons.local_grocery_store_rounded,
+            iconColor: const Color(0xFF10B981),
+            iconBg: const Color(0xFFE8F5E9),
+            title: 'Top Fruit',
+            name: topFruit != null ? (topFruit['name'] as String?) ?? '—' : null,
+            subtitle: topFruit != null
+                ? '${topFruit['count']} Orders'
+                : null,
+            emptyText: 'No fruit orders yet',
+          ),
+          _InsightCard(
+            icon: Icons.warning_amber_rounded,
+            iconColor: AppTheme.error,
+            iconBg: const Color(0xFFFEE2E2),
+            title: 'Low Stock',
+            name: firstLowStock != null ? (firstLowStock['name'] as String?) ?? '—' : null,
+            subtitle: lowStockSubtitle,
+            emptyText: 'No low stock alerts',
+          ),
+        ],
       ),
     );
   }
 
   // ── Revenue Chart ──────────────────────────────────────────────────────────
+
+  Widget _buildRevenueHeader(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textSecondary,
+              letterSpacing: 0.4,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              '7 Days',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryGreen,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildRevenueChart() {
     final chartData = (_data?['revenue_chart'] as List<dynamic>?) ?? [];
@@ -315,6 +339,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final dates = chartData
         .map((e) => (e as Map<String, dynamic>)['date'] as String? ?? '')
         .toList();
+
+    final double totalRevenue = revenues.fold(0.0, (sum, item) => sum + item);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -345,19 +371,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     color: AppTheme.textPrimary,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    '7 Days',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primaryGreen,
-                    ),
+                Text(
+                  'Total: ₹${_formatRevenue(totalRevenue)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryGreen,
                   ),
                 ),
               ],
@@ -685,84 +704,79 @@ class _InsightCard extends StatelessWidget {
     final hasData = name != null;
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Icon(icon, color: iconColor, size: 14),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: iconBg,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
                   title,
                   style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                     color: AppTheme.textSecondary,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (!hasData)
-            Text(
-              emptyText,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.textLight,
-                fontStyle: FontStyle.italic,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            )
-          else ...[
-            Text(
-              name!,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textPrimary,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 2),
+                if (!hasData)
+                  Text(
+                    emptyText,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textLight,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                else ...[
+                  Text(
+                    name!,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ],
             ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                subtitle!,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: AppTheme.textSecondary,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ],
+          ),
         ],
       ),
     );

@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _pollingTimer;
   String _searchQuery = '';
   int _selectedTabIndex = 0; // 0 = Packages, 1 = Fruits
+  int _unreadNotificationsCount = 0;
 
   // -- Packages State --
   List<dynamic> _categories = [];
@@ -58,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadCartCount();
     _loadPackageCartCount();
     _loadRecentlyViewed();
+    _fetchUnreadCount();
     _startPolling();
   }
 
@@ -72,6 +74,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _fetchUnreadCount() async {
+    try {
+      final res = await _api.get(ApiConstants.notificationsUnreadCount);
+      if (mounted) {
+        setState(() => _unreadNotificationsCount = (res.data['count'] as num?)?.toInt() ?? 0);
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _pollingTimer?.cancel();
@@ -84,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadFruits(isSilent: true);
       _loadCartCount();
       _loadPackageCartCount();
+      _fetchUnreadCount();
     });
   }
 
@@ -295,6 +307,45 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_rounded, color: AppTheme.primaryGreen),
+                onPressed: () async {
+                  await context.push('/notifications');
+                  _fetchUnreadCount();
+                },
+                tooltip: 'Notifications',
+              ),
+              if (_unreadNotificationsCount > 0)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.error,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 14,
+                      minHeight: 14,
+                    ),
+                    child: Text(
+                      _unreadNotificationsCount > 99 ? '99+' : '$_unreadNotificationsCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 4),
           if (_selectedTabIndex == 1) // Fruit Cart
             Stack(
               children: [
@@ -529,8 +580,7 @@ class _HomeScreenState extends State<HomeScreen> {
       else
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.60, crossAxisSpacing: 12, mainAxisSpacing: 12),
+          sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (_, i) {
                 final productId = _filteredPackages[i]['id']?.toString() ?? '';
@@ -554,8 +604,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_isLoadingFruits)
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.60, crossAxisSpacing: 12, mainAxisSpacing: 12),
+          sliver: SliverList(
             delegate: SliverChildBuilderDelegate((_, __) => _ShimmerCard(), childCount: 4),
           ),
         )
@@ -577,8 +626,7 @@ class _HomeScreenState extends State<HomeScreen> {
       else
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.60, crossAxisSpacing: 12, mainAxisSpacing: 12),
+          sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (_, i) {
                 final fruitId = _filteredFruits[i]['id']?.toString() ?? '';
@@ -605,7 +653,11 @@ class _ShimmerCard extends StatelessWidget {
     return Shimmer.fromColors(
       baseColor: Colors.grey.shade200,
       highlightColor: Colors.grey.shade100,
-      child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16))),
+      child: Container(
+        height: 104,
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+      ),
     );
   }
 }
@@ -689,7 +741,6 @@ class _ProductCard extends StatelessWidget {
     final mediaBaseUrl = ApiClient().mediaBaseUrl;
     
     final imgUrl = product['image_url'] != null ? '$mediaBaseUrl${product['image_url']}' : null;
-    if (imgUrl != null) debugPrint('Flutter Image Render (_ProductCard): $imgUrl');
 
     return GestureDetector(
       onTap: () {
@@ -699,61 +750,92 @@ class _ProductCard extends StatelessWidget {
       child: Opacity(
         opacity: isOutOfStock ? 0.6 : 1.0,
         child: Container(
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade100)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  Container(
-                    height: 110,
-                    decoration: BoxDecoration(color: AppTheme.primaryGreen.withValues(alpha: 0.08), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
-                    child: Center(
-                      child: imgUrl != null
-                        ? ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(16)), child: Image.network(imgUrl, fit: BoxFit.cover, width: double.infinity, height: 110, errorBuilder: (_, __, ___) => const Icon(Icons.eco_rounded, size: 40, color: AppTheme.primaryGreen)))
-                        : const Icon(Icons.eco_rounded, size: 40, color: AppTheme.primaryGreen),
-                    ),
-                  ),
-                  if (isOutOfStock)
-                    Container(height: 110, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.6), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))), child: const Center(child: Text('OUT OF STOCK', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)))),
-                  if (!isOutOfStock && product['is_featured'] == true)
-                    Positioned(top: 8, left: 8, child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(4)), child: const Text('FEATURED', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)))),
-                ],
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade100),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: imgUrl != null
+                        ? Image.network(
+                            imgUrl,
+                            fit: BoxFit.cover,
+                            width: 80,
+                            height: 80,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.eco_rounded, size: 32, color: AppTheme.primaryGreen),
+                          )
+                        : const Icon(Icons.eco_rounded, size: 32, color: AppTheme.primaryGreen),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(product['name'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(
+                        product['name'] ?? '',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       const SizedBox(height: 4),
                       if (product['description'] != null)
-                        Text(product['description'], style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary), maxLines: 2, overflow: TextOverflow.ellipsis),
-                      const Spacer(),
+                        Text(
+                          product['description'],
+                          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('${product['package_days'] ?? 6} Days', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen)),
+                              Text(
+                                '${product['package_days'] ?? 6} Days',
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
+                              ),
+                              const SizedBox(height: 2),
                               Row(
                                 children: [
                                   if (discountPrice != null) ...[
                                     Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 10, color: Colors.grey, decoration: TextDecoration.lineThrough)),
                                     const SizedBox(width: 4),
-                                    Text('₹${discountPrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                                    Text('₹${discountPrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
                                   ] else ...[
-                                    Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                                    Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
                                   ],
                                 ],
                               ),
                             ],
                           ),
+                          
                           if (isOutOfStock)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
                                 color: Colors.grey,
                                 borderRadius: BorderRadius.circular(8),
@@ -764,7 +846,7 @@ class _ProductCard extends StatelessWidget {
                             InkWell(
                               onTap: () => onQtyChanged(1),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: AppTheme.primaryGreen,
                                   borderRadius: BorderRadius.circular(8),
@@ -806,8 +888,8 @@ class _ProductCard extends StatelessWidget {
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -849,57 +931,96 @@ class _FruitCard extends StatelessWidget {
         if (fruitId.isNotEmpty) context.push('/fruits/$fruitId');
       },
       child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: AppTheme.primaryGreen.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))]),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: AspectRatio(
-                aspectRatio: 1.1,
-                child: fullImageUrl != null
-                    ? CachedNetworkImage(imageUrl: fullImageUrl, fit: BoxFit.cover, placeholder: (_, __) => Container(color: AppTheme.scaffoldBg, child: const Center(child: CircularProgressIndicator(strokeWidth: 2))), errorWidget: (_, __, ___) => _FruitPlaceholder(name: (fruit['name'] ?? 'Fruit').toString()))
-                    : _FruitPlaceholder(name: (fruit['name'] ?? 'Fruit').toString()),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text((fruit['name'] ?? 'Fruit').toString(), style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Text('₹${price.toStringAsFixed(0)} / KG', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen)),
-                  if (!available && statusLabel.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)), child: Text(statusLabel, style: GoogleFonts.inter(fontSize: 9, color: statusColor, fontWeight: FontWeight.w600))),
-                  ],
-                ],
-              ),
-            ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
-              child: available
-                  ? _QtyStepper(quantity: quantity, onChanged: onQtyChanged)
-                  : Center(child: Text(statusLabel.isEmpty ? 'Unavailable' : statusLabel, style: GoogleFonts.inter(fontSize: 10, color: AppTheme.textLight))),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade100),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryGreen.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Image (matches admin style layout/constraints)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 60,
+                  height: 60,
+                  child: Container(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                    child: fullImageUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: fullImageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            errorWidget: (_, __, ___) => const Icon(Icons.eco_rounded, size: 24, color: AppTheme.primaryGreen),
+                          )
+                        : const Icon(Icons.eco_rounded, size: 24, color: AppTheme.primaryGreen),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              
+              // Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      (fruit['name'] ?? 'Fruit').toString(),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '₹${price.toStringAsFixed(0)} / KG',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
+                    ),
+                    if (!available && statusLabel.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: GoogleFonts.inter(fontSize: 8, color: statusColor, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              
+              // Qty Stepper Controls (Placed on right)
+              SizedBox(
+                width: 90,
+                child: available
+                    ? _QtyStepper(quantity: quantity, onChanged: onQtyChanged)
+                    : Center(
+                        child: Text(
+                          statusLabel.isEmpty ? 'Unavailable' : statusLabel,
+                          style: GoogleFonts.inter(fontSize: 10, color: AppTheme.textLight, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
-  }
-}
-
-class _FruitPlaceholder extends StatelessWidget {
-  final String name;
-  const _FruitPlaceholder({required this.name});
-  static const _emojiMap = {'apple': '🍎', 'banana': '🍌', 'orange': '🍊', 'pomegranate': '🍎', 'papaya': '🥭', 'watermelon': '🍉', 'pineapple': '🍍', 'guava': '🍈', 'grapes': '🍇', 'mango': '🥭', 'grape': '🍇'};
-  @override
-  Widget build(BuildContext context) {
-    final key = name.toLowerCase();
-    final emoji = _emojiMap.entries.where((e) => key.contains(e.key)).map((e) => e.value).firstOrNull ?? '🍑';
-    return Container(color: AppTheme.scaffoldBg, child: Center(child: Text(emoji, style: const TextStyle(fontSize: 48))));
   }
 }
 

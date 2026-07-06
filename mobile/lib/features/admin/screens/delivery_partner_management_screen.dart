@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -29,20 +30,30 @@ class _DeliveryPartnerManagementScreenState
   bool _isLoading = true;
   bool? _activeFilter; // null = all, true = active, false = inactive
 
+  Timer? _pollingTimer;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _isLoading = true);
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      _load(isSilent: true);
+    });
+  }
+
+  Future<void> _load({bool isSilent = false}) async {
+    if (!isSilent) setState(() => _isLoading = true);
     try {
       final res = await _api.get('/delivery-partners');
       final list = (res.data as List).cast<Map<String, dynamic>>();
@@ -51,7 +62,7 @@ class _DeliveryPartnerManagementScreenState
         _applyFilter();
       });
     } catch (e) {
-      if (mounted) {
+      if (!isSilent && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to load: ${ApiErrorHandler.getMessage(e)}'),
@@ -60,7 +71,7 @@ class _DeliveryPartnerManagementScreenState
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (!isSilent && mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -182,13 +193,6 @@ class _DeliveryPartnerManagementScreenState
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
         title: const Text('Manage Delivery Partners'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _load,
-            tooltip: 'Refresh',
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {

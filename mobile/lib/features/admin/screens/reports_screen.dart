@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/api_constants.dart';
+import '../widgets/admin_drawer.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -18,10 +20,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
   bool _isLoadingCategoryData = false;
   Map<String, dynamic>? _summaryData;
   List<dynamic> _categories = [];
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Map<String, dynamic>? _selectedCategory;
   DateTime? _startDate;
   DateTime? _endDate;
   List<dynamic> _categoryProductsPerformance = [];
+  Timer? _pollingTimer;
 
   static const List<Color> _chartColors = [
     AppTheme.primaryGreen,
@@ -41,6 +45,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
     super.initState();
     _loadSummary();
     _loadCategories();
+    _startPolling();
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) {
+        _loadSummary();
+        _loadCategories();
+        if (_selectedCategory != null) {
+          _loadCategoryPerformance();
+        }
+      }
+    });
   }
 
   Future<void> _loadSummary() async {
@@ -282,21 +305,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.scaffoldBg,
+      drawer: const AdminDrawer(),
       appBar: AppBar(
-        title: const Text('Reports & Analytics'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              _loadSummary();
-              _loadCategories();
-              if (_selectedCategory != null) {
-                _loadCategoryPerformance();
-              }
-            },
+        leading: IconButton(
+          icon: const Icon(Icons.menu, size: 28),
+          color: AppTheme.textPrimary,
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
+        title: const Text(
+          'Admin Dashboard',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
           ),
-        ],
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFF0F0F0), height: 1),
+        ),
       ),
       body: _isLoadingSummary
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
@@ -312,6 +343,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
+                  // Page Header inside body (only on top of ListView)
+                  Container(
+                    width: double.infinity,
+                    color: Colors.white,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Reports & Analytics',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Monitor product performance and category-wise analytics.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   _buildStatRow(),
                   const SizedBox(height: 24),
                   _buildPerformanceLists(),
@@ -336,33 +395,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final active = _summaryData?['active_products']?.toString() ?? '0';
     final inactive = _summaryData?['inactive_products']?.toString() ?? '0';
 
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _StatCard(
-            title: 'Total',
-            value: total,
-            icon: Icons.inventory_2_outlined,
-            color: Colors.blue,
-          ),
+        _StatCard(
+          title: 'Total',
+          value: total,
+          icon: Icons.inventory_2_outlined,
+          color: AppTheme.primaryGreen,
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            title: 'Active',
-            value: active,
-            icon: Icons.check_circle_outline,
-            color: Colors.green,
-          ),
+        _StatCard(
+          title: 'Active',
+          value: active,
+          icon: Icons.check_circle_outline,
+          color: AppTheme.primaryGreen,
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            title: 'Inactive',
-            value: inactive,
-            icon: Icons.hide_source_outlined,
-            color: Colors.red,
-          ),
+        _StatCard(
+          title: 'Inactive',
+          value: inactive,
+          icon: Icons.cancel_outlined,
+          color: AppTheme.error,
         ),
       ],
     );
@@ -511,14 +562,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: Colors.grey.shade100),
         ),
-        child: const Padding(
-          padding: EdgeInsets.all(32),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
           child: Center(
             child: Column(
               children: [
-                Icon(Icons.pie_chart_outline, size: 48, color: Colors.grey),
-                SizedBox(height: 12),
-                Text('Select a category above to view performance details', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                const Icon(Icons.pie_chart_outline, size: 56, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text(
+                  'Detailed performance view',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Select a category above to load deep-dive analytics, including subscription retention and churn rates.',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                OutlinedButton(
+                  onPressed: () {
+                    if (_categories.isNotEmpty) {
+                      _selectCategory(_categories.first);
+                    }
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primaryGreen,
+                    side: const BorderSide(color: AppTheme.primaryGreen),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                  ),
+                  child: const Text('Load Full Report', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
               ],
             ),
           ),
@@ -732,32 +807,45 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: color.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
-      child: Column(
+      child: Row(
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              title,
-              style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title.toUpperCase(),
+                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+                ),
+              ],
             ),
           ),
         ],

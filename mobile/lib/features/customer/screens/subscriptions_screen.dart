@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -30,44 +31,59 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
   late TabController _historyTabController;
   final _historyStatuses = ['active', 'paused', 'completed', 'cancelled'];
 
+  Timer? _pollingTimer;
+
   @override
   void initState() {
     super.initState();
     _historyTabController = TabController(length: _historyStatuses.length, vsync: this);
     _loadAll();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _historyTabController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadAll() async {
-    await Future.wait([_loadCurrentSubscription(), _loadAllSubscriptions()]);
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted && !_isActionInProgress) {
+        _loadAll(isSilent: true);
+      }
+    });
   }
 
-  Future<void> _loadCurrentSubscription() async {
-    setState(() => _isLoadingCurrent = true);
+  Future<void> _loadAll({bool isSilent = false}) async {
+    await Future.wait([
+      _loadCurrentSubscription(isSilent: isSilent),
+      _loadAllSubscriptions(isSilent: isSilent)
+    ]);
+  }
+
+  Future<void> _loadCurrentSubscription({bool isSilent = false}) async {
+    if (!isSilent) setState(() => _isLoadingCurrent = true);
     try {
       final res = await _api.get(ApiConstants.subscriptionCurrent);
       setState(() => _currentSub = res.data is Map ? Map<String, dynamic>.from(res.data) : null);
     } catch (e) {
       setState(() => _currentSub = null);
     } finally {
-      setState(() => _isLoadingCurrent = false);
+      if (!isSilent) setState(() => _isLoadingCurrent = false);
     }
   }
 
-  Future<void> _loadAllSubscriptions() async {
-    setState(() => _isLoadingAll = true);
+  Future<void> _loadAllSubscriptions({bool isSilent = false}) async {
+    if (!isSilent) setState(() => _isLoadingAll = true);
     try {
       final res = await _api.get(ApiConstants.subscriptions);
       setState(() => _allSubs = res.data is List ? res.data : []);
     } catch (_) {
       setState(() => _allSubs = []);
     } finally {
-      setState(() => _isLoadingAll = false);
+      if (!isSilent) setState(() => _isLoadingAll = false);
     }
   }
 
@@ -138,13 +154,6 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
         title: const Text('My Subscriptions'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_outlined),
-            onPressed: _loadAll,
-            tooltip: 'Refresh',
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadAll,

@@ -13,34 +13,6 @@ class CustomerShell extends StatefulWidget {
 }
 
 class _CustomerShellState extends State<CustomerShell> {
-  final _api = ApiClient();
-  int _unreadCount = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchUnreadCount();
-  }
-
-  Future<void> _fetchUnreadCount() async {
-    try {
-      final res = await _api.get(ApiConstants.notificationsUnreadCount);
-      if (mounted) {
-        setState(() => _unreadCount = (res.data['count'] as num?)?.toInt() ?? 0);
-      }
-    } catch (_) {}
-  }
-
-  @override
-  void didUpdateWidget(CustomerShell oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Refresh badge when switching back to notifications tab
-    if (widget.navigationShell.currentIndex == 3 &&
-        oldWidget.navigationShell.currentIndex != 3) {
-      Future.delayed(const Duration(seconds: 1), _fetchUnreadCount);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -80,24 +52,11 @@ class _CustomerShellState extends State<CustomerShell> {
                   isSelected: widget.navigationShell.currentIndex == 2,
                   onTap: () => widget.navigationShell.goBranch(2),
                 ),
-                _NavItemBadge(
-                  icon: Icons.notifications_rounded,
-                  label: 'Alerts',
-                  badgeCount: _unreadCount,
-                  isSelected: widget.navigationShell.currentIndex == 3,
-                  onTap: () {
-                    widget.navigationShell.goBranch(3);
-                    // Clear badge after navigating to notifications
-                    Future.delayed(const Duration(milliseconds: 500), () {
-                      if (mounted) setState(() => _unreadCount = 0);
-                    });
-                  },
-                ),
                 _NavItem(
                   icon: Icons.person_rounded,
                   label: 'Profile',
-                  isSelected: widget.navigationShell.currentIndex == 4,
-                  onTap: () => widget.navigationShell.goBranch(4),
+                  isSelected: widget.navigationShell.currentIndex == 3,
+                  onTap: () => widget.navigationShell.goBranch(3),
                 ),
               ],
             ),

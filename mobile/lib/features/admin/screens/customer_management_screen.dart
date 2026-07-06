@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/api_client.dart';
@@ -20,21 +21,31 @@ class _CustomerManagementScreenState extends State<CustomerManagementScreen> {
   bool _isLoading = true;
   String _statusFilter = 'all'; // all, active, inactive, suspended
 
+  Timer? _pollingTimer;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      _loadData(isSilent: true);
+    });
+  }
+
+  Future<void> _loadData({bool isSilent = false}) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (!isSilent) setState(() => _isLoading = true);
     try {
       // Load users & delivery partners
       final usersRes = await _api.get('/users/?role=customer');
@@ -49,7 +60,7 @@ class _CustomerManagementScreenState extends State<CustomerManagementScreen> {
         _applyFilter();
       });
     } catch (e) {
-      if (mounted) {
+      if (!isSilent && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to load customers: $e'),
@@ -58,7 +69,7 @@ class _CustomerManagementScreenState extends State<CustomerManagementScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (!isSilent && mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -136,13 +147,6 @@ class _CustomerManagementScreenState extends State<CustomerManagementScreen> {
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
         title: const Text('Manage Customers'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadData,
-            tooltip: 'Refresh',
-          ),
-        ],
       ),
       body: Column(
         children: [

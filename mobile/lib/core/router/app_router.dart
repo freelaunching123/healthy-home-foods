@@ -106,7 +106,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/forgot-password', builder: (_, __) => const ForgotPasswordScreen()),
     GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
 
-    // Customer shell with bottom nav (6 tabs: Home, Plans, Fruits, Payments, Alerts, Profile)
+    // Customer shell with bottom nav (5 tabs: Home, Plans, Payments, Profile)
     StatefulShellRoute.indexedStack(
       builder: (_, __, navigationShell) => CustomerShell(navigationShell: navigationShell),
       branches: [
@@ -116,12 +116,8 @@ final GoRouter appRouter = GoRouter(
         StatefulShellBranch(routes: [
           GoRoute(path: '/subscriptions', builder: (_, __) => const SubscriptionsScreen()),
         ]),
-
         StatefulShellBranch(routes: [
           GoRoute(path: '/payments', builder: (_, __) => const PaymentHistoryScreen()),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
@@ -149,6 +145,7 @@ final GoRouter appRouter = GoRouter(
       path: '/tracking/:deliveryId',
       builder: (_, state) => TrackingScreen(deliveryId: state.pathParameters['deliveryId']!),
     ),
+    GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
     GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
     GoRoute(path: '/profile/edit', builder: (_, __) => const EditProfileScreen()),
     GoRoute(path: '/profile/subscription', builder: (_, __) => const MySubscriptionDetailScreen()),

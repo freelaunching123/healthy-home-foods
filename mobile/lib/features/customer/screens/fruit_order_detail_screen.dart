@@ -193,11 +193,15 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
                                 child: imageUrl != null
                                     ? CachedNetworkImage(
                                         imageUrl: '$baseUrl$imageUrl', fit: BoxFit.cover,
-                                        errorWidget: (_, __, ___) => Container(color: AppTheme.scaffoldBg,
-                                          child: const Center(child: Text('🍑', style: TextStyle(fontSize: 24)))),
+                                        errorWidget: (_, __, ___) => Container(
+                                          color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                                          child: const Center(child: Icon(Icons.eco_rounded, size: 20, color: AppTheme.primaryGreen)),
+                                        ),
                                       )
-                                    : Container(color: AppTheme.scaffoldBg,
-                                        child: const Center(child: Text('🍑', style: TextStyle(fontSize: 24)))),
+                                    : Container(
+                                        color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                                        child: const Center(child: Icon(Icons.eco_rounded, size: 20, color: AppTheme.primaryGreen)),
+                                      ),
                               ),
                             ),
                             const SizedBox(width: 12),

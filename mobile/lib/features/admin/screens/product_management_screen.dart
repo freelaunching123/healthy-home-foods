@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
+import '../widgets/admin_drawer.dart';
 
 class ProductManagementScreen extends StatefulWidget {
   const ProductManagementScreen({super.key});
@@ -20,6 +21,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
   String? _availabilityFilter;
   String? _selectedCategoryId;
   List<dynamic> _categories = [];
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
   final _searchController = TextEditingController();
 
@@ -94,9 +96,29 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.scaffoldBg,
+      drawer: const AdminDrawer(),
       appBar: AppBar(
-        title: const Text('Manage Packages'),
+        leading: IconButton(
+          icon: const Icon(Icons.menu, size: 28),
+          color: AppTheme.textPrimary,
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
+        title: const Text(
+          'Admin Dashboard',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFF0F0F0), height: 1),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryGreen),
@@ -107,6 +129,33 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
       ),
       body: Column(
         children: [
+          // Page Header
+          Container(
+            width: double.infinity,
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Manage Packages',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Configure food subscription plans and pricing.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
           // Filters & Search
           Container(
             padding: const EdgeInsets.all(16),
@@ -305,13 +354,12 @@ class _ProductAdminCard extends StatelessWidget {
                 Container(
                   width: 80, height: 80,
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                    color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(12),
-                    image: imgUrl != null 
-                        ? DecorationImage(image: NetworkImage(imgUrl), fit: BoxFit.cover)
-                        : null,
                   ),
-                  child: product['image_url'] == null ? const Icon(Icons.eco, color: AppTheme.primaryGreen) : null,
+                  child: const Center(
+                    child: Icon(Icons.image_outlined, color: Colors.grey, size: 32),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 
@@ -411,13 +459,13 @@ class _ProductAdminCard extends StatelessWidget {
   }
 
   Color _getStatusColor(String status) {
-    if (status == 'published') return Colors.blue;
+    if (status == 'published') return AppTheme.primaryGreen;
     if (status == 'draft') return Colors.orange;
     return Colors.grey;
   }
   
   Color _getAvailabilityColor(String avail) {
-    if (avail == 'available') return Colors.green;
+    if (avail == 'available') return AppTheme.primaryGreen;
     return Colors.red;
   }
 

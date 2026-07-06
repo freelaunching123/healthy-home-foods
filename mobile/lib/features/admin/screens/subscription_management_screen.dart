@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
@@ -23,17 +24,29 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
   bool _hasMore = true;
   List<dynamic> _plans = [];
 
+  Timer? _pollingTimer;
+
   @override
   void initState() {
     super.initState();
     _loadSubscriptions();
     _loadPlans();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) {
+        _loadSubscriptions(refresh: false, isSilent: true);
+      }
+    });
   }
 
   Future<void> _loadPlans() async {
@@ -47,7 +60,7 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
     }
   }
 
-  Future<void> _loadSubscriptions({bool refresh = true}) async {
+  Future<void> _loadSubscriptions({bool refresh = true, bool isSilent = false}) async {
     if (!mounted) return;
     if (refresh) {
       setState(() {
@@ -60,7 +73,7 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
 
     try {
       final Map<String, dynamic> queryParams = {
-        'page': _page,
+        'page': isSilent ? 1 : _page,
         'page_size': 15,
       };
 
@@ -76,16 +89,17 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
       final List<dynamic> items = res.data is List ? res.data : (res.data['items'] ?? []);
 
       setState(() {
-        if (refresh) {
+        if (refresh || isSilent) {
           _subscriptions = items;
+          if (isSilent) _page = 1;
         } else {
           _subscriptions.addAll(items);
         }
         _hasMore = items.length == 15;
-        _isLoading = false;
+        if (!isSilent) _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (!isSilent) setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -351,13 +365,6 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => context.pop(),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => _loadSubscriptions(refresh: true),
-            tooltip: 'Refresh',
-          ),
-        ],
       ),
       body: Column(
         children: [

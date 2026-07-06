@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
@@ -5,6 +6,7 @@ import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/file_saver.dart';
+import '../widgets/admin_drawer.dart';
 
 class DeliveryManagementScreen extends StatefulWidget {
   const DeliveryManagementScreen({super.key});
@@ -16,6 +18,7 @@ class DeliveryManagementScreen extends StatefulWidget {
 class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
   final _api = ApiClient();
   final _searchController = TextEditingController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   DateTime _selectedDate = DateTime.now();
   String _selectedStatus = 'all';
@@ -30,16 +33,29 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
   bool _isLoadingAnalytics = true;
   bool _isActionInProgress = false;
 
+  Timer? _pollingTimer;
+
   @override
   void initState() {
     super.initState();
     _loadAllData();
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted && !_isActionInProgress) {
+        _loadDeliveries();
+        _loadAnalytics();
+      }
+    });
   }
 
   Future<void> _loadAllData() async {
@@ -85,7 +101,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
       final res = await _api.get(ApiConstants.adminDeliveries, queryParameters: qParams);
       if (res.data is List) {
         setState(() {
-          _deliveries = (res.data as List).cast<Map<String, dynamic>>();
+          _deliveries = (res.data as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
         });
       }
     } catch (e) {
@@ -122,7 +138,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
       final res = await _api.get('/delivery-partners');
       if (res.data is List) {
         setState(() {
-          _partners = (res.data as List).cast<Map<String, dynamic>>();
+          _partners = (res.data as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
         });
       }
     } catch (e) {
@@ -290,21 +306,62 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
     final isDesktop = size.width > 900;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.scaffoldBg,
+      drawer: const AdminDrawer(),
       appBar: AppBar(
-        title: const Text('Manage Deliveries'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadAllData,
-            tooltip: 'Refresh',
+        leading: IconButton(
+          icon: const Icon(Icons.menu, size: 28),
+          color: AppTheme.textPrimary,
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
+        title: const Text(
+          'Admin Dashboard',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
           ),
-        ],
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFF0F0F0), height: 1),
+        ),
       ),
       body: Stack(
         children: [
           Column(
             children: [
+              // Page Header
+              Container(
+                width: double.infinity,
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Manage Deliveries',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Real-time logistics monitoring and driver assignments.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               // Analytics Top Cards
               if (_isLoadingAnalytics)
                 const LinearProgressIndicator(color: AppTheme.primaryGreen)
@@ -345,7 +402,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
   Widget _buildAnalyticsPanel(bool isDesktop) {
     final metrics = [
       _MetricData(
-        'Total scheduled',
+        'Total Scheduled',
         '${_analytics['total_deliveries'] ?? 0}',
         Icons.local_shipping_outlined,
         AppTheme.primaryGreen,
@@ -354,96 +411,51 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
         'Delivered',
         '${_analytics['delivered'] ?? 0}',
         Icons.check_circle_outline,
-        AppTheme.delivered,
+        AppTheme.primaryGreen,
       ),
       _MetricData(
         'Pending',
-        '${_analytics['pending'] ?? 0}',
-        Icons.pending_actions_outlined,
-        AppTheme.pending,
-      ),
-      _MetricData(
-        'Assigned',
-        '${_analytics['assigned'] ?? 0}',
-        Icons.person_add_alt_1_outlined,
-        AppTheme.info,
-      ),
-      _MetricData(
-        'Out for Delivery',
-        '${_analytics['out_for_delivery'] ?? 0}',
-        Icons.directions_bike_outlined,
-        AppTheme.outForDelivery,
+        '${(int.tryParse(_analytics['pending']?.toString() ?? '0') ?? 0) + (int.tryParse(_analytics['assigned']?.toString() ?? '0') ?? 0) + (int.tryParse(_analytics['out_for_delivery']?.toString() ?? '0') ?? 0)}',
+        Icons.watch_later_outlined,
+        AppTheme.warning,
       ),
       _MetricData(
         'Failed',
         '${_analytics['failed'] ?? 0}',
         Icons.error_outline,
-        AppTheme.missed,
-      ),
-      _MetricData(
-        'Cancelled',
-        '${_analytics['cancelled'] ?? 0}',
-        Icons.cancel_outlined,
-        Colors.grey,
-      ),
-      _MetricData(
-        'Success Rate',
-        '${_analytics['success_rate'] ?? 0}%',
-        Icons.trending_up,
-        Colors.blue,
-      ),
-      _MetricData(
-        'Avg Time',
-        '${_analytics['average_delivery_time'] ?? 0}m',
-        Icons.timer_outlined,
-        Colors.purple,
-      ),
-      _MetricData(
-        'Top Driver',
-        _analytics['top_partner_name'] ?? 'None',
-        Icons.star_outline,
-        Colors.orange,
+        AppTheme.error,
       ),
     ];
 
     if (isDesktop) {
       return Container(
-        height: 100,
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: GridView.builder(
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: sizeGridColumns(metrics.length),
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 2.2,
-          ),
-          itemCount: metrics.length,
-          itemBuilder: (context, i) => _MetricCard(data: metrics[i]),
+        child: Row(
+          children: [
+            Expanded(child: _MetricCard(data: metrics[0])),
+            const SizedBox(width: 10),
+            Expanded(child: _MetricCard(data: metrics[1])),
+            const SizedBox(width: 10),
+            Expanded(child: _MetricCard(data: metrics[2])),
+            const SizedBox(width: 10),
+            Expanded(child: _MetricCard(data: metrics[3])),
+          ],
         ),
       );
     } else {
       return Container(
-        height: 90,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: metrics.length,
-          itemBuilder: (context, i) => Container(
-            margin: const EdgeInsets.only(right: 12),
-            width: 140,
-            child: _MetricCard(data: metrics[i]),
-          ),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 1.30,
+          children: metrics.map((m) => _MetricCard(data: m)).toList(),
         ),
       );
     }
-  }
-
-  int sizeGridColumns(int len) {
-    final width = MediaQuery.of(context).size.width;
-    if (width > 1200) return 5;
-    if (width > 900) return 4;
-    return 3;
   }
 
   Widget _buildFiltersPanel(bool isDesktop) {
@@ -843,49 +855,51 @@ class _MetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade100),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: data.color.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: data.color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(data.icon, size: 16, color: data.color),
+            child: Icon(data.icon, color: data.color, size: 18),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  data.value,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  data.label,
-                  style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+          const Spacer(),
+          Text(
+            data.value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.textPrimary,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            data.label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

@@ -173,9 +173,9 @@ class _FruitCartScreenState extends State<FruitCartScreen> {
                           ? CachedNetworkImage(
                               imageUrl: '$baseUrl$imageUrl',
                               fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => _fruitEmoji(item['fruit_name'] as String),
+                              errorWidget: (_, __, ___) => _fruitPlaceholder(),
                             )
-                          : _fruitEmoji(item['fruit_name'] as String),
+                          : _fruitPlaceholder(),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -306,15 +306,12 @@ class _FruitCartScreenState extends State<FruitCartScreen> {
     ),
   );
 
-  Widget _fruitEmoji(String name) {
-    const map = {'apple': '🍎', 'banana': '🍌', 'orange': '🍊', 'watermelon': '🍉',
-      'pineapple': '🍍', 'grapes': '🍇', 'grape': '🍇', 'guava': '🍈', 'papaya': '🥭',
-      'mango': '🥭', 'pomegranate': '🍎'};
-    final k = name.toLowerCase();
-    final emoji = map.entries.where((e) => k.contains(e.key)).map((e) => e.value).firstOrNull ?? '🍑';
+  Widget _fruitPlaceholder() {
     return Container(
-      color: AppTheme.scaffoldBg,
-      child: Center(child: Text(emoji, style: const TextStyle(fontSize: 32))),
+      color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+      child: const Center(
+        child: Icon(Icons.eco_rounded, size: 24, color: AppTheme.primaryGreen),
+      ),
     );
   }
 }
