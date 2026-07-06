@@ -9,7 +9,7 @@ from app.core.dependencies import get_current_user, require_super_admin
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserListResponse, ChangePasswordRequest
 from app.schemas.common import MessageResponse, AddressResponse, AddressCreate, AddressUpdate
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_password, verify_password, validate_password_strength
 from app.models.address import Address
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -90,6 +90,13 @@ async def change_password(
     """Change password. Revokes other active sessions by incrementing token_version."""
     if not current_user.password_hash or not verify_password(payload.old_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid old password")
+    
+    if not validate_password_strength(payload.new_password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be 8-32 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+        )
+
     current_user.password_hash = hash_password(payload.new_password)
     current_user.token_version += 1
     await db.commit()

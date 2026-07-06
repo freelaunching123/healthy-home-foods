@@ -48,3 +48,19 @@ import string
 
 def generate_otp(length: int = 6) -> str:
     return "".join(random.choices(string.digits, k=length))
+
+
+def validate_password_strength(password: str) -> bool:
+    if not (8 <= len(password) <= 32):
+        return False
+    if not any(c.isupper() for c in password):
+        return False
+    if not any(c.islower() for c in password):
+        return False
+    if not any(c.isdigit() for c in password):
+        return False
+    # Check for at least one special character (non-alphanumeric)
+    if not any(not c.isalnum() for c in password):
+        return False
+    return True
+

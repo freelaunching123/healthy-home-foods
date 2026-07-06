@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from app.db.session import get_db
-from app.core.security import create_access_token, create_refresh_token, decode_token, verify_password, hash_password
+from app.core.security import create_access_token, create_refresh_token, decode_token, verify_password, hash_password, validate_password_strength
 from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.models.user import User
@@ -29,6 +29,18 @@ async def register_customer(
     db: AsyncSession = Depends(get_db),
 ):
     """Register a new customer account."""
+    if payload.mobile_number == "9876543210":
+        raise HTTPException(status_code=400, detail="This number is reserved and cannot be registered.")
+
+    if not payload.password:
+        raise HTTPException(status_code=400, detail="Password is required")
+
+    if not validate_password_strength(payload.password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be 8-32 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+        )
+
     # Check if user exists
     user_result = await db.execute(select(User).where(User.phone == payload.mobile_number))
     if user_result.scalar_one_or_none():
@@ -100,15 +112,7 @@ async def admin_login(
 
     user_role = user.role.value
 
-    if payload.role:
-        if payload.role == "customer" and user_role != "customer":
-            raise HTTPException(status_code=403, detail="Please use the correct login portal.")
-        elif payload.role == "admin" and user_role not in ["admin", "super_admin"]:
-            raise HTTPException(status_code=403, detail="Access denied. Admin account required.")
-        elif payload.role == "delivery_partner" and user_role != "delivery_partner":
-            raise HTTPException(status_code=403, detail="Access denied. Delivery Partner account required.")
-        elif payload.role not in ["customer", "admin", "delivery_partner"]:
-            raise HTTPException(status_code=400, detail="Invalid portal role specified.")
+
 
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
@@ -208,6 +212,12 @@ async def forgot_password(
     if not user:
         raise HTTPException(status_code=404, detail="User with this phone number not found")
         
+    if not validate_password_strength(payload.new_password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be 8-32 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+        )
+
     user.password_hash = hash_password(payload.new_password)
     await db.commit()
     return MessageResponse(message="Password updated successfully")

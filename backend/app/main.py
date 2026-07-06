@@ -30,8 +30,40 @@ async def lifespan(app: FastAPI):
     os.makedirs(os.path.join(settings.UPLOAD_DIR, "products"), exist_ok=True)
     os.makedirs(os.path.join(settings.UPLOAD_DIR, "proofs"), exist_ok=True)
     os.makedirs(os.path.join(settings.UPLOAD_DIR, "fruits"), exist_ok=True)
+
+    # Seed default admin user if not exists
+    try:
+        from app.db.session import AsyncSessionLocal
+        from app.models.user import User, UserStatus, UserRoleEnum
+        from app.models.admin import Admin
+        from app.core.security import hash_password
+        from sqlalchemy import select
+        async with AsyncSessionLocal() as db:
+            admin_result = await db.execute(select(User).where(User.phone == "9876543210"))
+            admin_user = admin_result.scalar_one_or_none()
+            if not admin_user:
+                logger.info("Seeding default admin user...")
+                admin_user = User(
+                    phone="9876543210",
+                    email="admin@healthyhomefoods.com",
+                    full_name="Super Admin",
+                    password_hash=hash_password("Admin123"),
+                    is_verified=True,
+                    status=UserStatus.ACTIVE,
+                    role=UserRoleEnum.SUPER_ADMIN,
+                )
+                db.add(admin_user)
+                await db.flush()
+                # Seed the separate Admin profile row
+                db.add(Admin(user_id=admin_user.id, is_super_admin=True))
+                await db.commit()
+                logger.info("Default admin user seeded successfully.")
+    except Exception as e:
+        logger.error(f"Failed to seed admin user on startup: {e}")
+
     yield
     logger.info("👋 Healthy Home Foods API shutting down...")
+
 
 
 # ── Rate Limiter ──────────────────────────────────────────────────────────────

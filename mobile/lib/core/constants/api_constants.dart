@@ -3,9 +3,9 @@ class ApiConstants {
   ApiConstants._();
 
   // Base URL — change for production
-  static const String baseUrl = 'http://10.239.18.53:8000/api/v1'; // Android localhost (uses local Wi-Fi IP)
-  static const String baseUrlIOS = 'http://10.239.18.53:8000/api/v1';
-  static const String baseUrlWeb = 'http://10.239.18.53:8000/api/v1';
+  static const String baseUrl = 'http://10.80.52.53:8000/api/v1'; // Android localhost (uses local Wi-Fi IP)
+  static const String baseUrlIOS = 'http://10.80.52.53:8000/api/v1';
+  static const String baseUrlWeb = 'http://10.80.52.53:8000/api/v1';
 
   // Auth
   static const String register = '/auth/register';

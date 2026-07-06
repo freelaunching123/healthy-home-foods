@@ -11,7 +11,7 @@ from sqlalchemy import select, func, or_
 from app.db.session import get_db
 from app.core.dependencies import require_super_admin
 from app.models.user import User
-from app.core.security import hash_password
+from app.core.security import hash_password, validate_password_strength
 from app.schemas.common import MessageResponse
 
 router = APIRouter(prefix="/delivery-partners", tags=["Delivery Partners"])
@@ -31,6 +31,12 @@ async def create_delivery_partner(
     user_result = await db.execute(select(User).where(User.phone == payload.mobile_number))
     if user_result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Phone number already registered")
+
+    if not validate_password_strength(payload.password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be 8-32 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+        )
 
     from app.models.user import UserRoleEnum
 
@@ -293,8 +299,11 @@ async def reset_delivery_partner_password(
 
     user, _ = row
     new_password = payload.get("new_password", "")
-    if len(new_password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    if not validate_password_strength(new_password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be 8-32 characters and contain at least one uppercase letter, one lowercase letter, one number, and one special character."
+        )
 
     user.password_hash = hash_password(new_password)
     await db.commit()

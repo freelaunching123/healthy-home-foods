@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:go_router/go_router.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -677,11 +679,24 @@ class _MapLocationPickerDialog extends StatefulWidget {
   State<_MapLocationPickerDialog> createState() => _MapLocationPickerDialogState();
 }
 
-class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> {
+class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with TickerProviderStateMixin {
   LatLng _selectedLatLng = const LatLng(9.919630, 78.094379); // Default to shop coordinates if null
   LatLng? _currentLatLng;
+  double? _currentAccuracy;
   final MapController _mapController = MapController();
+  
   bool _isLocating = false;
+  bool _isConfirming = false;
+  
+  double _currentZoom = 15.0;
+  
+  // Real-time location stream and map animation controllers
+  StreamSubscription<Position>? _positionStreamSubscription;
+  AnimationController? _mapAnimationController;
+  
+  // Detection of map movement (idle detection)
+  Timer? _mapIdleTimer;
+  bool _isMapMoving = false;
 
   @override
   void initState() {
@@ -695,7 +710,93 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> {
     });
   }
 
+  @override
+  void dispose() {
+    _mapAnimationController?.dispose();
+    _positionStreamSubscription?.cancel();
+    _mapIdleTimer?.cancel();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  void _animatedMapMove(LatLng destLocation, double destZoom) {
+    // Stop any existing animation
+    _mapAnimationController?.stop();
+    _mapAnimationController?.dispose();
+
+    // Create a new controller
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _mapAnimationController = controller;
+
+    // Interpolate latitude, longitude, and zoom
+    final latTween = Tween<double>(begin: _selectedLatLng.latitude, end: destLocation.latitude);
+    final lngTween = Tween<double>(begin: _selectedLatLng.longitude, end: destLocation.longitude);
+    final zoomTween = Tween<double>(begin: _currentZoom, end: destZoom);
+
+    final animation = CurvedAnimation(parent: controller, curve: Curves.fastOutSlowIn);
+
+    controller.addListener(() {
+      if (mounted) {
+        final currentLat = latTween.evaluate(animation);
+        final currentLng = lngTween.evaluate(animation);
+        final currentZoomVal = zoomTween.evaluate(animation);
+        
+        _mapController.move(
+          LatLng(currentLat, currentLng),
+          currentZoomVal,
+        );
+      }
+    });
+
+    controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed || status == AnimationStatus.dismissed) {
+        controller.dispose();
+        if (_mapAnimationController == controller) {
+          _mapAnimationController = null;
+        }
+      }
+    });
+
+    controller.forward();
+  }
+
+  Future<void> _startListeningToLocation() async {
+    // Cancel existing subscription first
+    await _positionStreamSubscription?.cancel();
+    
+    // Check permission and start stream if allowed
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (serviceEnabled) {
+        _positionStreamSubscription = Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium, // Medium accuracy is faster on Web
+            distanceFilter: 5, // update on 5m movement
+          ),
+        ).listen(
+          (Position position) {
+            if (mounted) {
+              setState(() {
+                _currentLatLng = LatLng(position.latitude, position.longitude);
+                _currentAccuracy = position.accuracy;
+              });
+            }
+          },
+          onError: (e) {
+            debugPrint('Live location stream error: $e');
+          },
+        );
+      }
+    }
+  }
+
   Future<void> _checkPermissionAndLoadLocation() async {
+    if (_isLocating) return;
+
     setState(() => _isLocating = true);
     try {
       // 1. Check if location services are enabled
@@ -726,22 +827,49 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> {
       }
 
       // 3. Get current location
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
+      Position? position;
+      try {
+        position = await Geolocator.getLastKnownPosition();
+      } catch (e) {
+        debugPrint('Error getting last known position: $e');
+      }
 
-      final currentPoint = LatLng(position.latitude, position.longitude);
-      setState(() {
-        _currentLatLng = currentPoint;
-        // If initial lat/lng was null, center map to current position
-        if (widget.initialLat == null || widget.initialLng == null) {
-          _selectedLatLng = currentPoint;
-          _mapController.move(currentPoint, 15.0);
+      if (position != null) {
+        final lastKnownPoint = LatLng(position.latitude, position.longitude);
+        setState(() {
+          _currentLatLng = lastKnownPoint;
+          _currentAccuracy = position!.accuracy;
+          _selectedLatLng = lastKnownPoint;
+        });
+        _animatedMapMove(lastKnownPoint, 16.0);
+      }
+
+      // Query fresh position with medium accuracy & shorter timeout for faster response
+      try {
+        final freshPosition = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 4),
+          ),
+        );
+        
+        final freshPoint = LatLng(freshPosition.latitude, freshPosition.longitude);
+        setState(() {
+          _currentLatLng = freshPoint;
+          _currentAccuracy = freshPosition.accuracy;
+          _selectedLatLng = freshPoint;
+        });
+        _animatedMapMove(freshPoint, 16.0);
+      } catch (e) {
+        debugPrint('Error getting fresh position: $e');
+        if (_currentLatLng == null) {
+          _showSnackbar('Location detection timed out. Please select location manually or verify browser GPS settings.');
         }
-      });
+      }
+
+      // Start live updates stream
+      _startListeningToLocation();
+
     } catch (e) {
       debugPrint('Error getting location: $e');
       _showSnackbar('Unable to detect your current location. Please enable GPS.');
@@ -788,6 +916,135 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> {
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  String _getDistanceString() {
+    if (_currentLatLng == null) return '--';
+    final distanceInMeters = Geolocator.distanceBetween(
+      _currentLatLng!.latitude,
+      _currentLatLng!.longitude,
+      _selectedLatLng.latitude,
+      _selectedLatLng.longitude,
+    );
+    if (distanceInMeters < 1000) {
+      return '${distanceInMeters.toStringAsFixed(0)} m';
+    } else {
+      final distanceInKm = distanceInMeters / 1000;
+      return '${distanceInKm.toStringAsFixed(1)} km';
+    }
+  }
+
+  String _getTravelTimeString() {
+    if (_currentLatLng == null) return '--';
+    final distanceInMeters = Geolocator.distanceBetween(
+      _currentLatLng!.latitude,
+      _currentLatLng!.longitude,
+      _selectedLatLng.latitude,
+      _selectedLatLng.longitude,
+    );
+    // Assume average delivery speed is 25 km/h (approx 416 meters per minute)
+    // Plus a base cooking/prep/handover buffer of 15 minutes.
+    final travelMinutes = (distanceInMeters / 416) + 15;
+    return '${travelMinutes.toStringAsFixed(0)} mins';
+  }
+
+  void _onPositionChanged(MapCamera position, bool hasGesture) {
+    setState(() {
+      _selectedLatLng = position.center;
+      _currentZoom = position.zoom;
+      if (!_isMapMoving) {
+        _isMapMoving = true;
+      }
+    });
+
+    _mapIdleTimer?.cancel();
+    _mapIdleTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _isMapMoving = false;
+        });
+      }
+    });
+  }
+
+  Widget _buildCoordinateColumn({required String label, required String value}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade500,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryGreen.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppTheme.primaryGreen, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryGreen,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -796,28 +1053,29 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select Location'),
+        backgroundColor: Colors.white.withValues(alpha: 0.9), // Translucent Material 3 style
+        elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
         ),
+        title: const Text(
+          'Select Delivery Location',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
         actions: [
-          if (_isLocating)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryGreen),
-                ),
-              ),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.my_location_rounded, color: AppTheme.primaryGreen),
-              onPressed: _checkPermissionAndLoadLocation,
-            ),
+          IconButton(
+            icon: _isLocating
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryGreen),
+                  )
+                : const Icon(Icons.gps_fixed_rounded, color: AppTheme.primaryGreen),
+            onPressed: _checkPermissionAndLoadLocation,
+            tooltip: 'Get Current Location',
+          ),
         ],
       ),
       body: Stack(
@@ -827,41 +1085,62 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _selectedLatLng,
-              initialZoom: 15.0,
-              onPositionChanged: (position, hasGesture) {
-                // Update center coordinate state if user moves the map
-                if (position.center != null) {
-                  setState(() {
-                    _selectedLatLng = position.center!;
-                  });
-                }
-              },
+              initialZoom: _currentZoom,
+              onPositionChanged: _onPositionChanged,
             ),
             children: [
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.healthyhomefoods.app',
               ),
+              if (_currentLatLng != null && _currentAccuracy != null)
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: _currentLatLng!,
+                      radius: _currentAccuracy!,
+                      useRadiusInMeter: true,
+                      color: Colors.blue.withValues(alpha: 0.15),
+                      borderColor: Colors.blue.withValues(alpha: 0.5),
+                      borderStrokeWidth: 1.5,
+                    ),
+                  ],
+                ),
               if (_currentLatLng != null)
                 MarkerLayer(
                   markers: [
                     Marker(
                       point: _currentLatLng!,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade600,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.blue.withValues(alpha: 0.4),
-                              blurRadius: 6,
-                              spreadRadius: 2,
+                      width: 24,
+                      height: 24,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
                             ),
-                          ],
-                        ),
+                          ),
+                          Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade600,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.blue.withValues(alpha: 0.3),
+                                  blurRadius: 6,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -873,89 +1152,388 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> {
           IgnorePointer(
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.only(bottom: 35), // adjust height to align icon tip with screen center
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.location_on_rounded,
-                      size: 44,
-                      color: Colors.red.shade600,
-                    ),
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 4,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                padding: const EdgeInsets.only(bottom: 35), // adjust height to align pin tip
+                child: DeliveryPinWidget(isMoving: _isMapMoving),
               ),
             ),
           ),
 
-          // Bottom card showing coordinates and confirmation button
+          // Floating map controls on the right side
           Positioned(
-            bottom: 24,
-            left: 24,
-            right: 24,
-            child: Card(
-              elevation: 6,
-              shadowColor: Colors.black26,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.pin_drop_rounded, color: AppTheme.primaryGreen),
-                        SizedBox(width: 8),
-                        Text(
-                          'Delivery Location',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Lat: ${_selectedLatLng.latitude.toStringAsFixed(6)}, Lng: ${_selectedLatLng.longitude.toStringAsFixed(6)}',
-                      style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-                    ),
-                    const SizedBox(height: 14),
-                    ElevatedButton(
-                      onPressed: () {
-                        _showSnackbar('✓ Location Selected Successfully');
-                        Navigator.pop(context, _selectedLatLng);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryGreen,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text(
-                        'Confirm Delivery Location',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                      ),
+            right: 16,
+            bottom: MediaQuery.of(context).size.height * 0.38, // float above the bottom sheet
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _AnimatedFloatingButton(
+                  icon: Icons.explore_outlined,
+                  onPressed: () {
+                    _mapController.rotate(0.0);
+                  },
+                  tooltip: 'Reset Rotation',
+                ),
+                const SizedBox(height: 12),
+                _AnimatedFloatingButton(
+                  icon: Icons.add_rounded,
+                  onPressed: () {
+                    final nextZoom = (_currentZoom + 1.0).clamp(1.0, 18.0);
+                    _animatedMapMove(_selectedLatLng, nextZoom);
+                  },
+                  tooltip: 'Zoom In',
+                ),
+                const SizedBox(height: 12),
+                _AnimatedFloatingButton(
+                  icon: Icons.remove_rounded,
+                  onPressed: () {
+                    final nextZoom = (_currentZoom - 1.0).clamp(1.0, 18.0);
+                    _animatedMapMove(_selectedLatLng, nextZoom);
+                  },
+                  tooltip: 'Zoom Out',
+                ),
+                const SizedBox(height: 12),
+                _AnimatedFloatingButton(
+                  icon: Icons.my_location_rounded,
+                  iconColor: AppTheme.primaryGreen,
+                  isLoading: _isLocating,
+                  onPressed: _checkPermissionAndLoadLocation,
+                  tooltip: 'Current Location',
+                ),
+              ],
+            ),
+          ),
+
+          // Draggable Bottom Sheet with Location Info
+          DraggableScrollableSheet(
+            initialChildSize: 0.32,
+            minChildSize: 0.22,
+            maxChildSize: 0.45,
+            snap: true,
+            snapSizes: const [0.22, 0.32, 0.45],
+            builder: (context, scrollController) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 16,
+                      spreadRadius: 1,
+                      offset: const Offset(0, -4),
                     ),
                   ],
+                ),
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  physics: const ClampingScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Drag handle
+                        Center(
+                          child: Container(
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        
+                        // Title
+                        const Row(
+                          children: [
+                            Icon(Icons.location_on_rounded, color: AppTheme.primaryGreen, size: 24),
+                            SizedBox(width: 8),
+                            Text(
+                              'Delivery Location',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Coordinates
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildCoordinateColumn(
+                                label: 'LATITUDE',
+                                value: _selectedLatLng.latitude.toStringAsFixed(6),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildCoordinateColumn(
+                                label: 'LONGITUDE',
+                                value: _selectedLatLng.longitude.toStringAsFixed(6),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Info cards
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildInfoCard(
+                                icon: Icons.straighten_rounded,
+                                label: 'Distance',
+                                value: _getDistanceString(),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildInfoCard(
+                                icon: Icons.access_time_filled_rounded,
+                                label: 'Est. Delivery Time',
+                                value: _getTravelTimeString(),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Confirm Button
+                        ElevatedButton(
+                          onPressed: _isConfirming
+                              ? null
+                              : () async {
+                                  setState(() => _isConfirming = true);
+                                  await Future.delayed(const Duration(milliseconds: 500));
+                                  if (mounted) {
+                                    _showSnackbar('✓ Location Selected Successfully');
+                                    Navigator.pop(context, _selectedLatLng);
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryGreen,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, 54),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 2,
+                            shadowColor: AppTheme.primaryGreen.withValues(alpha: 0.3),
+                          ),
+                          child: _isConfirming
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : const Text(
+                                  'Confirm Delivery Location',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Custom widget for Delivery Pin
+class DeliveryPinWidget extends StatelessWidget {
+  final bool isMoving;
+  const DeliveryPinWidget({super.key, required this.isMoving});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          transform: Matrix4.translationValues(0, isMoving ? -12 : 0, 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.restaurant_menu_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              CustomPaint(
+                size: const Size(12, 8),
+                painter: TrianglePainter(color: AppTheme.primaryGreen),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 2),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          width: isMoving ? 8 : 16,
+          height: isMoving ? 2 : 4,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: isMoving ? 0.15 : 0.35),
+            borderRadius: BorderRadius.all(Radius.elliptical(isMoving ? 4 : 8, isMoving ? 1 : 2)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isMoving ? 0.1 : 0.25),
+                blurRadius: isMoving ? 2 : 4,
+                spreadRadius: isMoving ? 0.5 : 1,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class TrianglePainter extends CustomPainter {
+  final Color color;
+  TrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = ui.Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// Custom widget for animated floating buttons
+class _AnimatedFloatingButton extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+  final String? tooltip;
+  final Color? iconColor;
+  final bool isLoading;
+
+  const _AnimatedFloatingButton({
+    required this.icon,
+    required this.onPressed,
+    this.tooltip,
+    this.iconColor,
+    this.isLoading = false,
+  });
+
+  @override
+  State<_AnimatedFloatingButton> createState() => _AnimatedFloatingButtonState();
+}
+
+class _AnimatedFloatingButtonState extends State<_AnimatedFloatingButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.9).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 8,
+              spreadRadius: 1,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.isLoading ? null : () async {
+              _controller.forward().then((_) => _controller.reverse());
+              widget.onPressed();
+            },
+            borderRadius: BorderRadius.circular(24),
+            child: Tooltip(
+              message: widget.tooltip ?? '',
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: Center(
+                  child: widget.isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppTheme.primaryGreen,
+                          ),
+                        )
+                      : Icon(
+                          widget.icon,
+                          color: widget.iconColor ?? AppTheme.textPrimary,
+                          size: 22,
+                        ),
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
