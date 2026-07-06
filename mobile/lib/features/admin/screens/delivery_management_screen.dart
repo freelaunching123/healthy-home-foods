@@ -332,60 +332,149 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
       ),
       body: Stack(
         children: [
-          Column(
-            children: [
-              // Page Header
-              Container(
-                width: double.infinity,
-                color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Manage Deliveries',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.textPrimary,
+          RefreshIndicator(
+            onRefresh: _loadAllData,
+            color: AppTheme.primaryGreen,
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      // Page Header
+                      Container(
+                        width: double.infinity,
+                        color: Colors.white,
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Manage Deliveries',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Real-time logistics monitoring and driver assignments.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Real-time logistics monitoring and driver assignments.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  ],
+
+                      // Analytics Top Cards
+                      if (_isLoadingAnalytics)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                          child: LinearProgressIndicator(color: AppTheme.primaryGreen),
+                        )
+                      else
+                        _buildAnalyticsPanel(isDesktop),
+
+                      // Filters & Search Panel
+                      _buildFiltersPanel(isDesktop),
+                    ],
+                  ),
                 ),
-              ),
-
-              // Analytics Top Cards
-              if (_isLoadingAnalytics)
-                const LinearProgressIndicator(color: AppTheme.primaryGreen)
-              else
-                _buildAnalyticsPanel(isDesktop),
-
-              // Filters & Search Panel
-              _buildFiltersPanel(isDesktop),
-
-              // Deliveries Entries
-              Expanded(
-                child: _isLoading
-                    ? const Center(
+                if (_isLoading)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32.0),
                         child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-                      )
-                    : _deliveries.isEmpty
-                        ? _buildEmptyState()
-                        : RefreshIndicator(
-                            onRefresh: _loadAllData,
-                            color: AppTheme.primaryGreen,
-                            child: isDesktop ? _buildTableView() : _buildListView(),
-                          ),
-              ),
-            ],
+                      ),
+                    ),
+                  )
+                else if (_deliveries.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildEmptyState(),
+                  )
+                else if (isDesktop)
+                  SliverToBoxAdapter(child: _buildTableView())
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.all(12),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) {
+                          final d = _deliveries[i];
+                          final displayStatus = d['status']?.toString() ?? 'pending';
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Order: ${d['subscription_id'].toString().substring(0, 8)}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                      _StatusBadge(
+                                        label: _formatStatus(displayStatus),
+                                        color: _getStatusColor(displayStatus),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text('Customer: ${d['customer_name'] ?? 'Unknown'} (${d['phone'] ?? ''})'),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Address: ${d['delivery_address'] ?? ''}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Time: ${d['delivery_time'] ?? 'Anytime'}'),
+                                      Text(
+                                        '₹${d['amount'] ?? 0.0}',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(),
+                                  Row(
+                                    children: [
+                                      const SizedBox(width: 10),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          minimumSize: const Size(80, 36),
+                                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                                          backgroundColor: AppTheme.primaryGreen,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ),
+                                        onPressed: () => _showDetails(d),
+                                        child: const Text('Details', style: TextStyle(fontSize: 13)),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        childCount: _deliveries.length,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           if (_isActionInProgress)
             Container(
@@ -444,15 +533,20 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
       );
     } else {
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 1.30,
-          children: metrics.map((m) => _MetricCard(data: m)).toList(),
+        height: 110,
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: metrics.length,
+          itemBuilder: (context, idx) {
+            final m = metrics[idx];
+            return Container(
+              width: 140,
+              margin: const EdgeInsets.only(right: 12),
+              child: _MetricCard(data: m),
+            );
+          },
         ),
       );
     }

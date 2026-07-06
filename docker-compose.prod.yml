@@ -41,10 +41,10 @@ services:
       - ALLOWED_ORIGINS=https://yourdomain.com,https://admin.yourdomain.com
     # Do not expose ports directly to host, only via network for Nginx
     expose:
-      - "8000"
+      - "1234"
     volumes:
       - ./backend/uploads:/app/uploads
-    command: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
+    command: gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:1234
     networks:
       - hhf_network_prod
 

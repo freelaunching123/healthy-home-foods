@@ -46,7 +46,7 @@ class _FruitDetailScreenState extends State<FruitDetailScreen> {
 
     try {
       // Load fruit details
-      final res = await _api.get('${ApiConstants.fruits}/${widget.fruitId}');
+      final res = await _api.get('${ApiConstants.fruitDetail}/${widget.fruitId}');
       _fruit = res.data;
       
       // Load cart quantity for this fruit
@@ -363,7 +363,7 @@ class _FruitDetailScreenState extends State<FruitDetailScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.remove, size: 20),
-                        onPressed: _cartQuantity > 0 ? () => _updateCart(_cartQuantity - 0.5) : null,
+                        onPressed: _cartQuantity > 0 ? () => _updateCart(_cartQuantity - 1.0) : null,
                         color: AppTheme.primaryGreen,
                       ),
                       SizedBox(
@@ -371,12 +371,12 @@ class _FruitDetailScreenState extends State<FruitDetailScreen> {
                         child: Center(
                           child: _isCartLoading 
                               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                              : Text('${_cartQuantity % 1 == 0 ? _cartQuantity.toInt() : _cartQuantity} kg', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                              : Text('${_cartQuantity.toInt()} kg', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
                         ),
                       ),
                       IconButton(
                         icon: const Icon(Icons.add, size: 20),
-                        onPressed: () => _updateCart(_cartQuantity + 0.5),
+                        onPressed: () => _updateCart(_cartQuantity + 1.0),
                         color: AppTheme.primaryGreen,
                       ),
                     ],

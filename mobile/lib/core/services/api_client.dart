@@ -11,11 +11,14 @@ class ApiClient {
 
   ApiClient._() {
     String baseUrl = ApiConstants.baseUrl;
-    if (!kIsWeb && Platform.isIOS) {
+    const envUrl = String.fromEnvironment('API_BASE_URL');
+    if (envUrl.isNotEmpty) {
+      baseUrl = envUrl;
+    } else if (!kIsWeb && Platform.isIOS) {
       baseUrl = ApiConstants.baseUrlIOS;
     } else if (kIsWeb) {
       final host = Uri.base.host.isNotEmpty ? Uri.base.host : 'localhost';
-      baseUrl = 'http://$host:8000/api/v1';
+      baseUrl = 'http://$host:1234/api/v1';
     }
 
     dio = Dio(BaseOptions(

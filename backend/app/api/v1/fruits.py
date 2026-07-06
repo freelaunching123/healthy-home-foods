@@ -601,6 +601,20 @@ async def admin_create_fruit(
     return fruit
 
 
+@router.get("/admin/fruits/{fruit_id}", response_model=FruitResponse)
+async def admin_get_fruit(
+    fruit_id: UUID,
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin: get a single fruit's details (including inactive)."""
+    result = await db.execute(select(Fruit).where(Fruit.id == fruit_id))
+    fruit = result.scalar_one_or_none()
+    if not fruit:
+        raise HTTPException(status_code=404, detail="Fruit not found")
+    return fruit
+
+
 @router.put("/admin/fruits/{fruit_id}", response_model=FruitResponse)
 async def admin_update_fruit(
     fruit_id: UUID,

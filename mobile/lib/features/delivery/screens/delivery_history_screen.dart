@@ -55,9 +55,10 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
 
     for (var item in _history) {
       if (item['status'] != 'delivered') continue;
-      
       try {
-        final parsedDate = DateTime.parse(item['delivery_date'] as String);
+        final dateStr = item['delivery_date']?.toString() ?? '';
+        if (dateStr.isEmpty) continue;
+        final parsedDate = DateTime.parse(dateStr);
         final dateOnly = DateTime(parsedDate.year, parsedDate.month, parsedDate.day);
         final diffDays = today.difference(dateOnly).inDays;
         
@@ -87,7 +88,9 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
     // 1. Filter by Period
     List<dynamic> periodFiltered = _history.where((item) {
       try {
-        final parsedDate = DateTime.parse(item['delivery_date'] as String);
+        final dateStr = item['delivery_date']?.toString() ?? '';
+        if (dateStr.isEmpty) return false;
+        final parsedDate = DateTime.parse(dateStr);
         final dateOnly = DateTime(parsedDate.year, parsedDate.month, parsedDate.day);
         final diffDays = today.difference(dateOnly).inDays;
 
@@ -297,14 +300,15 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
     final status = item['status'] as String? ?? '';
     final isDelivered = status == 'delivered';
     final isFailed = status == 'failed';
-    final dateStr = item['delivery_date'] as String? ?? '';
+    final dateStr = item['delivery_date']?.toString() ?? '';
     final orderType = item['order_type'] == 'fruit' ? 'Fruit Order' : 'Subscription';
     
     DateTime? dt;
     try {
-      if (item['delivery_time'] != null) {
-        dt = DateTime.parse(item['delivery_time']).toLocal();
-      } else {
+      final delTime = item['delivery_time']?.toString();
+      if (delTime != null && delTime.isNotEmpty) {
+        dt = DateTime.parse(delTime).toLocal();
+      } else if (dateStr.isNotEmpty) {
         dt = DateTime.parse(dateStr).toLocal();
       }
     } catch (_) {}

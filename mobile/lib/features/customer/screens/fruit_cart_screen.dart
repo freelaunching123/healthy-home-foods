@@ -199,8 +199,8 @@ class _FruitCartScreenState extends State<FruitCartScreen> {
                             // Stepper
                             _InlineQtyStepper(
                               qty: qty,
-                              onMinus: () => _updateQty(item, qty - 0.5),
-                              onPlus: () => _updateQty(item, qty + 0.5),
+                              onMinus: () => _updateQty(item, qty - 1.0),
+                              onPlus: () => _updateQty(item, qty + 1.0),
                             ),
                             const Spacer(),
                             Text(
@@ -349,7 +349,7 @@ class _InlineQtyStepper extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
-              '${qty % 1 == 0 ? qty.toInt() : qty} KG',
+              '${qty.toInt()} KG',
               style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
             ),
           ),

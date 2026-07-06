@@ -3,9 +3,18 @@ class ApiConstants {
   ApiConstants._();
 
   // Base URL — change for production
-  static const String baseUrl = 'http://10.80.52.53:8000/api/v1'; // Android localhost (uses local Wi-Fi IP)
-  static const String baseUrlIOS = 'http://10.80.52.53:8000/api/v1';
-  static const String baseUrlWeb = 'http://10.80.52.53:8000/api/v1';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://10.0.2.2:1234/api/v1', // Android Emulator default
+  );
+  static const String baseUrlIOS = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:1234/api/v1', // iOS Simulator default
+  );
+  static const String baseUrlWeb = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:1234/api/v1',
+  );
 
   // Auth
   static const String register = '/auth/register';

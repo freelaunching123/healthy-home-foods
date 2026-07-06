@@ -288,7 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onQtyChanged(Map<String, dynamic> fruit, double newQty) {
     final id = fruit['id']?.toString() ?? '';
     if (id.isEmpty) return;
-    setState(() => _quantities[id] = newQty < 0 ? 0 : newQty);
+    setState(() => _quantities[id] = newQty < 0 ? 0.0 : newQty);
     if (newQty > 0) {
       _addToCart(fruit, newQty);
     } else {
@@ -311,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen> {
             alignment: Alignment.center,
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_rounded, color: AppTheme.primaryGreen),
+                icon: const RingingBellIcon(color: AppTheme.primaryGreen),
                 onPressed: () async {
                   await context.push('/notifications');
                   _fetchUnreadCount();
@@ -320,26 +320,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               if (_unreadNotificationsCount > 0)
                 Positioned(
-                  top: 6,
-                  right: 6,
+                  top: 12,
+                  right: 12,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    width: 8,
+                    height: 8,
                     decoration: const BoxDecoration(
                       color: AppTheme.error,
                       shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 14,
-                      minHeight: 14,
-                    ),
-                    child: Text(
-                      _unreadNotificationsCount > 99 ? '99+' : '$_unreadNotificationsCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),
@@ -347,14 +335,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(width: 4),
           if (_selectedTabIndex == 1) // Fruit Cart
-            Stack(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.shopping_basket_rounded, color: AppTheme.primaryGreen),
-                  onPressed: () => context.push('/fruits/cart'),
-                  tooltip: 'Fruit Cart',
-                ),
-                if (_cartCount > 0)
+            if (_cartCount > 0)
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.shopping_basket_rounded, color: AppTheme.primaryGreen),
+                    onPressed: () => context.push('/fruits/cart'),
+                    tooltip: 'Fruit Cart',
+                  ),
                   Positioned(
                     top: 6, right: 6,
                     child: Container(
@@ -363,17 +351,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Text('$_cartCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
                     ),
                   ),
-              ],
-            )
+                ],
+              )
+            else
+              const SizedBox.shrink()
           else // Package Cart
-            Stack(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.shopping_cart_rounded, color: AppTheme.primaryGreen),
-                  onPressed: () => context.push('/packages/cart'),
-                  tooltip: 'Package Cart',
-                ),
-                if (_packageCartCount > 0)
+            if (_packageCartCount > 0)
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.shopping_cart_rounded, color: AppTheme.primaryGreen),
+                    onPressed: () => context.push('/packages/cart'),
+                    tooltip: 'Package Cart',
+                  ),
                   Positioned(
                     top: 6, right: 6,
                     child: Container(
@@ -382,8 +372,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Text('$_packageCartCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
                     ),
                   ),
-              ],
-            ),
+                ],
+              )
+            else
+              const SizedBox.shrink(),
         ],
       ),
       body: SafeArea(
@@ -632,7 +624,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 final fruitId = _filteredFruits[i]['id']?.toString() ?? '';
                 return _FruitCard(
                   fruit: _filteredFruits[i],
-                  quantity: _quantities[fruitId] ?? 0,
+                  quantity: _quantities[fruitId] ?? 0.0,
                   onQtyChanged: (newQty) => _onQtyChanged(_filteredFruits[i], newQty),
                   baseUrl: _api.dio.options.baseUrl.replaceAll('/api/v1', ''),
                 );
@@ -768,23 +760,23 @@ class _ProductCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
                     color: AppTheme.primaryGreen.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                     child: imgUrl != null
                         ? Image.network(
                             imgUrl,
                             fit: BoxFit.cover,
-                            width: 80,
-                            height: 80,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.eco_rounded, size: 32, color: AppTheme.primaryGreen),
+                            width: 60,
+                            height: 60,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.eco_rounded, size: 24, color: AppTheme.primaryGreen),
                           )
-                        : const Icon(Icons.eco_rounded, size: 32, color: AppTheme.primaryGreen),
+                        : const Icon(Icons.eco_rounded, size: 24, color: AppTheme.primaryGreen),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -1034,7 +1026,7 @@ class _QtyStepper extends StatelessWidget {
       return SizedBox(
         height: 32,
         child: ElevatedButton.icon(
-          onPressed: () => onChanged(1),
+          onPressed: () => onChanged(1.0),
           icon: const Icon(Icons.add_rounded, size: 14),
           label: Text('Add', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700)),
           style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 32), padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
@@ -1045,11 +1037,92 @@ class _QtyStepper extends StatelessWidget {
       height: 32, decoration: BoxDecoration(border: Border.all(color: AppTheme.primaryGreen), borderRadius: BorderRadius.circular(8)),
       child: Row(
         children: [
-          Expanded(child: GestureDetector(onTap: () => onChanged((quantity - 0.5).clamp(0, 999)), child: Container(decoration: const BoxDecoration(color: AppTheme.scaffoldBg, borderRadius: BorderRadius.horizontal(left: Radius.circular(7))), child: const Center(child: Icon(Icons.remove_rounded, size: 14, color: AppTheme.primaryGreen))))),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Text('${quantity % 1 == 0 ? quantity.toInt() : quantity} KG', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.textPrimary))),
-          Expanded(child: GestureDetector(onTap: () => onChanged(quantity + 0.5), child: Container(decoration: const BoxDecoration(color: AppTheme.primaryGreen, borderRadius: BorderRadius.horizontal(right: Radius.circular(7))), child: const Center(child: Icon(Icons.add_rounded, size: 14, color: Colors.white))))),
+          Expanded(child: GestureDetector(onTap: () => onChanged((quantity - 1.0).clamp(0.0, 999.0)), child: Container(decoration: const BoxDecoration(color: AppTheme.scaffoldBg, borderRadius: BorderRadius.horizontal(left: Radius.circular(7))), child: const Center(child: Icon(Icons.remove_rounded, size: 14, color: AppTheme.primaryGreen))))),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Text('${quantity.toInt()} KG', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.textPrimary))),
+          Expanded(child: GestureDetector(onTap: () => onChanged(quantity + 1.0), child: Container(decoration: const BoxDecoration(color: AppTheme.primaryGreen, borderRadius: BorderRadius.horizontal(right: Radius.circular(7))), child: const Center(child: Icon(Icons.add_rounded, size: 14, color: Colors.white))))),
         ],
       ),
     );
   }
 }
+
+class RingingBellIcon extends StatefulWidget {
+  final Color color;
+  final double size;
+
+  const RingingBellIcon({
+    super.key,
+    this.color = AppTheme.primaryGreen,
+    this.size = 24.0,
+  });
+
+  @override
+  State<RingingBellIcon> createState() => _RingingBellIconState();
+}
+
+class _RingingBellIconState extends State<RingingBellIcon> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+
+    // Create a realistic swinging bell rotation sequence
+    _animation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: -0.22).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 15,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.22, end: 0.22).chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 30,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.22, end: -0.15).chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 20,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.15, end: 0.10).chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 15,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.10, end: 0.0).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 20,
+      ),
+    ]).animate(_controller);
+
+    // Repeat the swinging animation continuously with a brief pause in between
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.rotate(
+          angle: _animation.value,
+          origin: const Offset(0, -9), // Pivot at the top hook of the bell
+          child: child,
+        );
+      },
+      child: Icon(
+        Icons.notifications_active_rounded,
+        color: widget.color,
+        size: widget.size,
+      ),
+    );
+  }
+}
+
