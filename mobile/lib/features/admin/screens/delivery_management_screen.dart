@@ -332,10 +332,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
       ),
       body: Stack(
         children: [
-          RefreshIndicator(
-            onRefresh: _loadAllData,
-            color: AppTheme.primaryGreen,
-            child: CustomScrollView(
+          CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Column(
@@ -475,7 +472,6 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
                   ),
               ],
             ),
-          ),
           if (_isActionInProgress)
             Container(
               color: Colors.black.withValues(alpha: 0.3),

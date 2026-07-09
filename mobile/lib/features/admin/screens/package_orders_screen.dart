@@ -60,10 +60,7 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
                       const SizedBox(height: 12),
                       Text('No package orders found', style: GoogleFonts.inter(fontSize: 16, color: AppTheme.textSecondary)),
                     ]))
-                  : RefreshIndicator(
-                      color: AppTheme.primaryGreen,
-                      onRefresh: _loadOrders,
-                      child: ListView.separated(
+                  : ListView.separated(
                         padding: const EdgeInsets.all(16),
                         itemCount: _orders.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -75,7 +72,6 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
                           );
                         },
                       ),
-                    ),
     );
   }
 

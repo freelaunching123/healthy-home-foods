@@ -331,16 +331,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ),
       body: _isLoadingSummary
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
-          : RefreshIndicator(
-              onRefresh: () async {
-                await _loadSummary();
-                await _loadCategories();
-                if (_selectedCategory != null) {
-                  await _loadCategoryPerformance();
-                }
-              },
-              color: AppTheme.primaryGreen,
-              child: ListView(
+          : ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
                   // Page Header inside body (only on top of ListView)
@@ -386,7 +377,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   const SizedBox(height: 40),
                 ],
               ),
-            ),
     );
   }
 
@@ -448,9 +438,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
               children: [
                 Icon(Icons.stars_rounded, color: badgeColor, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
                 ),
               ],
             ),

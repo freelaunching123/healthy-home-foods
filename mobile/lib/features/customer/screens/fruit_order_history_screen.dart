@@ -52,10 +52,7 @@ class _FruitOrderHistoryScreenState extends State<FruitOrderHistoryScreen> {
               ? _buildError()
               : _orders.isEmpty
                   ? _buildEmpty()
-                  : RefreshIndicator(
-                      color: AppTheme.primaryGreen,
-                      onRefresh: _loadOrders,
-                      child: ListView.separated(
+                  : ListView.separated(
                         padding: const EdgeInsets.all(16),
                         itemCount: _orders.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -64,7 +61,6 @@ class _FruitOrderHistoryScreenState extends State<FruitOrderHistoryScreen> {
                           onTap: () => context.push('/fruits/orders/${_orders[i]['id']}'),
                         ),
                       ),
-                    ),
     );
   }
 

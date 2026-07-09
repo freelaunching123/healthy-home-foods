@@ -518,7 +518,7 @@ async def get_current_subscription(
         missed_deliveries=sub.missed_deliveries,
         carry_forward_deliveries=carry_forward_count or 0,
         product_name=product_name,
-        price_per_delivery=float(sub.price_per_delivery),
+        price_per_delivery=float(sub.price_per_delivery) if sub.price_per_delivery is not None else 0.0,
         total_amount=float(sub.total_amount),
         next_delivery_date=next_delivery_date,
         today_delivery=today_delivery_info,

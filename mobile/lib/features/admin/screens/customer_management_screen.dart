@@ -233,10 +233,7 @@ class _CustomerManagementScreenState extends State<CustomerManagementScreen> {
                 ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
                 : _filtered.isEmpty
                     ? const Center(child: Text('No customers found', style: TextStyle(color: AppTheme.textSecondary)))
-                    : RefreshIndicator(
-                        onRefresh: _loadData,
-                        color: AppTheme.primaryGreen,
-                        child: ListView.builder(
+                    : ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: _filtered.length,
                           itemBuilder: (context, i) {
@@ -307,7 +304,6 @@ class _CustomerManagementScreenState extends State<CustomerManagementScreen> {
                             );
                           },
                         ),
-                      ),
           ),
         ],
       ),

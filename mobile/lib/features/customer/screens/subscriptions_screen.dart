@@ -155,10 +155,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
       appBar: AppBar(
         title: const Text('My Subscriptions'),
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadAll,
-        color: AppTheme.primaryGreen,
-        child: SingleChildScrollView(
+      body: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -187,7 +184,6 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
             ],
           ),
         ),
-      ),
     );
   }
 

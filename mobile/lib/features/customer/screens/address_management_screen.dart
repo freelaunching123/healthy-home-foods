@@ -130,10 +130,7 @@ class _AddressManagementScreenState extends State<AddressManagementScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
           : _addresses.isEmpty
               ? _buildEmptyState()
-              : RefreshIndicator(
-                  onRefresh: _loadAddresses,
-                  color: AppTheme.primaryGreen,
-                  child: ListView.separated(
+              : ListView.separated(
                     padding: const EdgeInsets.all(20),
                     itemCount: _addresses.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -239,7 +236,6 @@ class _AddressManagementScreenState extends State<AddressManagementScreen> {
                       );
                     },
                   ),
-                ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddressForm(),
         backgroundColor: AppTheme.primaryGreen,

@@ -190,10 +190,7 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
                           style: const TextStyle(color: Colors.grey),
                         ),
                       )
-                    : RefreshIndicator(
-                        onRefresh: _loadHistory,
-                        color: AppTheme.primaryGreen,
-                        child: ListView.builder(
+                    : ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: _filteredHistory.length,
                           itemBuilder: (context, index) {
@@ -201,7 +198,6 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
                             return _buildHistoryCard(item);
                           },
                         ),
-                      ),
           ),
         ],
       ),

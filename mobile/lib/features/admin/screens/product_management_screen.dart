@@ -237,10 +237,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
-                : RefreshIndicator(
-                    onRefresh: _loadProducts,
-                    color: AppTheme.primaryGreen,
-                    child: _products.isEmpty
+                : _products.isEmpty
                         ? const Center(child: Text('No products found.'))
                         : ListView.builder(
                             padding: const EdgeInsets.all(16),
@@ -256,7 +253,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                               );
                             },
                           ),
-                  ),
           ),
         ],
       ),

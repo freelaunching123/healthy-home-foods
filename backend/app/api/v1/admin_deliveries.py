@@ -154,7 +154,7 @@ async def list_deliveries(
             delivery_address=addr_str,
             scheduled_date=deliv.scheduled_date,
             delivery_time=sub.preferred_delivery_time,
-            amount=float(sub.price_per_delivery),
+            amount=float(sub.price_per_delivery) if sub.price_per_delivery is not None else 0.0,
             payment_status=pay_status,
             status=deliv.status.value if hasattr(deliv.status, "value") else str(deliv.status),
         ))
@@ -313,7 +313,7 @@ async def export_deliveries(
             addr_str,
             deliv.scheduled_date.isoformat(),
             sub.preferred_delivery_time or "",
-            f"{sub.price_per_delivery:.2f}",
+            f"{sub.price_per_delivery:.2f}" if sub.price_per_delivery is not None else "0.00",
             pay_status,
             deliv.status.value if hasattr(deliv.status, "value") else str(deliv.status)
         ])
@@ -430,7 +430,7 @@ async def get_delivery_details(
         AdminDeliveryProduct(
             product_name=p.name,
             quantity=item.quantity,
-            price_per_delivery=float(item.price_per_delivery)
+            price_per_delivery=float(item.price_per_delivery) if item.price_per_delivery is not None else 0.0
         )
         for item, p in prod_rows
     ]
@@ -536,7 +536,7 @@ async def get_delivery_details(
         customer_rating=deliv.customer_rating,
         customer_feedback=deliv.customer_feedback,
         notes=deliv.notes,
-        amount=float(sub.price_per_delivery),
+        amount=float(sub.price_per_delivery) if sub.price_per_delivery is not None else 0.0,
         payment_method=pay_method,
         payment_status=pay_status,
         preferred_delivery_time=sub.preferred_delivery_time,

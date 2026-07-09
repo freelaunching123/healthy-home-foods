@@ -473,10 +473,7 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
                           style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
                         ),
                       )
-                    : RefreshIndicator(
-                        onRefresh: () async => _loadSubscriptions(refresh: true),
-                        color: AppTheme.primaryGreen,
-                        child: ListView.builder(
+                    : ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: _subscriptions.length + (_hasMore ? 1 : 0),
                           itemBuilder: (context, i) {
@@ -663,7 +660,6 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
                             );
                           },
                         ),
-                      ),
           ),
         ],
       ),
@@ -953,7 +949,7 @@ class _SubscriptionDetailsSheetState extends State<_SubscriptionDetailsSheet> wi
               ),
               child: ListTile(
                 title: Text(item['product_name'] ?? 'Product', style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('Price per delivery: ₹${item['price_per_delivery']}'),
+                subtitle: Text('Price per delivery: ₹${item['price_per_delivery'] ?? '0.0'}'),
                 trailing: CircleAvatar(
                   backgroundColor: AppTheme.primaryGreen,
                   foregroundColor: Colors.white,
@@ -970,10 +966,10 @@ class _SubscriptionDetailsSheetState extends State<_SubscriptionDetailsSheet> wi
         _buildInfoRow('Plan Name', _subDetail?['plan_name'] ?? '—'),
         _buildInfoRow('Preferred Time', _subDetail?['preferred_delivery_time'] ?? 'Not configured'),
         _buildInfoRow('Auto Renew', _subDetail?['auto_renew'] == true ? 'Enabled' : 'Disabled'),
-        _buildInfoRow('Price per Delivery', '₹${_subDetail?['price_per_delivery']}'),
-        _buildInfoRow('Delivery Charge', '₹${_subDetail?['delivery_charge']}'),
-        _buildInfoRow('Tax Amount', '₹${_subDetail?['tax_amount']}'),
-        _buildInfoRow('Total Amount', '₹${_subDetail?['total_amount']}'),
+        _buildInfoRow('Price per Delivery', '₹${_subDetail?['price_per_delivery'] ?? '0.0'}'),
+        _buildInfoRow('Delivery Charge', '₹${_subDetail?['delivery_charge'] ?? '0.0'}'),
+        _buildInfoRow('Tax Amount', '₹${_subDetail?['tax_amount'] ?? '0.0'}'),
+        _buildInfoRow('Total Amount', '₹${_subDetail?['total_amount'] ?? '0.0'}'),
         _buildInfoRow('Address ID', _subDetail?['address_id'] ?? '—'),
         if (_subDetail != null && _subDetail!['notes'] != null && _subDetail!['notes'].toString().isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -996,7 +992,16 @@ class _SubscriptionDetailsSheetState extends State<_SubscriptionDetailsSheet> wi
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
-          Text(val, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              val,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

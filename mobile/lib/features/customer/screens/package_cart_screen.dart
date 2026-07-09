@@ -139,10 +139,7 @@ class _PackageCartScreenState extends State<PackageCartScreen> {
 
   Widget _buildCart() {
     final baseUrl = _api.dio.options.baseUrl.replaceAll('/api/v1', '');
-    return RefreshIndicator(
-      color: AppTheme.primaryGreen,
-      onRefresh: _loadCart,
-      child: ListView.separated(
+    return ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         itemCount: _items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -233,8 +230,7 @@ class _PackageCartScreenState extends State<PackageCartScreen> {
             ),
           );
         },
-      ),
-    );
+      );
   }
 
   Widget _buildCheckoutBar() {
@@ -265,13 +261,16 @@ class _PackageCartScreenState extends State<PackageCartScreen> {
                 minimumSize: const Size(double.infinity, 50),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.shopping_bag_rounded, size: 18),
-                  const SizedBox(width: 8),
-                  Text('Proceed to Checkout', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
-                ],
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.shopping_bag_rounded, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Proceed to Checkout', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+                  ],
+                ),
               ),
             ),
           ),

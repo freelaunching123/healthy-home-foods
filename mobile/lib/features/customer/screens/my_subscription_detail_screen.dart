@@ -153,42 +153,38 @@ class _MySubscriptionDetailScreenState extends State<MySubscriptionDetailScreen>
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
           : _subscription == null
               ? _buildEmptyState()
-              : RefreshIndicator(
-                  onRefresh: _loadCurrentSubscription,
-                  color: AppTheme.primaryGreen,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Subscription Main Card
-                        _buildMainSubscriptionCard(),
+              : SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Subscription Main Card
+                      _buildMainSubscriptionCard(),
+                      const SizedBox(height: 16),
+
+                      // Today's Delivery Card
+                      if (_subscription?['today_delivery'] != null)
+                        _buildTodayDeliveryCard(_subscription!['today_delivery']),
+
+                      if (_subscription?['today_delivery'] != null)
                         const SizedBox(height: 16),
 
-                        // Today's Delivery Card
-                        if (_subscription?['today_delivery'] != null)
-                          _buildTodayDeliveryCard(_subscription!['today_delivery']),
+                      // Stats Grid
+                      const Text(
+                        'Delivery Statistics',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStatsGrid(),
+                      const SizedBox(height: 32),
 
-                        if (_subscription?['today_delivery'] != null)
-                          const SizedBox(height: 16),
-
-                        // Stats Grid
-                        const Text(
-                          'Delivery Statistics',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatsGrid(),
-                        const SizedBox(height: 32),
-
-                        // Action Buttons
-                        if (_isActionInProgress)
-                          const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
-                        else
-                          _buildActionButtons(),
-                      ],
-                    ),
+                      // Action Buttons
+                      if (_isActionInProgress)
+                        const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
+                      else
+                        _buildActionButtons(),
+                    ],
                   ),
                 ),
     );

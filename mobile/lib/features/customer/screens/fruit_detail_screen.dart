@@ -60,10 +60,7 @@ class _FruitDetailScreenState extends State<FruitDetailScreen> {
       // Load wishlist status
       _isWishlisted = await LocalStorageService.isInWishlist(widget.fruitId);
       
-      // Track recently viewed
-      if (_fruit != null) {
-        LocalStorageService.addRecentlyViewed('fruit', _fruit!);
-      }
+      // Fruit loaded
       
       // Load reviews
       try {

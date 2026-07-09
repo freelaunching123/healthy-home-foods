@@ -143,7 +143,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _ProfileMenuItem(
                     icon: Icons.shopping_bag_outlined,
                     title: 'Fruit Order History',
-                    onTap: () => context.push('/profile/fruit-orders'),
+                    onTap: () => context.push('/fruits/orders'),
                   ),
                   _ProfileMenuItem(
                     icon: Icons.location_on_outlined,

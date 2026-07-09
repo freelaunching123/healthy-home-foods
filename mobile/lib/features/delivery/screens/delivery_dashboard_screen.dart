@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/api_client.dart';
@@ -16,27 +17,43 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
   Map<String, dynamic>? _stats;
   List<dynamic> _activeDeliveries = [];
   bool _isLoading = true;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _loadData(silent: true);
+    });
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isLoading = true);
+    }
     try {
       final statsRes = await _api.get(ApiConstants.partnerDashboard);
       final activeRes = await _api.get(ApiConstants.partnerActiveDeliveries);
       
-      setState(() {
-        _stats = statsRes.data;
-        _activeDeliveries = activeRes.data is List ? activeRes.data : [];
-      });
+      if (mounted) {
+        setState(() {
+          _stats = statsRes.data;
+          _activeDeliveries = activeRes.data is List ? activeRes.data : [];
+        });
+      }
     } catch (e) {
       debugPrint('Error loading dashboard: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (!silent && mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -78,38 +95,37 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Today\'s Performance',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildStatsSection(),
-                    const SizedBox(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
+          : SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Today\'s Performance',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildStatsSection(),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
                           'Current Active Deliveries',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                         ),
-                        TextButton(
-                          onPressed: () => context.push('/delivery/active'),
-                          child: const Text('View All'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    _buildActiveDeliveriesList(),
-                  ],
-                ),
+                      ),
+                      TextButton(
+                        onPressed: () => context.push('/delivery/active'),
+                        child: const Text('View All'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _buildActiveDeliveriesList(),
+                ],
               ),
             ),
     );

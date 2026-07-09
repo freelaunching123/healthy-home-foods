@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -22,6 +23,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   String? _error;
   late AnimationController _shimmerController;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  Timer? _refreshTimer;
 
   @override
   void initState() {
@@ -31,27 +33,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       duration: const Duration(milliseconds: 1400),
     )..repeat();
     _loadOverview();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _loadOverview(silent: true);
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _shimmerController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadOverview() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _loadOverview({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
     try {
       final res = await _api.get(ApiConstants.adminOverview);
-      setState(() => _data = res.data as Map<String, dynamic>);
+      if (mounted) {
+        setState(() {
+          _data = res.data as Map<String, dynamic>;
+          _error = null;
+        });
+      }
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (!silent && mounted) {
+        setState(() => _error = e.toString());
+      }
       debugPrint('Error loading admin overview: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (!silent && mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -64,61 +81,56 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       backgroundColor: AppTheme.scaffoldBg,
       drawer: const AdminDrawer(),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadOverview,
-          color: AppTheme.primaryGreen,
-          strokeWidth: 2.5,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              // ── Header ──────────────────────────────────────────────────
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            // ── Header ──────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: _buildHeader(today),
+            ),
+
+            if (_isLoading) ...[
+              SliverToBoxAdapter(child: _buildShimmer()),
+            ] else if (_error != null) ...[
+              SliverFillRemaining(
+                child: _buildError(),
+              ),
+            ] else ...[
+              // ── Summary Cards ────────────────────────────────────────
               SliverToBoxAdapter(
-                child: _buildHeader(today),
+                child: _buildSectionLabel('Summary'),
+              ),
+              SliverToBoxAdapter(
+                child: _buildSummaryCards(),
               ),
 
-              if (_isLoading) ...[
-                SliverToBoxAdapter(child: _buildShimmer()),
-              ] else if (_error != null) ...[
-                SliverFillRemaining(
-                  child: _buildError(),
-                ),
-              ] else ...[
-                // ── Summary Cards ────────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: _buildSectionLabel('Summary'),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildSummaryCards(),
-                ),
+              // ── Quick Insights ───────────────────────────────────────
+              SliverToBoxAdapter(
+                child: _buildSectionLabel('Quick Insights'),
+              ),
+              SliverToBoxAdapter(
+                child: _buildQuickInsights(),
+              ),
 
-                // ── Quick Insights ───────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: _buildSectionLabel('Quick Insights'),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildQuickInsights(),
-                ),
+              // ── Revenue Chart ────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: _buildRevenueHeader('Revenue — Last 7 Days'),
+              ),
+              SliverToBoxAdapter(
+                child: _buildRevenueChart(),
+              ),
 
-                // ── Revenue Chart ────────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: _buildRevenueHeader('Revenue — Last 7 Days'),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildRevenueChart(),
-                ),
+              // ── Recent Activity ──────────────────────────────────────
+              SliverToBoxAdapter(
+                child: _buildSectionLabel('Recent Activity'),
+              ),
+              SliverToBoxAdapter(
+                child: _buildRecentActivity(),
+              ),
 
-                // ── Recent Activity ──────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: _buildSectionLabel('Recent Activity'),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildRecentActivity(),
-                ),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-              ],
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -565,18 +577,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             ),
             const SizedBox(height: 6),
             const Text(
-              'Pull down to refresh',
+              'Checking connection...',
               style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _loadOverview,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(160, 44),
-                backgroundColor: AppTheme.primaryGreen,
-              ),
             ),
           ],
         ),

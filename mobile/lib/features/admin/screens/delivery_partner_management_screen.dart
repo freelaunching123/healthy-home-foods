@@ -319,10 +319,7 @@ class _DeliveryPartnerManagementScreenState
                         hasSearch: _searchController.text.isNotEmpty ||
                             _activeFilter != null,
                       )
-                    : RefreshIndicator(
-                        onRefresh: _load,
-                        color: AppTheme.primaryGreen,
-                        child: ListView.builder(
+                    : ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: _filtered.length,
                           itemBuilder: (context, i) => _PartnerCard(
@@ -338,7 +335,6 @@ class _DeliveryPartnerManagementScreenState
                             onDelete: () => _deletePartner(_filtered[i]),
                           ),
                         ),
-                      ),
           ),
         ],
       ),

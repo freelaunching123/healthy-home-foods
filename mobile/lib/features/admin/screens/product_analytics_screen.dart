@@ -46,10 +46,7 @@ class _ProductAnalyticsScreenState extends State<ProductAnalyticsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
-          : RefreshIndicator(
-              onRefresh: _loadAnalytics,
-              color: AppTheme.primaryGreen,
-              child: ListView(
+          : ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
                   _buildStatRow(),
@@ -74,7 +71,6 @@ class _ProductAnalyticsScreenState extends State<ProductAnalyticsScreen> {
                   ),
                 ],
               ),
-            ),
     );
   }
 

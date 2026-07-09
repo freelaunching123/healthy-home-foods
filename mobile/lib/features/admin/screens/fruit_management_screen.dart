@@ -263,10 +263,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
                     ? _buildError()
                     : _fruits.isEmpty
                         ? _buildEmpty()
-                        : RefreshIndicator(
-                            color: AppTheme.primaryGreen,
-                            onRefresh: _loadFruits,
-                            child: ListView.separated(
+                        : ListView.separated(
                               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                               itemCount: _fruits.length,
                               separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -285,7 +282,6 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
                                 );
                               },
                             ),
-                          ),
           ),
         ],
       ),

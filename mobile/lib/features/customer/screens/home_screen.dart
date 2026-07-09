@@ -7,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/local_storage_service.dart';
 import '../../../core/utils/api_error_handler.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -47,10 +46,6 @@ class _HomeScreenState extends State<HomeScreen> {
   double _packageCartTotal = 0;
   double _fruitCartTotal = 0;
   
-  // -- Recently Viewed State --
-  List<Map<String, dynamic>> _recentlyViewedPackages = [];
-  List<Map<String, dynamic>> _recentlyViewedFruits = [];
-
   @override
   void initState() {
     super.initState();
@@ -58,20 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadFruits();
     _loadCartCount();
     _loadPackageCartCount();
-    _loadRecentlyViewed();
     _fetchUnreadCount();
     _startPolling();
-  }
-
-  Future<void> _loadRecentlyViewed() async {
-    final packages = await LocalStorageService.getRecentlyViewed('package');
-    final fruits = await LocalStorageService.getRecentlyViewed('fruit');
-    if (mounted) {
-      setState(() {
-        _recentlyViewedPackages = packages;
-        _recentlyViewedFruits = fruits;
-      });
-    }
   }
 
   Future<void> _fetchUnreadCount() async {
@@ -90,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _startPolling() {
-    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       _loadPackages(isSilent: true);
       _loadFruits(isSilent: true);
       _loadCartCount();
@@ -379,88 +362,81 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            if (_selectedTabIndex == 0) await _loadPackages();
-            else await _loadFruits();
-          },
-          color: AppTheme.primaryGreen,
-          child: CustomScrollView(
-            slivers: [
-              // Search & Segmented Switch
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Fresh meals, delivered daily', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
-                      const SizedBox(height: 16),
-                      // Segmented Switch
-                      Container(
-                        decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.all(4),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() { _selectedTabIndex = 0; _searchQuery = ''; }),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: _selectedTabIndex == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text('Packages', style: TextStyle(fontWeight: FontWeight.bold, color: _selectedTabIndex == 0 ? AppTheme.primaryGreen : AppTheme.textLight)),
+        child: CustomScrollView(
+          slivers: [
+            // Search & Segmented Switch
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Fresh meals, delivered daily', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                    const SizedBox(height: 16),
+                    // Segmented Switch
+                    Container(
+                      decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() { _selectedTabIndex = 0; _searchQuery = ''; }),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: _selectedTabIndex == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
                                 ),
+                                alignment: Alignment.center,
+                                child: Text('Packages', style: TextStyle(fontWeight: FontWeight.bold, color: _selectedTabIndex == 0 ? AppTheme.primaryGreen : AppTheme.textLight)),
                               ),
                             ),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() { _selectedTabIndex = 1; _searchQuery = ''; }),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: _selectedTabIndex == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text('Fruits', style: TextStyle(fontWeight: FontWeight.bold, color: _selectedTabIndex == 1 ? AppTheme.primaryGreen : AppTheme.textLight)),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() { _selectedTabIndex = 1; _searchQuery = ''; }),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: _selectedTabIndex == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
                                 ),
+                                alignment: Alignment.center,
+                                child: Text('Fruits', style: TextStyle(fontWeight: FontWeight.bold, color: _selectedTabIndex == 1 ? AppTheme.primaryGreen : AppTheme.textLight)),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      // Search Field
-                      TextField(
-                        key: ValueKey('search_$_selectedTabIndex'), // Force rebuild to clear visually
-                        onChanged: (v) => setState(() => _searchQuery = v),
-                        decoration: InputDecoration(
-                          hintText: _selectedTabIndex == 0 ? 'Search healthy food packs...' : 'Search fresh fruits...',
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
-                        ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Search Field
+                    TextField(
+                      key: ValueKey('search_$_selectedTabIndex'), // Force rebuild to clear visually
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                      decoration: InputDecoration(
+                        hintText: _selectedTabIndex == 0 ? 'Search healthy food packs...' : 'Search fresh fruits...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
 
-              if (_selectedTabIndex == 0) ..._buildPackagesSlivers(),
-              if (_selectedTabIndex == 1) ..._buildFruitsSlivers(),
+            if (_selectedTabIndex == 0) ..._buildPackagesSlivers(),
+            if (_selectedTabIndex == 1) ..._buildFruitsSlivers(),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 100)),
-            ],
-          ),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
         ),
       ),
     );
@@ -470,42 +446,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   List<Widget> _buildPackagesSlivers() {
     return [
-      if (_recentlyViewedPackages.isNotEmpty && _searchQuery.isEmpty && _selectedCategoryId == null)
-        SliverToBoxAdapter(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: Text("Recently Viewed", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
-              ),
-              SizedBox(
-                height: 180,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _recentlyViewedPackages.length,
-                  itemBuilder: (ctx, i) {
-                    final product = _recentlyViewedPackages[i];
-                    final productId = product['id']?.toString() ?? '';
-                    return SizedBox(
-                      width: 150, 
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 12), 
-                        child: _ProductCard(
-                          product: product,
-                          quantity: _packageQuantities[productId] ?? 0,
-                          onQtyChanged: (newQty) => _onPackageQtyChanged(product, newQty),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
+
       if (_todaySpecials.isNotEmpty && _searchQuery.isEmpty && _selectedCategoryId == null)
         SliverToBoxAdapter(
           child: Column(
@@ -736,7 +677,6 @@ class _ProductCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        LocalStorageService.addRecentlyViewed('package', product);
         context.push('/product/${product['id']}');
       },
       child: Opacity(
@@ -918,7 +858,6 @@ class _FruitCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        LocalStorageService.addRecentlyViewed('fruit', fruit);
         final fruitId = fruit['id']?.toString() ?? '';
         if (fruitId.isNotEmpty) context.push('/fruits/$fruitId');
       },

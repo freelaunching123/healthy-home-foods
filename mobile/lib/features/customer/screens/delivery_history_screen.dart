@@ -80,10 +80,7 @@ class _CustomerDeliveryHistoryScreenState extends State<CustomerDeliveryHistoryS
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
           : _deliveries.isEmpty
               ? _buildEmptyState()
-              : RefreshIndicator(
-                  onRefresh: _loadDeliveryHistory,
-                  color: AppTheme.primaryGreen,
-                  child: ListView.separated(
+              : ListView.separated(
                     padding: const EdgeInsets.all(20),
                     itemCount: _deliveries.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -139,7 +136,6 @@ class _CustomerDeliveryHistoryScreenState extends State<CustomerDeliveryHistoryS
                       );
                     },
                   ),
-                ),
     );
   }
 

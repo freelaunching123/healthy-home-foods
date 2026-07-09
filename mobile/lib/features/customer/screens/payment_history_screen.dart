@@ -308,16 +308,12 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen>
     }
     if (_payments.isEmpty) return _buildEmptyState();
 
-    return RefreshIndicator(
-      onRefresh: _loadAll,
-      color: AppTheme.primaryGreen,
-      child: ListView.separated(
+    return ListView.separated(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         itemCount: _payments.length,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, index) => _buildPaymentCard(_payments[index]),
-      ),
-    );
+      );
   }
 
   Widget _buildPaymentCard(Map<String, dynamic> payment) {

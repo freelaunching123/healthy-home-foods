@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/api_client.dart';
@@ -19,6 +20,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   bool _isLoading = true;
   bool _hasError = false;
   late TabController _tabController;
+  Timer? _refreshTimer;
 
   static const _categories = [
     {'label': 'All', 'key': null, 'icon': Icons.notifications_outlined},
@@ -35,10 +37,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       if (!_tabController.indexIsChanging) _loadNotifications();
     });
     _loadNotifications();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _loadNotifications(silent: true);
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -48,25 +54,34 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     return _categories[idx]['key'] as String?;
   }
 
-  Future<void> _loadNotifications() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
+  Future<void> _loadNotifications({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _hasError = false;
+      });
+    }
     try {
       final category = _currentCategory;
       final res = await _api.get(
         ApiConstants.notifications,
         queryParameters: category != null ? {'category': category} : null,
       );
-      setState(() {
-        _notifications = res.data is List ? res.data : [];
-      });
+      if (mounted) {
+        setState(() {
+          _notifications = res.data is List ? res.data : [];
+          _hasError = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading notifications: $e');
-      setState(() => _hasError = true);
+      if (!silent && mounted) {
+        setState(() => _hasError = true);
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (!silent && mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -270,11 +285,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   Widget _buildNotificationList() {
     if (_notifications.isEmpty) return _buildEmptyState();
 
-    return RefreshIndicator(
-      onRefresh: _loadNotifications,
-      color: AppTheme.primaryGreen,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: _notifications.length,
         separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
         itemBuilder: (context, index) {
@@ -296,8 +308,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             child: _buildNotificationTile(notification, index, isRead, category),
           );
         },
-      ),
-    );
+      );
   }
 
   Widget _buildNotificationTile(
@@ -511,11 +522,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           const SizedBox(height: 16),
           const Text('Failed to load notifications', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: _loadNotifications,
-            icon: const Icon(Icons.refresh, color: AppTheme.primaryGreen),
-            label: const Text('Try Again', style: TextStyle(color: AppTheme.primaryGreen)),
-          ),
+          const Text('Checking connection...', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
         ],
       ),
     );

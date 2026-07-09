@@ -43,9 +43,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       
       _isWishlisted = await LocalStorageService.isInWishlist(widget.productId);
       
-      if (res.data != null) {
-        LocalStorageService.addRecentlyViewed('package', res.data);
-      }
+      // Product loaded
       
       try {
         final reviewRes = await _api.get(ApiConstants.productReviews(widget.productId), queryParameters: {'page': 1, 'page_size': 3});
