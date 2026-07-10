@@ -45,18 +45,16 @@ class AuthService {
 
   // Logout
   Future<void> logout() async {
-    try {
-      await _api.post(ApiConstants.logout);
-    } catch (_) {}
     await _storage.deleteAll();
+    // Call server logout asynchronously without awaiting it
+    _api.post(ApiConstants.logout).catchError((_) => Response(requestOptions: RequestOptions()));
   }
 
   // Logout from all devices
   Future<void> logoutAllDevices() async {
-    try {
-      await _api.post('/users/logout-all');
-    } catch (_) {}
     await _storage.deleteAll();
+    // Call server logout asynchronously without awaiting it
+    _api.post('/users/logout-all').catchError((_) => Response(requestOptions: RequestOptions()));
   }
 
   // Check if user is logged in

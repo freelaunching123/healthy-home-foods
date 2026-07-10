@@ -146,7 +146,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
         final formData = FormData.fromMap({
           'file': MultipartFile.fromBytes(_selectedImageBytes!, filename: _selectedImage!.name),
         });
-        await _api.post('${ApiConstants.products}/$productId/image', data: formData);
+        await _api.dio.post(
+          '${_api.dio.options.baseUrl}${ApiConstants.products}/$productId/image',
+          data: formData,
+          options: Options(contentType: 'multipart/form-data'),
+        );
       }
 
       if (mounted) {

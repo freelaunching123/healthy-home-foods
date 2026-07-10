@@ -115,27 +115,36 @@ async def create_product(
         )
     
     # Send Notifications
-    from app.services.notification_service import NotificationService
-    
-    # 1. Notify all admins
-    await NotificationService.send_notification_to_role(
-        db=db,
-        role="admin",
-        title="Product Added Successfully",
-        body=f"Product '{product.name}' has been successfully added to the catalog.",
-        notification_type="system",
-        reference_id=str(product.id)
-    )
-    
-    # 2. Notify all customers
-    body_text = f"{product.name}\n₹{product.package_price}\n{product.plan_type.capitalize()} Plan ({product.package_days} Deliveries)\nTap to view."
-    await NotificationService.send_notification_to_all_customers(
-        db=db,
-        title="New Healthy Pack Available",
-        body=body_text,
-        notification_type="promo",
-        reference_id=str(product.id)
-    )
+    try:
+        from app.services.notification_service import NotificationService
+        
+        # 1. Notify all admins
+        try:
+            await NotificationService.send_notification_to_role(
+                db=db,
+                role="admin",
+                title="Product Added Successfully",
+                body=f"Product '{product.name}' has been successfully added to the catalog.",
+                notification_type="system",
+                reference_id=str(product.id)
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify admins of new product: {e}")
+        
+        # 2. Notify all customers
+        try:
+            body_text = f"{product.name}\n₹{product.package_price}\n{product.plan_type.capitalize()} Plan ({product.package_days} Deliveries)\nTap to view."
+            await NotificationService.send_notification_to_all_customers(
+                db=db,
+                title="New Healthy Pack Available",
+                body=body_text,
+                notification_type="promo",
+                reference_id=str(product.id)
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify customers of new product: {e}")
+    except Exception as e:
+        logger.error(f"General notification processing error: {e}")
     
     res = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product.id))
     return res.scalar_one()

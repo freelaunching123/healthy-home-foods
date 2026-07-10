@@ -142,6 +142,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
       await _api.dio.post(
         '${_api.dio.options.baseUrl}${ApiConstants.adminFruits}/$fruitId/image',
         data: formData,
+        options: Options(contentType: 'multipart/form-data'),
       );
     } catch (e) {
       if (mounted) {

@@ -50,26 +50,29 @@ async def update_profile(
     """Update current user's profile, including profile photo parsing if base64 provided."""
     # Handle base64 image if provided
     if payload.photo_base64:
-        try:
-            import base64
-            import os
-            import uuid
-            from app.core.config import settings
-            
-            header, encoded = payload.photo_base64.split(",", 1) if "," in payload.photo_base64 else ("data:image/png;base64", payload.photo_base64)
-            ext = "png"
-            if "jpeg" in header or "jpg" in header:
-                ext = "jpg"
-            img_data = base64.b64decode(encoded)
-            upload_dir = os.path.join(settings.UPLOAD_DIR, "profiles")
-            os.makedirs(upload_dir, exist_ok=True)
-            filename = f"{uuid.uuid4()}.{ext}"
-            filepath = os.path.join(upload_dir, filename)
-            with open(filepath, "wb") as f:
-                f.write(img_data)
-            current_user.profile_photo_url = f"/uploads/profiles/{filename}"
-        except Exception as e:
-            raise HTTPException(status_code=400, detail="Invalid photo data")
+        if payload.photo_base64 == "delete":
+            current_user.profile_photo_url = None
+        else:
+            try:
+                import base64
+                import os
+                import uuid
+                from app.core.config import settings
+                
+                header, encoded = payload.photo_base64.split(",", 1) if "," in payload.photo_base64 else ("data:image/png;base64", payload.photo_base64)
+                ext = "png"
+                if "jpeg" in header or "jpg" in header:
+                    ext = "jpg"
+                img_data = base64.b64decode(encoded)
+                upload_dir = os.path.join(settings.UPLOAD_DIR, "profiles")
+                os.makedirs(upload_dir, exist_ok=True)
+                filename = f"{uuid.uuid4()}.{ext}"
+                filepath = os.path.join(upload_dir, filename)
+                with open(filepath, "wb") as f:
+                    f.write(img_data)
+                current_user.profile_photo_url = f"/uploads/profiles/{filename}"
+            except Exception as e:
+                raise HTTPException(status_code=400, detail="Invalid photo data")
 
     # Update other fields
     update_data = payload.model_dump(exclude_none=True, exclude={"photo_base64"})

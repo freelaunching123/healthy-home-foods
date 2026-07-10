@@ -528,21 +528,16 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
         ),
       );
     } else {
-      return Container(
-        height: 110,
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: metrics.length,
-          itemBuilder: (context, idx) {
-            final m = metrics[idx];
-            return Container(
-              width: 140,
-              margin: const EdgeInsets.only(right: 12),
-              child: _MetricCard(data: m),
-            );
-          },
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.6,
+          children: metrics.map((m) => _MetricCard(data: m)).toList(),
         ),
       );
     }

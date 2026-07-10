@@ -362,9 +362,17 @@ class _FruitTile extends StatelessWidget {
                 width: 60, height: 60,
                 child: Container(
                   color: Colors.grey.shade100,
-                  child: const Center(
-                    child: Icon(Icons.image_outlined, color: Colors.grey, size: 24),
-                  ),
+                  child: imageUrl != null
+                      ? Image.network(
+                          '$baseUrl$imageUrl',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.image_outlined, color: Colors.grey, size: 24),
+                          ),
+                        )
+                      : const Center(
+                          child: Icon(Icons.image_outlined, color: Colors.grey, size: 24),
+                        ),
                 ),
               ),
             ),

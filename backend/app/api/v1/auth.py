@@ -62,23 +62,29 @@ async def register_customer(
     await db.commit()
     
     # Send welcome notification to customer
-    await NotificationService.send_notification_to_user(
-        db=db,
-        user_id=user.id,
-        title="Welcome to Healthy Home Foods",
-        body="Your account has been created successfully.",
-        notification_type="promo"
-    )
+    try:
+        await NotificationService.send_notification_to_user(
+            db=db,
+            user_id=user.id,
+            title="Welcome to Healthy Home Foods",
+            body="Your account has been created successfully.",
+            notification_type="promo"
+        )
+    except Exception as e:
+        logger.error(f"Failed to send welcome notification: {e}")
     
     # Notify admin
-    await NotificationService.send_notification_to_role(
-        db=db,
-        role="admin",
-        title="New Customer Registered",
-        body=f"Customer Name: {user.full_name}",
-        notification_type="system",
-        reference_id=str(user.id)
-    )
+    try:
+        await NotificationService.send_notification_to_role(
+            db=db,
+            role="admin",
+            title="New Customer Registered",
+            body=f"Customer Name: {user.full_name}",
+            notification_type="system",
+            reference_id=str(user.id)
+        )
+    except Exception as e:
+        logger.error(f"Failed to send admin notification: {e}")
     
     return RegisterResponse(message="Registration successful", user_id=str(user.id))
 

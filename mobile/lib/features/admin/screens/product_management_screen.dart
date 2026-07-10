@@ -353,8 +353,19 @@ class _ProductAdminCard extends StatelessWidget {
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Center(
-                    child: Icon(Icons.image_outlined, color: Colors.grey, size: 32),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: imgUrl != null
+                        ? Image.network(
+                            imgUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.image_outlined, color: Colors.grey, size: 32),
+                            ),
+                          )
+                        : const Center(
+                            child: Icon(Icons.image_outlined, color: Colors.grey, size: 32),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 16),

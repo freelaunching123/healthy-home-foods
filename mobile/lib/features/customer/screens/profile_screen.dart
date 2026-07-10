@@ -153,11 +153,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _loadProfile();
                     },
                   ),
-                  _ProfileMenuItem(
-                    icon: Icons.receipt_long_outlined,
-                    title: 'Payment History',
-                    onTap: () => context.push('/payments'),
-                  ),
                   
                   const SizedBox(height: 32),
                   

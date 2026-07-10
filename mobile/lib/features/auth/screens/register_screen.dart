@@ -118,6 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _nameController,
                   textCapitalization: TextCapitalization.words,
+                  enableInteractiveSelection: false,
                   decoration: const InputDecoration(
                     hintText: 'Enter your full name',
                     prefixIcon: Icon(Icons.person_outline_rounded),
@@ -138,6 +139,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   keyboardType: TextInputType.phone,
                   maxLength: 10,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  enableInteractiveSelection: false,
                   decoration: InputDecoration(
                     hintText: '10-digit mobile number',
                     counterText: '',
@@ -167,6 +169,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  enableInteractiveSelection: false,
                   decoration: InputDecoration(
                     hintText: 'Set a password',
                     prefixIcon: const Icon(Icons.lock_outline_rounded),
@@ -193,6 +196,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextFormField(
                   controller: _confirmPasswordController,
                   obscureText: _obscurePassword,
+                  enableInteractiveSelection: false,
                   onChanged: (val) {
                     setState(() {});
                   },

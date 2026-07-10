@@ -57,24 +57,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
   void _startPolling() {
     _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (mounted) {
-        _loadSummary();
+        _loadSummary(silent: true);
         _loadCategories();
         if (_selectedCategory != null) {
-          _loadCategoryPerformance();
+          _loadCategoryPerformance(silent: true);
         }
       }
     });
   }
 
-  Future<void> _loadSummary() async {
-    setState(() => _isLoadingSummary = true);
+  Future<void> _loadSummary({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isLoadingSummary = true);
+    }
     try {
       final res = await _api.get('${ApiConstants.reports}/product-performance-summary');
       setState(() => _summaryData = res.data);
     } catch (e) {
       debugPrint('Error loading reports summary: $e');
     } finally {
-      setState(() => _isLoadingSummary = false);
+      if (!silent) {
+        setState(() => _isLoadingSummary = false);
+      }
     }
   }
 
@@ -87,9 +91,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
-  Future<void> _loadCategoryPerformance() async {
+  Future<void> _loadCategoryPerformance({bool silent = false}) async {
     if (_selectedCategory == null) return;
-    setState(() => _isLoadingCategoryData = true);
+    if (!silent) {
+      setState(() => _isLoadingCategoryData = true);
+    }
     try {
       final Map<String, dynamic> qParams = {
         'category_id': _selectedCategory!['id'],
@@ -111,7 +117,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
     } catch (e) {
       debugPrint('Error loading category performance: $e');
     } finally {
-      setState(() => _isLoadingCategoryData = false);
+      if (!silent) {
+        setState(() => _isLoadingCategoryData = false);
+      }
     }
   }
 

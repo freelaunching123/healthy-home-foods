@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
@@ -15,50 +16,80 @@ class CustomerShell extends StatefulWidget {
 class _CustomerShellState extends State<CustomerShell> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: widget.navigationShell,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _NavItem(
-                  icon: Icons.home_rounded,
-                  label: 'Home',
-                  isSelected: widget.navigationShell.currentIndex == 0,
-                  onTap: () => widget.navigationShell.goBranch(0),
-                ),
-                _NavItem(
-                  icon: Icons.calendar_today_rounded,
-                  label: 'Plans',
-                  isSelected: widget.navigationShell.currentIndex == 1,
-                  onTap: () => widget.navigationShell.goBranch(1),
-                ),
-                _NavItem(
-                  icon: Icons.receipt_long_rounded,
-                  label: 'Payments',
-                  isSelected: widget.navigationShell.currentIndex == 2,
-                  onTap: () => widget.navigationShell.goBranch(2),
-                ),
-                _NavItem(
-                  icon: Icons.person_rounded,
-                  label: 'Profile',
-                  isSelected: widget.navigationShell.currentIndex == 3,
-                  onTap: () => widget.navigationShell.goBranch(3),
-                ),
-              ],
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        if (context.canPop()) {
+          context.pop();
+          return;
+        }
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Exit App?'),
+            content: const Text('Are you sure you want to exit the application?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('No'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Yes', style: TextStyle(color: AppTheme.error)),
+              ),
+            ],
+          ),
+        );
+        if (shouldExit == true) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        body: widget.navigationShell,
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 20,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _NavItem(
+                    icon: Icons.home_rounded,
+                    label: 'Home',
+                    isSelected: widget.navigationShell.currentIndex == 0,
+                    onTap: () => widget.navigationShell.goBranch(0),
+                  ),
+                  _NavItem(
+                    icon: Icons.calendar_today_rounded,
+                    label: 'Plans',
+                    isSelected: widget.navigationShell.currentIndex == 1,
+                    onTap: () => widget.navigationShell.goBranch(1),
+                  ),
+                  _NavItem(
+                    icon: Icons.receipt_long_rounded,
+                    label: 'Payments',
+                    isSelected: widget.navigationShell.currentIndex == 2,
+                    onTap: () => widget.navigationShell.goBranch(2),
+                  ),
+                  _NavItem(
+                    icon: Icons.person_rounded,
+                    label: 'Profile',
+                    isSelected: widget.navigationShell.currentIndex == 3,
+                    onTap: () => widget.navigationShell.goBranch(3),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

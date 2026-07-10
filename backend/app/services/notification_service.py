@@ -13,17 +13,30 @@ try:
     firebase_admin.get_app()
     firebase_initialized = True
 except ValueError:
-    cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "./firebase-credentials.json")
-    if os.path.exists(cred_path):
+    cred_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    if cred_json:
         try:
-            cred = credentials.Certificate(cred_path)
+            import json
+            cred_dict = json.loads(cred_json)
+            cred = credentials.Certificate(cred_dict)
             firebase_admin.initialize_app(cred)
             firebase_initialized = True
-            logger.info("Firebase Admin SDK initialized successfully.")
+            logger.info("Firebase Admin SDK initialized successfully from env var JSON.")
         except Exception as e:
-            logger.error(f"Error initializing Firebase Admin SDK: {e}")
-    else:
-        logger.warning(f"Firebase credentials not found at {cred_path}. Push notifications will run in Mock mode.")
+            logger.error(f"Error initializing Firebase Admin SDK from env var JSON: {e}")
+
+    if not firebase_initialized:
+        cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "./firebase-credentials.json")
+        if os.path.exists(cred_path):
+            try:
+                cred = credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred)
+                firebase_initialized = True
+                logger.info("Firebase Admin SDK initialized successfully.")
+            except Exception as e:
+                logger.error(f"Error initializing Firebase Admin SDK from file: {e}")
+        else:
+            logger.warning(f"Firebase credentials not found. Push notifications will run in Mock mode.")
 
 
 class NotificationService:

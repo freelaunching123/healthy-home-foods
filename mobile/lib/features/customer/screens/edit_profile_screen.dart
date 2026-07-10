@@ -90,10 +90,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       setState(() {
         _photoBase64 = 'data:$mimeType;base64,$base64String';
+        _selectedImageFile = File(image.path);
       });
     } catch (e) {
       debugPrint('Error picking image: $e');
     }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _selectedImageFile = null;
+      _profilePhotoUrl = null;
+      _photoBase64 = 'delete';
+    });
   }
 
   Future<void> _saveProfile() async {
@@ -182,6 +191,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                             ),
                           ),
+                          if (imageProvider != null)
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                onTap: _removeImage,
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: const BoxDecoration(
+                                    color: AppTheme.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.delete_rounded, color: Colors.white, size: 20),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
