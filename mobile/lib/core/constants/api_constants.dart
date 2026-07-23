@@ -1,20 +1,13 @@
+import '../config/app_config.dart';
+
 /// API endpoint constants for Healthy Home Foods backend
 class ApiConstants {
   ApiConstants._();
 
-  // Base URL — change for production
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:1234/api/v1', // Android Emulator default
-  );
-  static const String baseUrlIOS = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://localhost:1234/api/v1', // iOS Simulator default
-  );
-  static const String baseUrlWeb = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://localhost:1234/api/v1',
-  );
+  // Base URL — centralized in AppConfig
+  static const String baseUrl = AppConfig.apiBaseUrl;
+  static const String baseUrlIOS = AppConfig.apiBaseUrl;
+  static const String baseUrlWeb = AppConfig.apiBaseUrl;
 
   // Auth
   static const String register = '/auth/register';

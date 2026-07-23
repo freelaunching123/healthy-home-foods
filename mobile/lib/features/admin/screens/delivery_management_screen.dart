@@ -337,33 +337,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
                 SliverToBoxAdapter(
                   child: Column(
                     children: [
-                      // Page Header
-                      Container(
-                        width: double.infinity,
-                        color: Colors.white,
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Manage Deliveries',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Real-time logistics monitoring and driver assignments.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+
 
                       // Analytics Top Cards
                       if (_isLoadingAnalytics)

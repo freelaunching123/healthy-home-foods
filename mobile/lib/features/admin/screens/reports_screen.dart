@@ -342,34 +342,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
           : ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  // Page Header inside body (only on top of ListView)
-                  Container(
-                    width: double.infinity,
-                    color: Colors.white,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Reports & Analytics',
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Monitor product performance and category-wise analytics.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   _buildStatRow(),
                   const SizedBox(height: 24),
                   _buildPerformanceLists(),

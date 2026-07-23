@@ -70,7 +70,9 @@ async def register_customer(
             body="Your account has been created successfully.",
             notification_type="promo"
         )
+        await db.commit()
     except Exception as e:
+        await db.rollback()
         logger.error(f"Failed to send welcome notification: {e}")
     
     # Notify admin
@@ -83,7 +85,9 @@ async def register_customer(
             notification_type="system",
             reference_id=str(user.id)
         )
+        await db.commit()
     except Exception as e:
+        await db.rollback()
         logger.error(f"Failed to send admin notification: {e}")
     
     return RegisterResponse(message="Registration successful", user_id=str(user.id))

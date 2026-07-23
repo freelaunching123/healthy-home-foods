@@ -382,8 +382,21 @@ async def update_delivery_status(
     current_user: User = Depends(require_delivery_partner),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(DeliveryAssignment).where(DeliveryAssignment.id == assignment_id))
-    assignment = result.scalar_one_or_none()
+    try:
+        assign_uuid = uuid_lib.UUID(assignment_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid assignment ID format")
+
+    result = await db.execute(
+        select(DeliveryAssignment).where(
+            or_(
+                DeliveryAssignment.id == assign_uuid,
+                DeliveryAssignment.subscription_delivery_id == assign_uuid,
+                DeliveryAssignment.fruit_order_id == assign_uuid,
+            )
+        )
+    )
+    assignment = result.scalars().first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
         
@@ -391,20 +404,27 @@ async def update_delivery_status(
     
     # Identify the parent order
     user_id = None
+    delivery = None
+    fruit_order = None
     if assignment.subscription_delivery_id:
         sd_res = await db.execute(select(SubscriptionDelivery).where(SubscriptionDelivery.id == assignment.subscription_delivery_id))
-        delivery = sd_res.scalar_one()
-        sub_res = await db.execute(select(Subscription).where(Subscription.id == delivery.subscription_id))
-        sub = sub_res.scalar_one()
-        cust_res = await db.execute(select(Customer).where(Customer.id == sub.customer_id))
-        cust = cust_res.scalar_one()
-        user_id = cust.user_id
+        delivery = sd_res.scalar_one_or_none()
+        if delivery:
+            sub_res = await db.execute(select(Subscription).where(Subscription.id == delivery.subscription_id))
+            sub = sub_res.scalar_one_or_none()
+            if sub:
+                cust_res = await db.execute(select(Customer).where(Customer.id == sub.customer_id))
+                cust = cust_res.scalar_one_or_none()
+                if cust:
+                    user_id = cust.user_id
     elif assignment.fruit_order_id:
         fo_res = await db.execute(select(FruitOrder).where(FruitOrder.id == assignment.fruit_order_id))
-        fruit_order = fo_res.scalar_one()
-        cust_res = await db.execute(select(Customer).where(Customer.id == fruit_order.customer_id))
-        cust = cust_res.scalar_one()
-        user_id = cust.user_id
+        fruit_order = fo_res.scalar_one_or_none()
+        if fruit_order:
+            cust_res = await db.execute(select(Customer).where(Customer.id == fruit_order.customer_id))
+            cust = cust_res.scalar_one_or_none()
+            if cust:
+                user_id = cust.user_id
 
     if payload.status == "accepted":
         assignment.status = AssignmentStatus.ACCEPTED
@@ -412,47 +432,55 @@ async def update_delivery_status(
     elif payload.status == "out_for_delivery":
         assignment.status = AssignmentStatus.OUT_FOR_DELIVERY
         assignment.out_at = now
-        if assignment.subscription_delivery_id:
+        if assignment.subscription_delivery_id and delivery:
             delivery.status = DeliveryStatus.OUT_FOR_DELIVERY
-        elif assignment.fruit_order_id:
+        elif assignment.fruit_order_id and fruit_order:
             fruit_order.order_status = FruitOrderStatus.OUT_FOR_DELIVERY
             
         if user_id:
-            await NotificationService.create_in_app_notification(
-                db=db, user_id=user_id, title="Out for Delivery",
-                body="Your order is out for delivery! You can track it live.",
-                category="delivery", action_type="delivery", reference_id=str(assignment.id)
-            )
+            try:
+                await NotificationService.create_in_app_notification(
+                    db=db, user_id=user_id, title="Out for Delivery",
+                    body="Your order is out for delivery! You can track it live.",
+                    category="delivery", action_type="delivery", reference_id=str(assignment.id)
+                )
+            except Exception:
+                pass
     elif payload.status == "delivered":
         assignment.status = AssignmentStatus.DELIVERED
         assignment.delivered_at = now
-        if assignment.subscription_delivery_id:
+        if assignment.subscription_delivery_id and delivery:
             await subscription_engine.mark_delivered(db, delivery)
-        elif assignment.fruit_order_id:
+        elif assignment.fruit_order_id and fruit_order:
             fruit_order.order_status = FruitOrderStatus.DELIVERED
             
         if user_id:
-            await NotificationService.create_in_app_notification(
-                db=db, user_id=user_id, title="Delivery Completed",
-                body="Your order has been delivered. Enjoy!",
-                category="delivery", action_type="delivery", reference_id=str(assignment.id)
-            )
+            try:
+                await NotificationService.create_in_app_notification(
+                    db=db, user_id=user_id, title="Delivery Completed",
+                    body="Your order has been delivered. Enjoy!",
+                    category="delivery", action_type="delivery", reference_id=str(assignment.id)
+                )
+            except Exception:
+                pass
     elif payload.status == "failed":
         assignment.status = AssignmentStatus.FAILED
         assignment.failed_at = now
         assignment.failure_reason = payload.failure_reason
-        if assignment.subscription_delivery_id:
+        if assignment.subscription_delivery_id and delivery:
             await subscription_engine.handle_missed_delivery(db, delivery)
-        elif assignment.fruit_order_id:
-            # Maybe a new status for failed fruit delivery, but keeping it simple
-            pass
+        elif assignment.fruit_order_id and fruit_order:
+            fruit_order.order_status = FruitOrderStatus.CANCELLED
             
         if user_id:
-            await NotificationService.create_in_app_notification(
-                db=db, user_id=user_id, title="Delivery Failed",
-                body=f"We couldn't deliver your order today. Reason: {payload.failure_reason}",
-                category="delivery", action_type="delivery", reference_id=str(assignment.id)
-            )
+            try:
+                await NotificationService.create_in_app_notification(
+                    db=db, user_id=user_id, title="Delivery Failed",
+                    body=f"We couldn't deliver your order today. Reason: {payload.failure_reason}",
+                    category="delivery", action_type="delivery", reference_id=str(assignment.id)
+                )
+            except Exception:
+                pass
     else:
         raise HTTPException(status_code=400, detail=f"Invalid status: {payload.status}")
 

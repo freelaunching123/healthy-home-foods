@@ -194,19 +194,25 @@ async def update_delivery_status(
     now = datetime.now(timezone.utc)
     
     # Pre-fetch user_id for notifications
-    delivery_result = await db.execute(
-        select(SubscriptionDelivery).where(SubscriptionDelivery.id == assignment.delivery_id)
-    )
-    delivery = delivery_result.scalar_one()
-    sub_result = await db.execute(
-        select(Subscription).where(Subscription.id == delivery.subscription_id)
-    )
-    sub = sub_result.scalar_one()
-    customer_result = await db.execute(
-        select(Customer).where(Customer.id == sub.customer_id)
-    )
-    customer = customer_result.scalar_one()
-    user_id = customer.user_id
+    user_id = None
+    delivery = None
+    if assignment.subscription_delivery_id:
+        delivery_result = await db.execute(
+            select(SubscriptionDelivery).where(SubscriptionDelivery.id == assignment.subscription_delivery_id)
+        )
+        delivery = delivery_result.scalar_one_or_none()
+        if delivery:
+            sub_result = await db.execute(
+                select(Subscription).where(Subscription.id == delivery.subscription_id)
+            )
+            sub = sub_result.scalar_one_or_none()
+            if sub:
+                customer_result = await db.execute(
+                    select(Customer).where(Customer.id == sub.customer_id)
+                )
+                customer = customer_result.scalar_one_or_none()
+                if customer:
+                    user_id = customer.user_id
 
     if payload.status == "accepted":
         assignment.status = AssignmentStatus.ACCEPTED
@@ -214,43 +220,58 @@ async def update_delivery_status(
     elif payload.status == "out_for_delivery":
         assignment.status = AssignmentStatus.OUT_FOR_DELIVERY
         assignment.out_at = now
-        delivery.status = DeliveryStatus.OUT_FOR_DELIVERY
-        await NotificationService.create_in_app_notification(
-            db=db,
-            user_id=user_id,
-            title="Out for Delivery",
-            body="Your meal is out for delivery! You can track it live.",
-            category="delivery",
-            action_type="delivery",
-            reference_id=str(delivery.id)
-        )
+        if delivery:
+            delivery.status = DeliveryStatus.OUT_FOR_DELIVERY
+        if user_id:
+            try:
+                await NotificationService.create_in_app_notification(
+                    db=db,
+                    user_id=user_id,
+                    title="Out for Delivery",
+                    body="Your meal is out for delivery! You can track it live.",
+                    category="delivery",
+                    action_type="delivery",
+                    reference_id=str(delivery.id) if delivery else str(assignment.id)
+                )
+            except Exception as e:
+                pass
     elif payload.status == "delivered":
         assignment.status = AssignmentStatus.DELIVERED
-        await subscription_engine.mark_delivered(db, delivery)
+        if delivery:
+            await subscription_engine.mark_delivered(db, delivery)
         assignment.delivered_at = now
-        await NotificationService.create_in_app_notification(
-            db=db,
-            user_id=user_id,
-            title="Delivery Completed",
-            body="Your meal has been delivered. Enjoy your food!",
-            category="delivery",
-            action_type="delivery",
-            reference_id=str(delivery.id)
-        )
+        if user_id:
+            try:
+                await NotificationService.create_in_app_notification(
+                    db=db,
+                    user_id=user_id,
+                    title="Delivery Completed",
+                    body="Your meal has been delivered. Enjoy your food!",
+                    category="delivery",
+                    action_type="delivery",
+                    reference_id=str(delivery.id) if delivery else str(assignment.id)
+                )
+            except Exception as e:
+                pass
     elif payload.status == "failed":
         assignment.status = AssignmentStatus.FAILED
         assignment.failed_at = now
         assignment.failure_reason = payload.failure_reason
-        await subscription_engine.handle_missed_delivery(db, delivery)
-        await NotificationService.create_in_app_notification(
-            db=db,
-            user_id=user_id,
-            title="Delivery Failed",
-            body=f"We couldn't deliver your meal today. Reason: {payload.failure_reason}",
-            category="delivery",
-            action_type="delivery",
-            reference_id=str(delivery.id)
-        )
+        if delivery:
+            await subscription_engine.handle_missed_delivery(db, delivery)
+        if user_id:
+            try:
+                await NotificationService.create_in_app_notification(
+                    db=db,
+                    user_id=user_id,
+                    title="Delivery Failed",
+                    body=f"We couldn't deliver your meal today. Reason: {payload.failure_reason}",
+                    category="delivery",
+                    action_type="delivery",
+                    reference_id=str(delivery.id) if delivery else str(assignment.id)
+                )
+            except Exception as e:
+                pass
     else:
         raise HTTPException(status_code=400, detail=f"Invalid status: {payload.status}")
 

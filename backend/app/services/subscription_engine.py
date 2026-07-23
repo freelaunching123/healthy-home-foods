@@ -470,11 +470,12 @@ async def cancel_subscription(db: AsyncSession, subscription: Subscription, reas
     subscription.status = SubscriptionStatus.CANCELLED
     subscription.actual_end_date = date.today()
 
+    new_status_val = SubscriptionStatus.CANCELLED.value if hasattr(SubscriptionStatus.CANCELLED, "value") else str(SubscriptionStatus.CANCELLED)
     # Status history log
     history = SubscriptionStatusHistory(
         subscription_id=subscription.id,
         old_status=old_status,
-        new_status=SubscriptionStatus.CANCELLED.value,
+        new_status=new_status_val,
         reason=reason or "Subscription cancelled"
     )
     db.add(history)
@@ -486,15 +487,16 @@ async def cancel_subscription(db: AsyncSession, subscription: Subscription, reas
             SubscriptionDelivery.status.in_([DeliveryStatus.PENDING, DeliveryStatus.ASSIGNED])
         )
     )
+    skipped_val = DeliveryStatus.SKIPPED.value if hasattr(DeliveryStatus.SKIPPED, "value") else str(DeliveryStatus.SKIPPED)
     for delivery in deliveries_result.scalars().all():
-        old_del_status = delivery.status.value
+        old_del_status = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
         delivery.status = DeliveryStatus.SKIPPED
         
         # Log delivery history
         del_history = SubscriptionDeliveryHistory(
             delivery_id=delivery.id,
             old_status=old_del_status,
-            new_status=DeliveryStatus.SKIPPED.value,
+            new_status=skipped_val,
             notes="Skipped due to subscription cancellation"
         )
         db.add(del_history)
@@ -505,17 +507,19 @@ async def cancel_subscription(db: AsyncSession, subscription: Subscription, reas
 async def skip_delivery(db: AsyncSession, delivery: SubscriptionDelivery) -> SubscriptionDelivery:
     """Marks a delivery as SKIPPED, deletes any active delivery partner assignment,
     increments subscription pause days, and schedules a carry-forward delivery."""
+    curr_status_val = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
     if delivery.status in [DeliveryStatus.DELIVERED, DeliveryStatus.SKIPPED, DeliveryStatus.MISSED]:
-        raise ValueError(f"Cannot skip delivery in status {delivery.status.value}")
+        raise ValueError(f"Cannot skip delivery in status {curr_status_val}")
 
-    old_status = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
+    old_status = curr_status_val
     delivery.status = DeliveryStatus.SKIPPED
 
+    skipped_val = DeliveryStatus.SKIPPED.value if hasattr(DeliveryStatus.SKIPPED, "value") else str(DeliveryStatus.SKIPPED)
     # Log delivery history
     del_history = SubscriptionDeliveryHistory(
         delivery_id=delivery.id,
         old_status=old_status,
-        new_status=DeliveryStatus.SKIPPED.value,
+        new_status=skipped_val,
         notes="Delivery skipped by user/admin"
     )
     db.add(del_history)

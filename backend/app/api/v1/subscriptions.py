@@ -29,6 +29,13 @@ import math
 router = APIRouter(prefix="/subscriptions", tags=["Subscriptions"])
 
 
+def _is_admin(user: User) -> bool:
+    if not user or not user.role:
+        return False
+    role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
+    return role_val in ["admin", "super_admin"]
+
+
 async def _get_customer(db: AsyncSession, user_id: UUID) -> Customer:
     result = await db.execute(select(Customer).where(Customer.user_id == user_id))
     customer = result.scalar_one_or_none()
@@ -207,11 +214,7 @@ async def update_subscription(
     db: AsyncSession = Depends(get_db),
 ):
     """Update subscription options and items."""
-    roles_res = await db.execute(
-        select(User.role).where(User.id == current_user.id)
-    )
-    user_roles = [r[0] for r in roles_res.fetchall()]
-    is_admin = "super_admin" in user_roles
+    is_admin = _is_admin(current_user)
 
     result = await db.execute(
         select(Subscription)
@@ -339,11 +342,7 @@ async def list_subscriptions(
     page_size: int = Query(10, ge=1, le=50),
 ):
     """List subscriptions with search, filtering and sorting."""
-    roles_res = await db.execute(
-        select(User.role).where(User.id == current_user.id)
-    )
-    user_roles = [r[0] for r in roles_res.fetchall()]
-    is_admin = "super_admin" in user_roles
+    is_admin = _is_admin(current_user)
 
     query = select(Subscription).options(
         selectinload(Subscription.items).selectinload(SubscriptionItem.product),
@@ -532,11 +531,7 @@ async def get_subscription(
     db: AsyncSession = Depends(get_db),
 ):
     """Get rich subscription detail including history log lists."""
-    roles_res = await db.execute(
-        select(User.role).where(User.id == current_user.id)
-    )
-    user_roles = [r[0] for r in roles_res.fetchall()]
-    is_admin = "super_admin" in user_roles
+    is_admin = _is_admin(current_user)
 
     query = (
         select(Subscription)
@@ -579,11 +574,7 @@ async def pause_subscription(
     db: AsyncSession = Depends(get_db),
 ):
     """Pause an active subscription."""
-    roles_res = await db.execute(
-        select(User.role).where(User.id == current_user.id)
-    )
-    user_roles = [r[0] for r in roles_res.fetchall()]
-    is_admin = "super_admin" in user_roles
+    is_admin = _is_admin(current_user)
 
     sub_res = await db.execute(select(Subscription).where(Subscription.id == sub_id))
     sub = sub_res.scalar_one_or_none()
@@ -623,11 +614,7 @@ async def resume_subscription(
     db: AsyncSession = Depends(get_db),
 ):
     """Resume a paused subscription."""
-    roles_res = await db.execute(
-        select(User.role).where(User.id == current_user.id)
-    )
-    user_roles = [r[0] for r in roles_res.fetchall()]
-    is_admin = "super_admin" in user_roles
+    is_admin = _is_admin(current_user)
 
     sub_res = await db.execute(select(Subscription).where(Subscription.id == sub_id))
     sub = sub_res.scalar_one_or_none()
@@ -668,11 +655,7 @@ async def cancel_subscription(
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel a subscription."""
-    roles_res = await db.execute(
-        select(User.role).where(User.id == current_user.id)
-    )
-    user_roles = [r[0] for r in roles_res.fetchall()]
-    is_admin = "super_admin" in user_roles
+    is_admin = _is_admin(current_user)
 
     sub_res = await db.execute(select(Subscription).where(Subscription.id == sub_id))
     sub = sub_res.scalar_one_or_none()
@@ -714,11 +697,7 @@ async def renew_subscription(
     auto_renew: Optional[bool] = Query(None),
 ):
     """Renew a subscription manually."""
-    roles_res = await db.execute(
-        select(User.role).where(User.id == current_user.id)
-    )
-    user_roles = [r[0] for r in roles_res.fetchall()]
-    is_admin = "super_admin" in user_roles
+    is_admin = _is_admin(current_user)
 
     sub_res = await db.execute(select(Subscription).where(Subscription.id == sub_id))
     sub = sub_res.scalar_one_or_none()
@@ -772,11 +751,7 @@ async def get_subscription_deliveries(
     page_size: int = Query(20, ge=1, le=100),
     status: str = Query(None),
 ):
-    roles_res = await db.execute(
-        select(User.role).where(User.id == current_user.id)
-    )
-    user_roles = [r[0] for r in roles_res.fetchall()]
-    is_admin = "super_admin" in user_roles
+    is_admin = _is_admin(current_user)
 
     if not is_admin:
         customer = await _get_customer(db, current_user.id)
@@ -805,12 +780,8 @@ async def skip_delivery_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """Skip a specific delivery day. Triggers carry-forward extension and registers skipped status history."""
-    roles_res = await db.execute(
-        select(User.role)
-        .where(User.id == current_user.id)
-    )
-    user_roles = [r[0] for r in roles_res.fetchall()]
-    is_admin = "super_admin" in user_roles
+    is_admin = _is_admin(current_user)
+    del_status_val = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
 
     delivery_result = await db.execute(
         select(SubscriptionDelivery).where(SubscriptionDelivery.id == delivery_id)
@@ -831,7 +802,7 @@ async def skip_delivery_endpoint(
     if delivery.status not in [DeliveryStatus.PENDING, DeliveryStatus.ASSIGNED]:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot skip a delivery that is {delivery.status.value}"
+            detail=f"Cannot skip a delivery that is {del_status_val}"
         )
 
     try:

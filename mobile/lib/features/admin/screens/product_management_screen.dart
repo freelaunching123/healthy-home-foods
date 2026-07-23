@@ -129,33 +129,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
       ),
       body: Column(
         children: [
-          // Page Header
-          Container(
-            width: double.infinity,
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Manage Packages',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Configure food subscription plans and pricing.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
+
           // Filters & Search
           Container(
             padding: const EdgeInsets.all(16),

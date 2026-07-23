@@ -107,16 +107,7 @@ class AdminDrawer extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.dashboard_outlined,
-                    title: 'Dashboard',
-                    isSelected: currentRoute == '/admin',
-                    onTap: () {
-                      context.pop();
-                      if (currentRoute != '/admin') context.pushReplacement('/admin');
-                    },
-                  ),
+
                   _buildDrawerItem(
                     context: context,
                     icon: Icons.people_outline,

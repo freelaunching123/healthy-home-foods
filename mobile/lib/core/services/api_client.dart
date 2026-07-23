@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../config/app_config.dart';
 import '../constants/api_constants.dart';
 
 class ApiClient {
@@ -10,16 +11,7 @@ class ApiClient {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   ApiClient._() {
-    String baseUrl = ApiConstants.baseUrl;
-    const envUrl = String.fromEnvironment('API_BASE_URL');
-    if (envUrl.isNotEmpty) {
-      baseUrl = envUrl;
-    } else if (!kIsWeb && Platform.isIOS) {
-      baseUrl = ApiConstants.baseUrlIOS;
-    } else if (kIsWeb) {
-      final host = Uri.base.host.isNotEmpty ? Uri.base.host : 'localhost';
-      baseUrl = 'http://$host:1234/api/v1';
-    }
+    final baseUrl = AppConfig.apiBaseUrl;
 
     dio = Dio(BaseOptions(
       baseUrl: baseUrl,

@@ -261,15 +261,19 @@ class NotificationService:
         data: dict = None
     ) -> bool:
         """Sends notification to all active users belonging to a specific role."""
-        from app.models.user import User
+        from app.models.user import User, UserRoleEnum
         
         if role == "admin":
+            admin_roles = [UserRoleEnum.ADMIN, UserRoleEnum.SUPER_ADMIN, "admin", "super_admin"]
             result = await db.execute(
-                select(User).where(User.role.in_(["admin", "super_admin"]), User.is_deleted == False)
+                select(User).where(User.role.in_(admin_roles), User.is_deleted == False)
             )
         else:
+            role_matches = [role]
+            if hasattr(UserRoleEnum, role.upper()):
+                role_matches.append(getattr(UserRoleEnum, role.upper()))
             result = await db.execute(
-                select(User).where(User.role == role, User.is_deleted == False)
+                select(User).where(User.role.in_(role_matches), User.is_deleted == False)
             )
         users = result.scalars().all()
         
