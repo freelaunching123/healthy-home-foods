@@ -115,10 +115,11 @@ async def admin_login(
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if getattr(user, 'is_deleted', False):
         raise HTTPException(status_code=403, detail="Account is deleted")
-    if user.status.value != "active":
+    status_val = user.status.value if hasattr(user.status, "value") else str(user.status)
+    if status_val != "active":
         raise HTTPException(status_code=403, detail="Account is suspended")
 
-    user_role = user.role.value
+    user_role = user.role.value if hasattr(user.role, "value") else str(user.role)
 
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
@@ -151,10 +152,12 @@ async def login_with_password(
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if getattr(user, 'is_deleted', False):
         raise HTTPException(status_code=403, detail="Account is deleted")
-    if user.status.value != "active":
+        
+    status_val = user.status.value if hasattr(user.status, "value") else str(user.status)
+    if status_val != "active":
         raise HTTPException(status_code=403, detail="Account is suspended")
 
-    user_role = user.role.value
+    user_role = user.role.value if hasattr(user.role, "value") else str(user.role)
 
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
@@ -198,7 +201,7 @@ async def refresh_token(
     if getattr(user, 'is_deleted', False):
         raise HTTPException(status_code=403, detail="Account is deleted")
 
-    user_role = user.role.value
+    user_role = user.role.value if hasattr(user.role, "value") else str(user.role)
     token_data = {"sub": str(user.id), "role": user_role, "version": user.token_version}
 
     return TokenResponse(
