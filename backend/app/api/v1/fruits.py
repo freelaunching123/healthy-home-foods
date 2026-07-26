@@ -47,7 +47,7 @@ router = APIRouter(prefix="/fruits", tags=["Fruits"])
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _razorpay_client():
-    return razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+    return razorpay.Client(auth=(settings.RAZORPAY_KEY_ID or "mock", settings.RAZORPAY_KEY_SECRET or "mock"))
 
 
 async def _get_customer(db: AsyncSession, user_id: UUID) -> Customer:
@@ -470,15 +470,13 @@ async def initiate_fruit_payment(
     if order.payment_status not in (FruitPaymentStatus.PENDING, FruitPaymentStatus.INITIATED):
         raise HTTPException(status_code=400, detail="Order payment is not in a payable state")
 
-    order.gateway_order_id = f"mock_order_fruit_{order.id}"
-    order.payment_status = FruitPaymentStatus.INITIATED
-    await db.commit()
+    gateway_order_id = await PaymentService.initiate_fruit_payment(db, order)
 
     return {
-        "order_id": order.gateway_order_id,
+        "order_id": gateway_order_id,
         "amount": int(float(order.total_amount) * 100),
         "currency": "INR",
-        "key_id": "mock_key",
+        "key_id": settings.RAZORPAY_KEY_ID or "mock_key",
         "fruit_order_id": str(order.id),
         "order_number": order.order_number,
     }
@@ -491,8 +489,14 @@ async def verify_fruit_payment(
     current_user: User = Depends(require_customer),
     db: AsyncSession = Depends(get_db),
 ):
-    """Verify mock payment, mark order paid, and clear the cart."""
-    await PaymentService.verify_mock_fruit_payment(db, order_id, current_user)
+    """Verify Razorpay payment, mark order paid, and clear the cart."""
+    await PaymentService.verify_fruit_payment(
+        db=db,
+        order_id=order_id,
+        gateway_payment_id=payload.razorpay_payment_id,
+        gateway_signature=payload.razorpay_signature,
+        user=current_user
+    )
     return MessageResponse(message="Payment verified. Your fruit order has been placed successfully!")
 
 

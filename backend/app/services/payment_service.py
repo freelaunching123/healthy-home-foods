@@ -1,10 +1,12 @@
 import logging
+import razorpay
 from uuid import UUID
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.models.payment import Payment, PaymentStatus, PaymentMethod
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.fruit import FruitOrder, FruitOrderStatus, FruitPaymentStatus
@@ -15,14 +17,36 @@ from app.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
+
 class PaymentService:
     @staticmethod
-    async def initiate_mock_payment(db: AsyncSession, customer_id: UUID, subscription_id: UUID, amount: float) -> Payment:
-        """Create a mock payment record in INITIATED state."""
+    def _get_razorpay_client():
+        if settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET and settings.RAZORPAY_KEY_ID != "mock":
+            return razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+        return None
+
+    @staticmethod
+    async def initiate_payment(db: AsyncSession, customer_id: UUID, subscription_id: UUID, amount: float) -> Payment:
+        """Create a payment record and create Razorpay order if key is present."""
+        client = PaymentService._get_razorpay_client()
+        gateway_order_id = f"mock_order_{subscription_id}"
+
+        if client:
+            try:
+                rzp_order = client.order.create({
+                    "amount": int(round(amount * 100)),
+                    "currency": "INR",
+                    "receipt": f"sub_{str(subscription_id)[:8]}"
+                })
+                gateway_order_id = rzp_order["id"]
+            except Exception as e:
+                logger.error(f"Razorpay order creation failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to create Razorpay order: {str(e)}")
+
         payment = Payment(
             subscription_id=subscription_id,
             customer_id=customer_id,
-            gateway_order_id=f"mock_order_{subscription_id}",
+            gateway_order_id=gateway_order_id,
             amount=amount,
             status=PaymentStatus.INITIATED,
         )
@@ -30,16 +54,17 @@ class PaymentService:
         await db.commit()
         return payment
 
+    # Alias for backwards compatibility
+    initiate_mock_payment = initiate_payment
+
     @staticmethod
-    async def verify_mock_payment(db: AsyncSession, gateway_order_id: str, gateway_payment_id: str, user) -> Payment:
-        """Verify the mock payment and activate subscription/invoicing."""
-        # Find payment by order id
+    async def verify_payment(db: AsyncSession, gateway_order_id: str, gateway_payment_id: str, gateway_signature: str, user) -> Payment:
+        """Verify Razorpay payment signature (or mock fallback) and activate subscription/invoicing."""
         result = await db.execute(
             select(Payment).where(Payment.gateway_order_id == gateway_order_id)
         )
         payment = result.scalar_one_or_none()
         if not payment:
-            # Fallback: check if order ID is just subscription ID (as created by some endpoints)
             try:
                 sub_id = UUID(gateway_order_id)
                 result = await db.execute(
@@ -48,14 +73,31 @@ class PaymentService:
                 payment = result.scalar_one_or_none()
             except ValueError:
                 pass
-                
+
         if not payment:
             raise HTTPException(status_code=404, detail="Payment record not found")
 
+        client = PaymentService._get_razorpay_client()
+        if client and gateway_signature and gateway_signature != "mock_signature":
+            try:
+                client.utility.verify_payment_signature({
+                    'razorpay_order_id': gateway_order_id,
+                    'razorpay_payment_id': gateway_payment_id,
+                    'razorpay_signature': gateway_signature
+                })
+                payment.payment_method = PaymentMethod.RAZORPAY
+            except razorpay.errors.SignatureVerificationError:
+                logger.error(f"Razorpay signature verification failed for order {gateway_order_id}")
+                raise HTTPException(status_code=400, detail="Invalid payment signature")
+            except Exception as e:
+                logger.error(f"Razorpay verification error: {e}")
+                raise HTTPException(status_code=400, detail=f"Payment verification failed: {str(e)}")
+        else:
+            payment.payment_method = PaymentMethod.MOCK_PAYMENT
+
         payment.gateway_payment_id = gateway_payment_id
-        payment.gateway_signature = "mock_signature"
+        payment.gateway_signature = gateway_signature or "mock_signature"
         payment.status = PaymentStatus.SUCCESS
-        payment.payment_method = PaymentMethod.MOCK_PAYMENT
         payment.paid_at = datetime.now(timezone.utc)
 
         # Activate subscription
@@ -105,33 +147,80 @@ class PaymentService:
             action_type="subscription",
             reference_id=str(sub.id)
         )
-        
+
         await db.commit()
         return payment
 
+    # Alias for backwards compatibility
     @staticmethod
-    async def verify_mock_fruit_payment(db: AsyncSession, order_id: UUID, user) -> FruitOrder:
-        """Verify mock fruit payment and set order status to PENDING (Pending Assignment)."""
+    async def verify_mock_payment(db: AsyncSession, gateway_order_id: str, gateway_payment_id: str, user, gateway_signature: str = "mock_signature") -> Payment:
+        return await PaymentService.verify_payment(db, gateway_order_id, gateway_payment_id, gateway_signature, user)
+
+    @staticmethod
+    async def initiate_fruit_payment(db: AsyncSession, order: FruitOrder) -> str:
+        """Create Razorpay order for fruit order."""
+        client = PaymentService._get_razorpay_client()
+        gateway_order_id = f"mock_order_fruit_{order.id}"
+        if client:
+            try:
+                rzp_order = client.order.create({
+                    "amount": int(round(float(order.total_amount) * 100)),
+                    "currency": "INR",
+                    "receipt": f"frt_{str(order.id)[:8]}"
+                })
+                gateway_order_id = rzp_order["id"]
+            except Exception as e:
+                logger.error(f"Razorpay fruit order creation failed: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to create Razorpay order: {str(e)}")
+
+        order.gateway_order_id = gateway_order_id
+        order.payment_status = FruitPaymentStatus.INITIATED
+        await db.commit()
+        return gateway_order_id
+
+    @staticmethod
+    async def verify_fruit_payment(db: AsyncSession, order_id: UUID, gateway_payment_id: str, gateway_signature: str, user) -> FruitOrder:
+        """Verify fruit payment and set order status to PENDING."""
         order = await db.get(FruitOrder, order_id)
         if not order:
             raise HTTPException(status_code=404, detail="Fruit order not found")
 
-        order.gateway_payment_id = f"mock_pay_fruit_{order_id}"
-        order.gateway_signature = "mock_signature"
+        client = PaymentService._get_razorpay_client()
+        if client and gateway_signature and gateway_signature != "mock_signature":
+            try:
+                client.utility.verify_payment_signature({
+                    'razorpay_order_id': order.gateway_order_id,
+                    'razorpay_payment_id': gateway_payment_id,
+                    'razorpay_signature': gateway_signature
+                })
+            except razorpay.errors.SignatureVerificationError:
+                logger.error(f"Razorpay signature verification failed for fruit order {order_id}")
+                raise HTTPException(status_code=400, detail="Invalid payment signature")
+            except Exception as e:
+                logger.error(f"Razorpay verification error: {e}")
+                raise HTTPException(status_code=400, detail=f"Payment verification failed: {str(e)}")
+
+        order.gateway_payment_id = gateway_payment_id
+        order.gateway_signature = gateway_signature or "mock_signature"
         order.payment_status = FruitPaymentStatus.SUCCESS
         order.paid_at = datetime.now(timezone.utc)
-        order.order_status = FruitOrderStatus.PENDING # Pending Assignment
+        order.order_status = FruitOrderStatus.PENDING  # Pending Assignment
 
         # Clear the customer's fruit cart
         from app.models.fruit import FruitCart
         from app.models.customer import Customer
-        
+
         cust_res = await db.execute(select(Customer).where(Customer.user_id == user.id))
         customer = cust_res.scalar_one()
-        
+
         cart_result = await db.execute(select(FruitCart).where(FruitCart.customer_id == customer.id))
         for item in cart_result.scalars().all():
             await db.delete(item)
 
         await db.commit()
         return order
+
+    # Alias for backwards compatibility
+    @staticmethod
+    async def verify_mock_fruit_payment(db: AsyncSession, order_id: UUID, user, gateway_payment_id: str = "mock_pay", gateway_signature: str = "mock_signature") -> FruitOrder:
+        return await PaymentService.verify_fruit_payment(db, order_id, gateway_payment_id, gateway_signature, user)

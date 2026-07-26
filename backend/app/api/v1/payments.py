@@ -67,7 +67,7 @@ async def initiate_payment(
         "order_id": payment.gateway_order_id,
         "amount": int(float(sub.total_amount) * 100),
         "currency": "INR",
-        "key_id": "mock_key",
+        "key_id": settings.RAZORPAY_KEY_ID or "mock_key",
         "subscription_id": str(sub.id),
         "payment_id": str(payment.id),
     }
@@ -80,10 +80,11 @@ async def verify_payment(
     db: AsyncSession = Depends(get_db),
 ):
     """Verify mock payment and activate subscription."""
-    await PaymentService.verify_mock_payment(
+    await PaymentService.verify_payment(
         db=db,
         gateway_order_id=payload.razorpay_order_id,
         gateway_payment_id=payload.razorpay_payment_id,
+        gateway_signature=payload.razorpay_signature,
         user=current_user
     )
     return MessageResponse(message="Payment verified and subscription activated")

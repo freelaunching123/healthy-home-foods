@@ -155,48 +155,67 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       final subId = subRes.data['id'];
 
-      // Initiate payment (mock: auto-verify)
+      // Initiate payment
       try {
         final payRes = await _api.post(ApiConstants.paymentInitiate, data: {
           'subscription_id': subId,
         });
 
-        // Show Mock Payment Successful confirmation
-        if (mounted) {
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 28),
-                  SizedBox(width: 10),
-                  Text('Payment Successful'),
+        final payData = payRes.data;
+        final keyId = payData['key_id'] as String?;
+        final gatewayOrderId = payData['order_id'] as String?;
+
+        if (keyId != null && keyId.isNotEmpty && keyId != 'mock_key') {
+          final options = {
+            'key': keyId,
+            'amount': payData['amount'] ?? ((_total * 100).toInt()),
+            'name': 'Healthy Home Foods',
+            'description': 'Subscription Payment',
+            'order_id': gatewayOrderId,
+            'retry': {'enabled': true, 'max_count': 1},
+            'send_sms_hash': true,
+            'external': {
+              'wallets': ['paytm']
+            }
+          };
+          _razorpay.open(options);
+        } else {
+          // Fallback for mock payment when key_id is mock_key
+          if (mounted) {
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                title: const Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 28),
+                    SizedBox(width: 10),
+                    Text('Payment Successful'),
+                  ],
+                ),
+                content: const Text(
+                  'Mock Payment Successful!\nYour transaction has been processed.',
+                  style: TextStyle(fontSize: 15),
+                ),
+                actions: [
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK'),
+                  ),
                 ],
               ),
-              content: const Text(
-                'Mock Payment Successful!\nYour transaction has been processed.',
-                style: TextStyle(fontSize: 15),
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-        }
+            );
+          }
 
-        // For mock: directly verify with mock data
-        await _api.post(ApiConstants.paymentVerify, data: {
-          'razorpay_order_id': payRes.data['order_id'] ?? 'mock_order',
-          'razorpay_payment_id': 'mock_pay_${DateTime.now().millisecondsSinceEpoch}',
-          'razorpay_signature': 'mock_signature',
-        });
+          await _api.post(ApiConstants.paymentVerify, data: {
+            'razorpay_order_id': gatewayOrderId ?? 'mock_order',
+            'razorpay_payment_id': 'mock_pay_${DateTime.now().millisecondsSinceEpoch}',
+            'razorpay_signature': 'mock_signature',
+          });
+        }
       } catch (e) {
-        debugPrint('Payment mock: $e');
+        debugPrint('Payment error: $e');
       }
 
       if (!mounted) return;

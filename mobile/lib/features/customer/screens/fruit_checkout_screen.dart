@@ -191,55 +191,75 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
       final orderId = orderRes.data['id'] as String;
       _pendingOrderId = orderId;
 
-      // Step 2: Initiate mock payment
+      // Initiate payment
       final payRes = await _api.post(
         '${ApiConstants.fruitOrders}/$orderId/payment/initiate',
         data: {},
       );
 
-      // Show Mock Payment Successful confirmation
-      if (mounted) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 28),
-                SizedBox(width: 10),
-                Text('Payment Successful'),
+      final payData = payRes.data;
+      final keyId = payData['key_id'] as String?;
+      final gatewayOrderId = payData['order_id'] as String?;
+
+      if (keyId != null && keyId.isNotEmpty && keyId != 'mock_key') {
+        final options = {
+          'key': keyId,
+          'amount': payData['amount'] ?? ((_total * 100).toInt()),
+          'name': 'Healthy Home Foods',
+          'description': 'Fruit Box Order Payment',
+          'order_id': gatewayOrderId,
+          'retry': {'enabled': true, 'max_count': 1},
+          'send_sms_hash': true,
+          'external': {
+            'wallets': ['paytm']
+          }
+        };
+        setState(() { _placingOrder = false; _paymentProcessing = true; });
+        _razorpay.open(options);
+      } else {
+        // Fallback for mock environment when key_id is mock_key
+        if (mounted) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 28),
+                  SizedBox(width: 10),
+                  Text('Payment Successful'),
+                ],
+              ),
+              content: const Text(
+                'Mock Payment Successful!\nYour transaction has been processed.',
+                style: TextStyle(fontSize: 15),
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK'),
+                ),
               ],
             ),
-            content: const Text(
-              'Mock Payment Successful!\nYour transaction has been processed.',
-              style: TextStyle(fontSize: 15),
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      }
+          );
+        }
 
-      setState(() { _placingOrder = false; _paymentProcessing = true; });
-      
-      // Call verification directly on backend
-      await _api.post(
-        '${ApiConstants.fruitOrders}/$_pendingOrderId/payment/verify',
-        data: {
-          'razorpay_order_id': payRes.data['order_id'] ?? 'mock_order',
-          'razorpay_payment_id': 'mock_pay_fruit_${DateTime.now().millisecondsSinceEpoch}',
-          'razorpay_signature': 'mock_signature',
-        },
-      );
-      
-      setState(() => _paymentProcessing = false);
-      if (mounted) {
-        _showSuccessDialog();
+        setState(() { _placingOrder = false; _paymentProcessing = true; });
+        
+        await _api.post(
+          '${ApiConstants.fruitOrders}/$_pendingOrderId/payment/verify',
+          data: {
+            'razorpay_order_id': gatewayOrderId ?? 'mock_order',
+            'razorpay_payment_id': 'mock_pay_fruit_${DateTime.now().millisecondsSinceEpoch}',
+            'razorpay_signature': 'mock_signature',
+          },
+        );
+        
+        setState(() => _paymentProcessing = false);
+        if (mounted) {
+          _showSuccessDialog();
+        }
       }
     } catch (e) {
       setState(() { 
