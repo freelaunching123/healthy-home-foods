@@ -116,7 +116,7 @@ async def get_active_deliveries(
                 delivery_address=f"{addr.address_line1}, {addr.city}, {addr.pincode}",
                 latitude=float(addr.latitude) if addr.latitude else None,
                 longitude=float(addr.longitude) if addr.longitude else None,
-                status=a.status.value,
+                status=a.status.value if hasattr(a.status, "value") else str(a.status),
                 assigned_at=a.assigned_at,
                 items_summary="Subscription Meal",
                 total_amount=0.0, # Prepaid usually
@@ -143,7 +143,7 @@ async def get_active_deliveries(
                 delivery_address=f"{addr.address_line1}, {addr.city}, {addr.pincode}",
                 latitude=float(addr.latitude) if addr.latitude else None,
                 longitude=float(addr.longitude) if addr.longitude else None,
-                status=a.status.value,
+                status=a.status.value if hasattr(a.status, "value") else str(a.status),
                 assigned_at=a.assigned_at,
                 items_summary="Fresh Fruits Order",
                 total_amount=float(fo.total_amount),

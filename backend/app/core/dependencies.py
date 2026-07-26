@@ -38,9 +38,11 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
-    if user.status.value != "active":
+    status_val = user.status.value if hasattr(user.status, "value") else str(user.status or "active")
+    if status_val != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is not active")
-    if token_version is not None and user.token_version != token_version:
+    version_val = getattr(user, 'token_version', 1) or 1
+    if token_version is not None and version_val != token_version:
         raise credentials_exception
     return user
 
@@ -50,7 +52,8 @@ async def get_current_user_roles(
     db: AsyncSession = Depends(get_db),
 ) -> list[str]:
     """Returns list of role names for the current user."""
-    return [current_user.role.value]
+    role_val = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role or "customer")
+    return [role_val]
 
 
 def require_roles(*allowed_roles: str):
@@ -58,7 +61,8 @@ def require_roles(*allowed_roles: str):
     async def _check(
         current_user: User = Depends(get_current_user),
     ) -> User:
-        if current_user.role.value not in allowed_roles:
+        user_role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role or "customer")
+        if user_role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied. Required role(s): {', '.join(allowed_roles)}",
