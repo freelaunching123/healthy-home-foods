@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -15,6 +16,7 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _api = ApiClient();
+  late Razorpay _razorpay;
   Map<String, dynamic>? _product;
   List<dynamic> _addresses = [];
   List<dynamic> _plans = [];
@@ -29,7 +31,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
+    _setupRazorpay();
     _loadData();
+  }
+
+  void _setupRazorpay() {
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -213,52 +229,87 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             'razorpay_payment_id': 'mock_pay_${DateTime.now().millisecondsSinceEpoch}',
             'razorpay_signature': 'mock_signature',
           });
+          if (mounted) {
+            _showSuccessDialog();
+          }
         }
       } catch (e) {
         debugPrint('Payment error: $e');
       }
-
-      if (!mounted) return;
-      // Show success
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: AppTheme.success.withValues(alpha: 0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.check_circle_rounded, size: 48, color: AppTheme.success),
-              ),
-              const SizedBox(height: 16),
-              const Text('Subscription Activated!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              const Text('Your healthy meals will start soon', textAlign: TextAlign.center,
-                style: TextStyle(color: AppTheme.textSecondary)),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () { Navigator.pop(context); context.go('/subscriptions'); },
-                child: const Text('View My Plans'),
-              ),
-            ],
-          ),
-        ),
-      );
     } catch (e) {
-      String msg = 'Failed to create subscription';
-      try {
-        final dioError = e as dynamic;
-        msg = dioError.response?.data?['detail'] ?? msg;
-      } catch (_) {}
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: AppTheme.error),
-      );
+      debugPrint('Checkout error: $e');
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: AppTheme.success.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: const Icon(Icons.check_circle_rounded, size: 48, color: AppTheme.success),
+            ),
+            const SizedBox(height: 16),
+            const Text('Subscription Activated!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            const Text('Your healthy meals will start soon', textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textSecondary)),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () { Navigator.pop(context); context.go('/subscriptions'); },
+              child: const Text('View My Plans'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onPaymentSuccess(PaymentSuccessResponse response) async {
+    setState(() => _isProcessing = false);
+    try {
+      await _api.post(
+        ApiConstants.paymentVerify,
+        data: {
+          'razorpay_order_id': response.orderId,
+          'razorpay_payment_id': response.paymentId,
+          'razorpay_signature': response.signature,
+        },
+      );
+      if (mounted) {
+        _showSuccessDialog();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment verification failed: $e'), backgroundColor: AppTheme.error),
+        );
+      }
+    }
+  }
+
+  void _onPaymentError(PaymentFailureResponse response) {
+    setState(() => _isProcessing = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment failed: ${response.message ?? "Transaction cancelled"}'),
+        backgroundColor: AppTheme.error,
+      ),
+    );
+  }
+
+  void _onExternalWallet(ExternalWalletResponse response) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('External Wallet Selected: ${response.walletName}')),
+    );
   }
 
   @override

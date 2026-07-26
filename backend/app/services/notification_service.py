@@ -263,30 +263,37 @@ class NotificationService:
         """Sends notification to all active users belonging to a specific role."""
         from app.models.user import User, UserRoleEnum
         
-        if role == "admin":
-            admin_roles = [UserRoleEnum.ADMIN, UserRoleEnum.SUPER_ADMIN, "admin", "super_admin"]
-            result = await db.execute(
-                select(User).where(User.role.in_(admin_roles), User.is_deleted == False)
-            )
+        target_roles = []
+        if role.lower() in ("admin", "super_admin"):
+            target_roles = [UserRoleEnum.ADMIN, UserRoleEnum.SUPER_ADMIN]
+        elif hasattr(UserRoleEnum, role.upper()):
+            target_roles = [getattr(UserRoleEnum, role.upper())]
         else:
-            role_matches = [role]
-            if hasattr(UserRoleEnum, role.upper()):
-                role_matches.append(getattr(UserRoleEnum, role.upper()))
-            result = await db.execute(
-                select(User).where(User.role.in_(role_matches), User.is_deleted == False)
-            )
+            for r in UserRoleEnum:
+                if r.value == role.lower():
+                    target_roles.append(r)
+
+        if not target_roles:
+            return True
+
+        result = await db.execute(
+            select(User).where(User.role.in_(target_roles), User.is_deleted == False)
+        )
         users = result.scalars().all()
         
         for user in users:
-            await NotificationService.send_notification_to_user(
-                db=db,
-                user_id=user.id,
-                title=title,
-                body=body,
-                notification_type=notification_type,
-                reference_id=reference_id,
-                data=data
-            )
+            try:
+                await NotificationService.send_notification_to_user(
+                    db=db,
+                    user_id=user.id,
+                    title=title,
+                    body=body,
+                    notification_type=notification_type,
+                    reference_id=reference_id,
+                    data=data
+                )
+            except Exception as ex:
+                logger.error(f"Error sending notification to user {user.id}: {ex}")
         return True
 
     @staticmethod

@@ -72,7 +72,6 @@ async def register_customer(
         )
         await db.commit()
     except Exception as e:
-        await db.rollback()
         logger.error(f"Failed to send welcome notification: {e}")
     
     # Notify admin
@@ -87,7 +86,6 @@ async def register_customer(
         )
         await db.commit()
     except Exception as e:
-        await db.rollback()
         logger.error(f"Failed to send admin notification: {e}")
     
     return RegisterResponse(message="Registration successful", user_id=str(user.id))
@@ -122,8 +120,6 @@ async def admin_login(
 
     user_role = user.role.value
 
-
-
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
 
@@ -143,7 +139,10 @@ async def login_with_password(
     db: AsyncSession = Depends(get_db),
 ):
     """Phone + password login (for admin / pre-registered users)."""
-    result = await db.execute(select(User).where(User.phone == payload.phone))
+    phone_val = payload.phone.strip().lstrip("+")
+    if phone_val.startswith("91") and len(phone_val) == 12:
+        phone_val = phone_val[2:]
+    result = await db.execute(select(User).where(User.phone == phone_val))
     user = result.scalar_one_or_none()
 
     if not user or not user.password_hash:
