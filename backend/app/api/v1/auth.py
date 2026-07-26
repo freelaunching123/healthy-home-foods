@@ -111,26 +111,35 @@ async def admin_login(
 
     if not user or not user.password_hash:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not verify_password(payload.password, user.password_hash):
+    try:
+        if not verify_password(payload.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+    except Exception as ex:
+        logger.error(f"Password verification error: {ex}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
     if getattr(user, 'is_deleted', False):
         raise HTTPException(status_code=403, detail="Account is deleted")
-    status_val = user.status.value if hasattr(user.status, "value") else str(user.status)
+    status_val = user.status.value if hasattr(user.status, "value") else str(user.status or "active")
     if status_val != "active":
         raise HTTPException(status_code=403, detail="Account is suspended")
 
-    user_role = user.role.value if hasattr(user.role, "value") else str(user.role)
+    user_role = user.role.value if hasattr(user.role, "value") else str(user.role or "customer")
+    version_val = getattr(user, 'token_version', 1) or 1
 
-    user.last_login_at = datetime.now(timezone.utc)
-    await db.commit()
+    try:
+        user.last_login_at = datetime.now(timezone.utc)
+        await db.commit()
+    except Exception as ex:
+        logger.error(f"Error updating last_login_at: {ex}")
 
-    token_data = {"sub": str(user.id), "role": user_role, "version": user.token_version}
+    token_data = {"sub": str(user.id), "role": user_role, "version": version_val}
     return TokenResponse(
         access_token=create_access_token(token_data),
         refresh_token=create_refresh_token(token_data),
         user_id=str(user.id),
         role=user_role,
-        full_name=user.full_name,
+        full_name=user.full_name or "Customer",
     )
 
 
@@ -148,27 +157,36 @@ async def login_with_password(
 
     if not user or not user.password_hash:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not verify_password(payload.password, user.password_hash):
+    try:
+        if not verify_password(payload.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+    except Exception as ex:
+        logger.error(f"Password verification error: {ex}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
     if getattr(user, 'is_deleted', False):
         raise HTTPException(status_code=403, detail="Account is deleted")
         
-    status_val = user.status.value if hasattr(user.status, "value") else str(user.status)
+    status_val = user.status.value if hasattr(user.status, "value") else str(user.status or "active")
     if status_val != "active":
         raise HTTPException(status_code=403, detail="Account is suspended")
 
-    user_role = user.role.value if hasattr(user.role, "value") else str(user.role)
+    user_role = user.role.value if hasattr(user.role, "value") else str(user.role or "customer")
+    version_val = getattr(user, 'token_version', 1) or 1
 
-    user.last_login_at = datetime.now(timezone.utc)
-    await db.commit()
+    try:
+        user.last_login_at = datetime.now(timezone.utc)
+        await db.commit()
+    except Exception as ex:
+        logger.error(f"Error updating last_login_at: {ex}")
 
-    token_data = {"sub": str(user.id), "role": user_role, "version": user.token_version}
+    token_data = {"sub": str(user.id), "role": user_role, "version": version_val}
     return TokenResponse(
         access_token=create_access_token(token_data),
         refresh_token=create_refresh_token(token_data),
         user_id=str(user.id),
         role=user_role,
-        full_name=user.full_name,
+        full_name=user.full_name or "Customer",
     )
 
 
@@ -201,15 +219,16 @@ async def refresh_token(
     if getattr(user, 'is_deleted', False):
         raise HTTPException(status_code=403, detail="Account is deleted")
 
-    user_role = user.role.value if hasattr(user.role, "value") else str(user.role)
-    token_data = {"sub": str(user.id), "role": user_role, "version": user.token_version}
+    user_role = user.role.value if hasattr(user.role, "value") else str(user.role or "customer")
+    version_val = getattr(user, 'token_version', 1) or 1
+    token_data = {"sub": str(user.id), "role": user_role, "version": version_val}
 
     return TokenResponse(
         access_token=create_access_token(token_data),
         refresh_token=create_refresh_token(token_data),
         user_id=str(user.id),
         role=user_role,
-        full_name=user.full_name,
+        full_name=user.full_name or "Customer",
     )
 
 

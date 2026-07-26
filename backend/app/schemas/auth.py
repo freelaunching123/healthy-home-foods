@@ -67,7 +67,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: str
     role: str
-    full_name: str
+    full_name: Optional[str] = "Customer"
 
 
 class RegisterResponse(BaseModel):
