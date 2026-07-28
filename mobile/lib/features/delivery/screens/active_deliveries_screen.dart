@@ -56,6 +56,7 @@ class _ActiveDeliveriesScreenState extends State<ActiveDeliveriesScreen> {
       }
     });
 
+    try {
       final data = {
         'status': newStatus,
         'failure_reason': failureReason,
