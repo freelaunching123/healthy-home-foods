@@ -5,6 +5,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/api_error_handler.dart';
 import '../widgets/admin_drawer.dart';
 
 class FruitManagementScreen extends StatefulWidget {
