@@ -460,23 +460,30 @@ class _StatusTracker extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-      child: Row(
-        children: _steps.asMap().entries.map((e) {
-          final idx = e.key;
-          final step = e.value;
-          final isDone = idx <= currentIdx;
-          final isCurrent = idx == currentIdx;
-          return Expanded(
-            child: Column(
-              children: [
-                Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: List.generate(_steps.length, (idx) {
+              final isDone = idx <= currentIdx;
+              final isCurrent = idx == currentIdx;
+              final step = _steps[idx];
+
+              return Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (idx > 0) Expanded(
-                      child: Container(height: 2,
-                        color: idx <= currentIdx ? AppTheme.primaryGreen : Colors.grey.shade200),
-                    ),
+                    if (idx > 0)
+                      Expanded(
+                        child: Container(
+                          height: 2,
+                          color: idx <= currentIdx ? AppTheme.primaryGreen : Colors.grey.shade200,
+                        ),
+                      ),
                     Container(
-                      width: 28, height: 28,
+                      width: 28,
+                      height: 28,
                       decoration: BoxDecoration(
                         color: isDone ? AppTheme.primaryGreen : Colors.grey.shade200,
                         shape: BoxShape.circle,
@@ -484,14 +491,28 @@ class _StatusTracker extends StatelessWidget {
                       ),
                       child: Icon(step.$3, size: 14, color: isDone ? Colors.white : AppTheme.textLight),
                     ),
-                    if (idx < _steps.length - 1) Expanded(
-                      child: Container(height: 2,
-                        color: idx < currentIdx ? AppTheme.primaryGreen : Colors.grey.shade200),
-                    ),
+                    if (idx < _steps.length - 1)
+                      Expanded(
+                        child: Container(
+                          height: 2,
+                          color: idx < currentIdx ? AppTheme.primaryGreen : Colors.grey.shade200,
+                        ),
+                      ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
+              );
+            }),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: List.generate(_steps.length, (idx) {
+              final isDone = idx <= currentIdx;
+              final isCurrent = idx == currentIdx;
+              final step = _steps[idx];
+
+              return Expanded(
+                child: Text(
                   step.$2,
                   style: GoogleFonts.inter(
                     fontSize: 9,
@@ -500,10 +521,10 @@ class _StatusTracker extends StatelessWidget {
                   ),
                   textAlign: TextAlign.center,
                 ),
-              ],
-            ),
-          );
-        }).toList(),
+              );
+            }),
+          ),
+        ],
       ),
     );
   }

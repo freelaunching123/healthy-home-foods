@@ -323,7 +323,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.shopping_basket_rounded, color: AppTheme.primaryGreen),
-                    onPressed: () => context.push('/fruits/cart'),
+                    onPressed: () async {
+                      await context.push('/fruits/cart');
+                      if (mounted) {
+                        _loadCartCount();
+                        _loadFruits(isSilent: true);
+                      }
+                    },
                     tooltip: 'Fruit Cart',
                   ),
                   Positioned(
@@ -344,7 +350,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.shopping_cart_rounded, color: AppTheme.primaryGreen),
-                    onPressed: () => context.push('/packages/cart'),
+                    onPressed: () async {
+                      await context.push('/packages/cart');
+                      if (mounted) {
+                        _loadPackageCartCount();
+                        _loadPackages(isSilent: true);
+                      }
+                    },
                     tooltip: 'Package Cart',
                   ),
                   Positioned(
@@ -527,6 +539,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   product: _filteredPackages[i],
                   quantity: _packageQuantities[productId] ?? 0,
                   onQtyChanged: (newQty) => _onPackageQtyChanged(_filteredPackages[i], newQty),
+                  onRefresh: () {
+                    _loadPackageCartCount();
+                    _loadPackages(isSilent: true);
+                  },
                 );
               },
               childCount: _filteredPackages.length,
@@ -581,6 +597,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   quantity: _quantities[fruitId] ?? 0.0,
                   onQtyChanged: (newQty) => _onQtyChanged(_filteredFruits[i], newQty),
                   baseUrl: _api.dio.options.baseUrl.replaceAll('/api/v1', ''),
+                  onRefresh: () {
+                    _loadCartCount();
+                    _loadFruits(isSilent: true);
+                  },
                 );
               },
               childCount: _filteredFruits.length,
@@ -677,8 +697,9 @@ class _ProductCard extends StatelessWidget {
   final dynamic product;
   final int quantity;
   final Function(int) onQtyChanged;
+  final VoidCallback? onRefresh;
   
-  const _ProductCard({required this.product, required this.quantity, required this.onQtyChanged});
+  const _ProductCard({required this.product, required this.quantity, required this.onQtyChanged, this.onRefresh});
   @override
   Widget build(BuildContext context) {
     final double packagePrice = double.tryParse(product['package_price']?.toString() ?? '0') ?? 0;
@@ -689,8 +710,9 @@ class _ProductCard extends StatelessWidget {
     final imgUrl = product['image_url'] != null ? '$mediaBaseUrl${product['image_url']}' : null;
 
     return GestureDetector(
-      onTap: () {
-        context.push('/product/${product['id']}');
+      onTap: () async {
+        await context.push('/product/${product['id']}');
+        onRefresh?.call();
       },
       child: Opacity(
         opacity: isOutOfStock ? 0.6 : 1.0,
@@ -864,8 +886,9 @@ class _FruitCard extends StatelessWidget {
   final double quantity;
   final ValueChanged<double> onQtyChanged;
   final String baseUrl;
+  final VoidCallback? onRefresh;
 
-  const _FruitCard({required this.fruit, required this.quantity, required this.onQtyChanged, required this.baseUrl});
+  const _FruitCard({required this.fruit, required this.quantity, required this.onQtyChanged, required this.baseUrl, this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
@@ -885,9 +908,12 @@ class _FruitCard extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         final fruitId = fruit['id']?.toString() ?? '';
-        if (fruitId.isNotEmpty) context.push('/fruits/$fruitId');
+        if (fruitId.isNotEmpty) {
+          await context.push('/fruits/$fruitId');
+          onRefresh?.call();
+        }
       },
       child: Container(
         decoration: BoxDecoration(

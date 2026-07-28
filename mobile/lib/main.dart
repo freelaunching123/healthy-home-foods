@@ -10,21 +10,6 @@ import 'core/services/fcm_service.dart';
 void main() async {
   debugPrint('--- FLUTTER STARTUP MAIN ---');
   WidgetsFlutterBinding.ensureInitialized();
-  debugPrint('WidgetsFlutterBinding initialized');
-  
-  // Initialize Firebase and FCM
-  try {
-    if (!kIsWeb) {
-      await Firebase.initializeApp();
-      debugPrint('Firebase initialized');
-      await FcmService().initialize();
-      debugPrint('FcmService initialized');
-    } else {
-      debugPrint('Firebase/FCM is bypassed on Web platform');
-    }
-  } catch (e) {
-    debugPrint('Error initializing Firebase/FCM: $e');
-  }
   
   // Lock to portrait
   try {
@@ -32,7 +17,6 @@ void main() async {
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
-    debugPrint('Preferred orientations set');
   } catch (e) {
     debugPrint('Error setting preferred orientations: $e');
   }
@@ -42,10 +26,24 @@ void main() async {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
   ));
-  debugPrint('SystemUIOverlayStyle set');
 
+  // Render UI immediately for instant startup
   runApp(const ProviderScope(child: HealthyHomeFoodsApp()));
   debugPrint('runApp called');
+
+  // Initialize Firebase and FCM asynchronously in background without blocking UI
+  if (!kIsWeb) {
+    Future.microtask(() async {
+      try {
+        await Firebase.initializeApp();
+        debugPrint('Firebase initialized');
+        await FcmService().initialize();
+        debugPrint('FcmService initialized');
+      } catch (e) {
+        debugPrint('Error initializing Firebase/FCM: $e');
+      }
+    });
+  }
 }
 
 class HealthyHomeFoodsApp extends StatelessWidget {

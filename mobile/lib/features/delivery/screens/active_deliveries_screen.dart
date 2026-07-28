@@ -22,48 +22,60 @@ class _ActiveDeliveriesScreenState extends State<ActiveDeliveriesScreen> {
     _loadDeliveries();
   }
 
-  Future<void> _loadDeliveries() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadDeliveries({bool silent = false}) async {
+    if (!silent) setState(() => _isLoading = true);
     try {
       final res = await _api.get(ApiConstants.partnerActiveDeliveries);
-      setState(() {
-        _deliveries = res.data is List ? res.data : [];
-      });
+      if (mounted) {
+        setState(() {
+          _deliveries = res.data is List ? res.data : [];
+        });
+      }
     } catch (e) {
       debugPrint('Error loading active deliveries: $e');
-      if (mounted) {
+      if (!silent && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to load active deliveries')),
         );
       }
     } finally {
-      if (mounted) {
+      if (!silent && mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
 
   Future<void> _updateStatus(String assignmentId, String newStatus, {String? failureReason}) async {
-    try {
+    // Optimistic UI update: Remove delivered/failed items instantly from UI
+    setState(() {
+      if (newStatus == 'delivered' || newStatus == 'failed') {
+        _deliveries.removeWhere((item) => item['id'] == assignmentId);
+      } else {
+        final idx = _deliveries.indexWhere((item) => item['id'] == assignmentId);
+        if (idx != -1) _deliveries[idx]['status'] = newStatus;
+      }
+    });
+
       final data = {
         'status': newStatus,
-        if (failureReason != null) 'failure_reason': failureReason,
-      };
+        'failure_reason': failureReason,
+      }..removeWhere((_, v) => v == null);
       
       await _api.put(ApiConstants.partnerUpdateStatus(assignmentId), data: data);
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Status updated to $newStatus')),
+          SnackBar(content: Text('Status updated to $newStatus'), duration: const Duration(seconds: 1)),
         );
       }
-      _loadDeliveries();
+      _loadDeliveries(silent: true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to update status')),
         );
       }
+      _loadDeliveries(silent: true);
     }
   }
 
@@ -247,7 +259,7 @@ class _ActiveDeliveriesScreenState extends State<ActiveDeliveriesScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryGreen.withOpacity(0.1),
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
