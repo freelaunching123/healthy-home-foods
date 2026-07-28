@@ -204,16 +204,28 @@ async def hard_delete_product(
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    try:
-        await db.delete(product)
-        await db.commit()
-        return MessageResponse(message="Product permanently deleted")
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(
-            status_code=400, 
-            detail="Cannot delete product because it is associated with active orders or subscriptions. Please deactivate it instead."
-        )
+
+    # 1. Delete cart items referencing this product
+    from app.models.package_cart import PackageCart
+    cart_result = await db.execute(select(PackageCart).where(PackageCart.product_id == product_id))
+    for cart_item in cart_result.scalars().all():
+        await db.delete(cart_item)
+
+    # 2. Delete subscription items referencing this product
+    from app.models.subscription import SubscriptionItem, Subscription
+    sub_items_res = await db.execute(select(SubscriptionItem).where(SubscriptionItem.product_id == product_id))
+    for sub_item in sub_items_res.scalars().all():
+        await db.delete(sub_item)
+
+    # 3. Disassociate subscriptions referencing this product (set product_id=None)
+    subs_res = await db.execute(select(Subscription).where(Subscription.product_id == product_id))
+    for sub in subs_res.scalars().all():
+        sub.product_id = None
+
+    # 4. Perform complete delete of product
+    await db.delete(product)
+    await db.commit()
+    return MessageResponse(message="Product permanently deleted")
 
 
 @router.post("/{product_id}/restore", response_model=MessageResponse)

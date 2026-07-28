@@ -1005,6 +1005,10 @@ class _EditPartnerDialogState extends State<_EditPartnerDialog> {
                 controller: _mobileCtrl,
                 keyboardType: TextInputType.phone,
                 maxLength: 10,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
                 decoration: const InputDecoration(
                   labelText: 'Mobile Number',
                   prefixIcon: Icon(Icons.phone_outlined),

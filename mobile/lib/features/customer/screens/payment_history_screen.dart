@@ -110,7 +110,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen>
       debugPrint('Error downloading invoice: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to download invoice'), backgroundColor: AppTheme.error),
+          SnackBar(content: Text('Failed to download invoice: ${ApiErrorHandler.getMessage(e)}'), backgroundColor: AppTheme.error),
         );
       }
     } finally {

@@ -238,109 +238,170 @@ async def download_invoice(
     paid_date = payment.paid_at.strftime('%B %d, %Y') if payment.paid_at else payment.created_at.strftime('%B %d, %Y')
     pmt_method = payment.payment_method.value if payment.payment_method and hasattr(payment.payment_method, "value") else (payment.payment_method or "Razorpay")
 
-    # Generate PDF using WeasyPrint
-    import weasyprint
+    # Generate PDF using ReportLab
     import io
     from fastapi.responses import StreamingResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-    html_content = f"""
-    <html>
-    <head>
-      <style>
-        body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 40px; color: #333; }}
-        .header {{ border-bottom: 2px solid #2E7D32; padding-bottom: 20px; margin-bottom: 30px; }}
-        .header h1 {{ color: #2E7D32; margin: 0; font-size: 28px; }}
-        .header p {{ margin: 5px 0 0 0; color: #666; font-size: 14px; }}
-        .invoice-details {{ width: 100%; margin-bottom: 30px; }}
-        .invoice-details td {{ vertical-align: top; font-size: 14px; }}
-        .details-title {{ font-weight: bold; color: #2E7D32; margin-bottom: 5px; text-transform: uppercase; font-size: 12px; }}
-        .table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; }}
-        .table th {{ background: #2E7D32; color: white; padding: 10px; font-size: 14px; text-align: left; }}
-        .table td {{ padding: 12px 10px; border-bottom: 1px solid #eee; font-size: 14px; }}
-        .summary {{ float: right; width: 300px; margin-top: 10px; }}
-        .summary table {{ width: 100%; border-collapse: collapse; }}
-        .summary td {{ padding: 6px 0; font-size: 14px; }}
-        .summary .total {{ font-weight: bold; font-size: 16px; border-top: 2px solid #2E7D32; color: #2E7D32; padding-top: 10px; }}
-        .footer {{ position: fixed; bottom: 0; left: 0; right: 0; border-top: 1px solid #ddd; padding-top: 10px; text-align: center; color: #999; font-size: 11px; }}
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>HEALTHY HOME FOODS</h1>
-        <p>Your Daily Dose of Healthy & Fresh Home-Cooked Meals</p>
-      </div>
-      
-      <table class="invoice-details">
-        <tr>
-          <td style="width: 50%;">
-            <div class="details-title">Billed To</div>
-            <strong>{cust_name}</strong><br/>
-            Phone: {cust_phone}<br/>
-            {f"Email: {cust_email}<br/>" if cust_email else ""}
-            Address: {billing_addr}
-          </td>
-          <td style="width: 50%; text-align: right;">
-            <div class="details-title">Invoice Information</div>
-            <strong>Invoice No:</strong> {invoice_no}<br/>
-            <strong>Date:</strong> {paid_date}<br/>
-            <strong>Payment Method:</strong> {pmt_method.upper()}<br/>
-            <strong>Status:</strong> {payment.status.upper()}
-          </td>
-        </tr>
-      </table>
-      
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Item Description</th>
-            <th style="text-align: right; width: 150px;">Price per Delivery</th>
-            <th style="text-align: right; width: 100px;">Deliveries</th>
-            <th style="text-align: right; width: 150px;">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <strong>{prod_name}</strong><br/>
-              <span style="font-size: 12px; color: #666;">Plan: {plan_name.title()}</span>
-            </td>
-            <td style="text-align: right;">₹{price_per:.2f}</td>
-            <td style="text-align: right;">{total_del}</td>
-            <td style="text-align: right;">₹{subtotal:.2f}</td>
-          </tr>
-        </tbody>
-      </table>
-      
-      <div class="summary">
-        <table>
-          <tr>
-            <td>Subtotal</td>
-            <td style="text-align: right;">₹{subtotal:.2f}</td>
-          </tr>
-          <tr>
-            <td>Delivery Charge</td>
-            <td style="text-align: right;">₹{del_charge:.2f}</td>
-          </tr>
-          <tr>
-            <td>Tax Amount</td>
-            <td style="text-align: right;">₹{tax_amt:.2f}</td>
-          </tr>
-          <tr class="total">
-            <td>Total Paid</td>
-            <td style="text-align: right;">₹{total_amt:.2f}</td>
-          </tr>
-        </table>
-      </div>
-      
-      <div class="footer">
-        Thank you for subscribing to Healthy Home Foods! For support, contact support@healthyhomefoods.com
-      </div>
-    </body>
-    </html>
-    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=20,
+        leading=24,
+        textColor=colors.HexColor('#2E7D32')
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=13,
+        textColor=colors.HexColor('#666666')
+    )
+    h2_style = ParagraphStyle(
+        'H2Style',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=11,
+        leading=14,
+        textColor=colors.HexColor('#2E7D32')
+    )
+    normal_style = ParagraphStyle(
+        'NormalText',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#333333')
+    )
+    right_normal = ParagraphStyle(
+        'RightNormal',
+        parent=normal_style,
+        alignment=2
+    )
+    right_bold = ParagraphStyle(
+        'RightBold',
+        parent=normal_style,
+        fontName='Helvetica-Bold',
+        alignment=2
+    )
+
+    story = []
+
+    # Header
+    story.append(Paragraph("HEALTHY HOME FOODS", title_style))
+    story.append(Paragraph("Fresh, Healthy & Home-Cooked Meals", subtitle_style))
+    story.append(Spacer(1, 12))
+    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#2E7D32'), spaceAfter=15))
+
+    # Billed To and Invoice Details
+    left_info = [
+        Paragraph("BILLED TO", h2_style),
+        Spacer(1, 4),
+        Paragraph(f"<b>{cust_name}</b>", normal_style),
+        Paragraph(f"Phone: {cust_phone}", normal_style),
+    ]
+    if cust_email:
+        left_info.append(Paragraph(f"Email: {cust_email}", normal_style))
+    if billing_addr:
+        left_info.append(Paragraph(f"Address: {billing_addr}", normal_style))
+
+    status_str = payment.status.value if hasattr(payment.status, "value") else str(payment.status)
+    right_info = [
+        Paragraph("INVOICE DETAILS", h2_style),
+        Spacer(1, 4),
+        Paragraph(f"<b>Invoice No:</b> {invoice_no}", normal_style),
+        Paragraph(f"<b>Date:</b> {paid_date}", normal_style),
+        Paragraph(f"<b>Payment Method:</b> {pmt_method.upper()}", normal_style),
+        Paragraph(f"<b>Status:</b> <font color='#2E7D32'><b>{status_str.upper()}</b></font>", normal_style),
+    ]
+
+    info_table = Table([[left_info, right_info]], colWidths=[270, 270])
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 20))
+
+    # Items Table
+    headers = [
+        Paragraph("<b>Item Description</b>", ParagraphStyle('TH1', parent=normal_style, textColor=colors.white, fontName='Helvetica-Bold')),
+        Paragraph("<b>Price / Del.</b>", ParagraphStyle('TH2', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
+        Paragraph("<b>Deliveries</b>", ParagraphStyle('TH3', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
+        Paragraph("<b>Total</b>", ParagraphStyle('TH4', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
+    ]
     
-    pdf_bytes = weasyprint.HTML(string=html_content).write_pdf()
-    
+    item_row = [
+        Paragraph(f"<b>{prod_name}</b><br/><font size=8 color='#666666'>Plan: {plan_name.title()}</font>", normal_style),
+        Paragraph(f"INR {price_per:.2f}", right_normal),
+        Paragraph(f"{total_del}", right_normal),
+        Paragraph(f"INR {subtotal:.2f}", right_bold),
+    ]
+
+    table_data = [headers, item_row]
+    items_table = Table(table_data, colWidths=[240, 100, 80, 120])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2E7D32')),
+        ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+        ('TOPPADDING', (0,0), (-1,-1), 8),
+        ('LINEBELOW', (0,1), (-1,1), 1, colors.HexColor('#EEEEEE')),
+    ]))
+    story.append(items_table)
+    story.append(Spacer(1, 15))
+
+    # Summary
+    summary_data = [
+        [Paragraph("Subtotal", normal_style), Paragraph(f"INR {subtotal:.2f}", right_normal)],
+        [Paragraph("Delivery Charge", normal_style), Paragraph(f"INR {del_charge:.2f}", right_normal)],
+        [Paragraph("Tax Amount", normal_style), Paragraph(f"INR {tax_amt:.2f}", right_normal)],
+        [Paragraph("<b>Total Paid</b>", ParagraphStyle('TotL', parent=normal_style, fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#2E7D32'))),
+         Paragraph(f"<b>INR {total_amt:.2f}</b>", ParagraphStyle('TotR', parent=right_normal, fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#2E7D32')))],
+    ]
+    summary_table = Table(summary_data, colWidths=[140, 100])
+    summary_table.setStyle(TableStyle([
+        ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LINEABOVE', (0,-1), (-1,-1), 1.5, colors.HexColor('#2E7D32')),
+    ]))
+
+    wrapper_table = Table([["", summary_table]], colWidths=[300, 240])
+    wrapper_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(wrapper_table)
+    story.append(Spacer(1, 30))
+
+    # Footer
+    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#CCCCCC'), spaceAfter=10))
+    story.append(Paragraph("Thank you for subscribing to Healthy Home Foods! For support, contact support@healthyhomefoods.com", ParagraphStyle('Footer', parent=normal_style, alignment=1, fontSize=9, textColor=colors.HexColor('#888888'))))
+
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",

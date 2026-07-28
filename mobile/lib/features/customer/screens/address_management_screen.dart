@@ -470,13 +470,19 @@ class _AddressFormSheetState extends State<_AddressFormSheet> {
               TextFormField(
                 controller: _recipientPhoneController,
                 keyboardType: TextInputType.phone,
+                maxLength: 10,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
                 decoration: InputDecoration(
                   labelText: 'Recipient Mobile Number',
+                  counterText: '',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) return 'Recipient mobile number is required';
-                  if (!RegExp(r'^\+?[0-9]{10,15}$').hasMatch(val.trim())) return 'Invalid mobile number';
+                  if (val.trim().length != 10) return 'Mobile number must be exactly 10 digits';
                   return null;
                 },
               ),

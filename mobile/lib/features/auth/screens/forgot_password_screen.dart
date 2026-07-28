@@ -125,7 +125,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   maxLength: 10,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
                   decoration: InputDecoration(
                     hintText: '10-digit mobile number',
                     counterText: '',

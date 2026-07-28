@@ -304,6 +304,10 @@ class _CreateDeliveryPartnerScreenState extends State<CreateDeliveryPartnerScree
                   controller: _mobileController,
                   keyboardType: TextInputType.phone,
                   maxLength: 10,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
                   decoration: const InputDecoration(
                     hintText: 'Enter 10-digit number',
                     prefixIcon: Icon(Icons.phone_outlined),

@@ -77,17 +77,17 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
       }
       _loadProducts();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ApiErrorHandler.getMessage(e)), backgroundColor: AppTheme.error));
     }
   }
 
   Future<void> _hardDeleteProduct(dynamic product) async {
     try {
       await _api.delete('${ApiConstants.products}/${product['id']}/hard');
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Product permanently deleted')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Product permanently deleted'), backgroundColor: AppTheme.primaryGreen));
       _loadProducts();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ApiErrorHandler.getMessage(e)), backgroundColor: AppTheme.error));
     }
   }
 

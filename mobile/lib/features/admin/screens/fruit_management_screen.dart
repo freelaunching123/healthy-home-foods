@@ -96,8 +96,19 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
     if (confirm != true) return;
     try {
       await _api.delete('${ApiConstants.adminFruits}/${fruit['id']}');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Fruit permanently deleted'), backgroundColor: AppTheme.primaryGreen),
+        );
+      }
       _loadFruits();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ApiErrorHandler.getMessage(e)), backgroundColor: AppTheme.error),
+        );
+      }
+    }
   }
 
   void _showAvailabilitySheet(Map<String, dynamic> fruit) {
