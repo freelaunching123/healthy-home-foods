@@ -43,7 +43,7 @@ class ProductCreate(BaseModel):
         if self.plan_type == 'monthly' and self.package_days != 26:
             raise ValueError("Monthly plan must have 26 package days")
         return self
-    status: ProductStatus = ProductStatus.DRAFT
+    status: ProductStatus = ProductStatus.PUBLISHED
     availability: ProductAvailability = ProductAvailability.AVAILABLE
     display_order: int = 0
     is_featured: bool = False

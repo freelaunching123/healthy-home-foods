@@ -15,8 +15,10 @@ from app.schemas.product import (
 )
 from app.schemas.common import MessageResponse
 from sqlalchemy.exc import IntegrityError
-import os, shutil, uuid as uuid_lib
+import logging
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/products", tags=["Products"])
 

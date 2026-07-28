@@ -107,8 +107,13 @@ class PaymentService:
 
         await subscription_engine.activate_subscription(db, sub)
 
-        # Generate invoice
+        # Generate invoice safely guarding None values
         invoice_number = f"INV-{datetime.now().strftime('%Y%m')}-{str(payment.id)[:8].upper()}"
+        del_charge = float(sub.delivery_charge) if sub.delivery_charge is not None else 0.0
+        tax_amt = float(sub.tax_amount) if sub.tax_amount is not None else 0.0
+        tot_amt = float(sub.total_amount) if sub.total_amount is not None else float(payment.amount or 0.0)
+        subtot = tot_amt - del_charge - tax_amt
+
         invoice = Invoice(
             payment_id=payment.id,
             invoice_number=invoice_number,
@@ -120,11 +125,11 @@ class PaymentService:
             plan_name=f"{sub.plan_type.upper()} Plan" if sub.plan_type else "Subscription Plan",
             total_deliveries=sub.total_deliveries,
             price_per_delivery=0.0 if not sub.product_id or sub.price_per_delivery is None else float(sub.price_per_delivery),
-            subtotal=float(sub.total_amount) - float(sub.delivery_charge) - float(sub.tax_amount),
-            delivery_charge=float(sub.delivery_charge),
+            subtotal=subtot,
+            delivery_charge=del_charge,
             tax_percentage=0.0,
-            tax_amount=float(sub.tax_amount),
-            total_amount=float(sub.total_amount)
+            tax_amount=tax_amt,
+            total_amount=tot_amt
         )
         db.add(invoice)
 

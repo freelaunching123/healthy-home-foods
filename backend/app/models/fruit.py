@@ -155,9 +155,9 @@ class FruitOrderItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("fruit_orders.id", ondelete="CASCADE"),
         nullable=False, index=True
     )
-    fruit_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("fruits.id", ondelete="RESTRICT"),
-        nullable=False, index=True
+    fruit_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("fruits.id", ondelete="SET NULL"),
+        nullable=True, index=True
     )
     quantity_kg: Mapped[float] = mapped_column(Numeric(10, 3), nullable=False)
     price_per_kg: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)  # snapshot

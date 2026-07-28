@@ -17,7 +17,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
   List<dynamic> _products = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  String? _statusFilter;
   String? _availabilityFilter;
   String? _selectedCategoryId;
   List<dynamic> _categories = [];
@@ -58,7 +57,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
         'page_size': 100,
         'active_only': false,
         if (_searchQuery.isNotEmpty) 'search': _searchQuery,
-        if (_statusFilter != null) 'status': _statusFilter,
         if (_availabilityFilter != null) 'availability': _availabilityFilter,
         if (_selectedCategoryId != null) 'category_id': _selectedCategoryId,
       });
@@ -141,22 +139,27 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Search products...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                        _loadProducts();
-                      },
-                    ),
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textLight),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, color: AppTheme.textLight),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                              _loadProducts();
+                            },
+                          )
+                        : null,
                     filled: true,
-                    fillColor: Colors.grey.shade50,
+                    fillColor: AppTheme.scaffoldBg,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                   ),
-                  onSubmitted: (v) {
+                  onChanged: (v) {
                     setState(() => _searchQuery = v);
-                    _loadProducts();
+                    Future.delayed(const Duration(milliseconds: 400), () {
+                      if (_searchQuery == v) _loadProducts();
+                    });
                   },
                 ),
                 const SizedBox(height: 12),
@@ -164,11 +167,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildFilterChip('Status', ['draft', 'published', 'hidden'], _statusFilter, (v) {
-                        setState(() => _statusFilter = v);
-                        _loadProducts();
-                      }),
-                      const SizedBox(width: 8),
                       _buildFilterChip('Availability', ['available', 'out_of_stock', 'temporarily_unavailable'], _availabilityFilter, (v) {
                         setState(() => _availabilityFilter = v);
                         _loadProducts();
@@ -218,7 +216,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                             itemCount: _products.length,
                             itemBuilder: (context, index) {
                               final product = _products[index];
-                              final isActive = product['is_active'] == true;
                               return _ProductAdminCard(
                                 product: product,
                                 onToggleActive: () => _toggleProductActive(product),
@@ -298,7 +295,6 @@ class _ProductAdminCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isActive = product['is_active'] == true;
-    final String status = product['status'] ?? 'unknown';
     final String availability = product['availability'] ?? 'unknown';
     final mediaBaseUrl = ApiClient().mediaBaseUrl;
     
@@ -372,7 +368,6 @@ class _ProductAdminCard extends StatelessWidget {
                         spacing: 6,
                         runSpacing: 6,
                         children: [
-                          _buildBadge(status, _getStatusColor(status)),
                           _buildBadge(availability.replaceAll('_', ' '), _getAvailabilityColor(availability)),
                           if (!isActive) _buildBadge('Soft Deleted', Colors.red),
                         ],
@@ -439,12 +434,6 @@ class _ProductAdminCard extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(String status) {
-    if (status == 'published') return AppTheme.primaryGreen;
-    if (status == 'draft') return Colors.orange;
-    return Colors.grey;
-  }
-  
   Color _getAvailabilityColor(String avail) {
     if (avail == 'available') return AppTheme.primaryGreen;
     return Colors.red;

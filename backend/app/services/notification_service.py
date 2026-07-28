@@ -88,24 +88,29 @@ class NotificationService:
         reference_id: str = None,
     ):
         """Create an in-app notification for a user."""
-        from app.models.notification import Notification
-        
-        new_notification = Notification(
-            user_id=user_id,
-            title=title,
-            body=body,
-            channel="in_app",
-            status="sent",
-            event_type="in_app",
-            category=category,
-            action_type=action_type,
-            reference_id=reference_id,
-            is_read=False,
-            is_deleted=False,
-        )
-        db.add(new_notification)
-        await db.flush()
-        return new_notification
+        try:
+            from app.models.notification import Notification, NotificationChannel, NotificationStatus
+            
+            async with db.begin_nested():
+                new_notification = Notification(
+                    user_id=user_id,
+                    title=title,
+                    body=body,
+                    channel=NotificationChannel.IN_APP,
+                    status=NotificationStatus.SENT,
+                    event_type="in_app",
+                    category=category,
+                    action_type=action_type,
+                    reference_id=reference_id,
+                    is_read=False,
+                    is_deleted=False,
+                )
+                db.add(new_notification)
+                await db.flush()
+                return new_notification
+        except Exception as e:
+            logger.error(f"Error creating in-app notification: {e}")
+            return None
 
     # ── Reusable Production Notification Methods ──────────────────────────────────────────
 
@@ -120,20 +125,25 @@ class NotificationService:
         reference_id: str = None
     ):
         """Saves a notification to the notification_history table."""
-        from app.models.notification_history import NotificationHistory
-        
-        history = NotificationHistory(
-            user_id=user_id,
-            role=role,
-            title=title,
-            body=body,
-            notification_type=notification_type,
-            reference_id=reference_id,
-            is_read=False
-        )
-        db.add(history)
-        await db.flush()
-        return history
+        try:
+            from app.models.notification_history import NotificationHistory
+            
+            async with db.begin_nested():
+                history = NotificationHistory(
+                    user_id=user_id,
+                    role=role,
+                    title=title,
+                    body=body,
+                    notification_type=notification_type,
+                    reference_id=reference_id,
+                    is_read=False
+                )
+                db.add(history)
+                await db.flush()
+                return history
+        except Exception as e:
+            logger.error(f"Error saving notification history: {e}")
+            return None
 
     @staticmethod
     async def update_fcm_token(db, user_id, fcm_token: str, device_type: str = None) -> bool:

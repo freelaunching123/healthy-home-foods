@@ -745,19 +745,39 @@ async def admin_toggle_active(
 
 
 @router.delete("/admin/fruits/{fruit_id}", response_model=MessageResponse)
-async def admin_soft_delete_fruit(
+async def admin_delete_fruit(
     fruit_id: UUID,
     _: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin: soft-delete a fruit (sets is_active=False, hides from customers)."""
+    """Admin: completely delete a fruit from database."""
     result = await db.execute(select(Fruit).where(Fruit.id == fruit_id))
     fruit = result.scalar_one_or_none()
     if not fruit:
         raise HTTPException(status_code=404, detail="Fruit not found")
-    fruit.is_active = False
+
+    # Delete fruit image file if present
+    if fruit.image_url:
+        old_path = os.path.join(settings.UPLOAD_DIR, fruit.image_url.lstrip("/uploads/"))
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
+
+    # Delete any cart items referencing this fruit
+    cart_result = await db.execute(select(FruitCart).where(FruitCart.fruit_id == fruit_id))
+    for cart_item in cart_result.scalars().all():
+        await db.delete(cart_item)
+
+    # Disassociate order items (set fruit_id=None) so past order history remains intact
+    order_items_result = await db.execute(select(FruitOrderItem).where(FruitOrderItem.fruit_id == fruit_id))
+    for item in order_items_result.scalars().all():
+        item.fruit_id = None
+
+    await db.delete(fruit)
     await db.commit()
-    return MessageResponse(message="Fruit deleted (deactivated) successfully")
+    return MessageResponse(message="Fruit deleted successfully")
 
 
 # ── Admin: Fruit Orders ────────────────────────────────────────────────────────

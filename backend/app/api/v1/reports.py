@@ -556,7 +556,7 @@ async def get_admin_overview(
         [a for a in activity if a.get("timestamp")],
         key=lambda x: x["timestamp"],
         reverse=True,
-    )[:15]
+    )[:5]
 
     return {
         "summary": {

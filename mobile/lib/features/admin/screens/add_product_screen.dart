@@ -28,12 +28,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _descCtrl = TextEditingController();
   final _packagePriceCtrl = TextEditingController();
   final _discountPriceCtrl = TextEditingController();
-  final _packageDaysCtrl = TextEditingController();
+  final _packageDaysCtrl = TextEditingController(text: '6');
   final _displayOrderCtrl = TextEditingController(text: '0');
 
   String? _selectedCategory;
   String _planType = 'weekly';
-  String _status = 'draft';
+  String _status = 'published';
   String _availability = 'available';
   bool _isFeatured = false;
   bool _isPopular = false;
@@ -266,8 +266,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
               
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
-                items: _categories.map((c) => DropdownMenuItem<String>(value: c['id'], child: Text(c['name']))).toList(),
+                items: _categories.map((c) => DropdownMenuItem<String>(value: c['id'], child: Text(c['name'], overflow: TextOverflow.ellipsis))).toList(),
                 onChanged: (v) => setState(() => _selectedCategory = v),
               ),
               const SizedBox(height: 16),
@@ -280,10 +281,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       value: _planType,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Plan Type', border: OutlineInputBorder()),
                       items: const [
-                        DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                        DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                        DropdownMenuItem(value: 'weekly', child: Text('Weekly', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'monthly', child: Text('Monthly', overflow: TextOverflow.ellipsis)),
                       ],
                       onChanged: (v) {
                         setState(() {
@@ -310,33 +312,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _status,
-                      decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
-                      items: const [
-                        DropdownMenuItem(value: 'draft', child: Text('Draft')),
-                        DropdownMenuItem(value: 'published', child: Text('Published')),
-                        DropdownMenuItem(value: 'hidden', child: Text('Hidden')),
-                      ],
-                      onChanged: (v) => setState(() => _status = v!),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
                       value: _availability,
+                      isExpanded: true,
                       decoration: const InputDecoration(labelText: 'Availability', border: OutlineInputBorder()),
                       items: const [
-                        DropdownMenuItem(value: 'available', child: Text('Available')),
-                        DropdownMenuItem(value: 'out_of_stock', child: Text('Out Of Stock')),
-                        DropdownMenuItem(value: 'temporarily_unavailable', child: Text('Temp Unavailable')),
+                        DropdownMenuItem(value: 'available', child: Text('Available', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'out_of_stock', child: Text('Out Of Stock', overflow: TextOverflow.ellipsis)),
+                        DropdownMenuItem(value: 'temporarily_unavailable', child: Text('Temp Unavailable', overflow: TextOverflow.ellipsis)),
                       ],
                       onChanged: (v) => setState(() => _availability = v!),
                     ),
                   ),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildTextField('Display Order (Sort)', _displayOrderCtrl, isNumeric: true)),
                 ],
               ),
-              const SizedBox(height: 16),
-              _buildTextField('Display Order (Sort)', _displayOrderCtrl, isNumeric: true),
               const SizedBox(height: 24),
 
               _buildSectionTitle('Marketing Badges'),

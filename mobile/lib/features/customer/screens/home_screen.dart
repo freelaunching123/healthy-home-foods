@@ -491,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.60, crossAxisSpacing: 12, mainAxisSpacing: 12),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.72, crossAxisSpacing: 12, mainAxisSpacing: 12),
             delegate: SliverChildBuilderDelegate((_, __) => _ShimmerCard(), childCount: 4),
           ),
         )
@@ -513,7 +513,13 @@ class _HomeScreenState extends State<HomeScreen> {
       else
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverList(
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.72,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
             delegate: SliverChildBuilderDelegate(
               (_, i) {
                 final productId = _filteredPackages[i]['id']?.toString() ?? '';
@@ -537,7 +543,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_isLoadingFruits)
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverList(
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.72, crossAxisSpacing: 12, mainAxisSpacing: 12),
             delegate: SliverChildBuilderDelegate((_, __) => _ShimmerCard(), childCount: 4),
           ),
         )
@@ -559,7 +566,13 @@ class _HomeScreenState extends State<HomeScreen> {
       else
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverList(
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.72,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
             delegate: SliverChildBuilderDelegate(
               (_, i) {
                 final fruitId = _filteredFruits[i]['id']?.toString() ?? '';
@@ -682,7 +695,6 @@ class _ProductCard extends StatelessWidget {
       child: Opacity(
         opacity: isOutOfStock ? 0.6 : 1.0,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -695,133 +707,149 @@ class _ProductCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryGreen.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Product Image with Package Days badge
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Container(
+                      height: 105,
+                      width: double.infinity,
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                      child: imgUrl != null
+                          ? Image.network(
+                              imgUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Icon(Icons.eco_rounded, size: 36, color: AppTheme.primaryGreen),
+                              ),
+                            )
+                          : const Center(
+                              child: Icon(Icons.eco_rounded, size: 36, color: AppTheme.primaryGreen),
+                            ),
+                    ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: imgUrl != null
-                        ? Image.network(
-                            imgUrl,
-                            fit: BoxFit.cover,
-                            width: 60,
-                            height: 60,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.eco_rounded, size: 24, color: AppTheme.primaryGreen),
-                          )
-                        : const Icon(Icons.eco_rounded, size: 24, color: AppTheme.primaryGreen),
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryGreen,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${product['package_days'] ?? 6} Days',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                
-                Expanded(
+                ],
+              ),
+              
+              // Product Details
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        product['name'] ?? '',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      if (product['description'] != null)
-                        Text(
-                          product['description'],
-                          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Text(
+                            product['name'] ?? '',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          if (product['description'] != null)
+                            Text(
+                              product['description'],
+                              style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          const SizedBox(height: 4),
+                          Row(
                             children: [
-                              Text(
-                                '${product['package_days'] ?? 6} Days',
-                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
+                              if (discountPrice != null) ...[
+                                Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 9, color: Colors.grey, decoration: TextDecoration.lineThrough)),
+                                const SizedBox(width: 4),
+                                Text('₹${discountPrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                              ] else ...[
+                                Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                      
+                      // Add / Qty Control
+                      if (isOutOfStock)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text('Unavailable', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.w700)),
+                        )
+                      else if (quantity == 0)
+                        InkWell(
+                          onTap: () => onQtyChanged(1),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryGreen,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            alignment: Alignment.center,
+                            child: const Text('Add', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                          ),
+                        )
+                      else
+                        Container(
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              InkWell(
+                                onTap: () => onQtyChanged(quantity - 1),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  child: Icon(Icons.remove, size: 14, color: AppTheme.primaryGreen),
+                                ),
                               ),
-                              const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  if (discountPrice != null) ...[
-                                    Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 10, color: Colors.grey, decoration: TextDecoration.lineThrough)),
-                                    const SizedBox(width: 4),
-                                    Text('₹${discountPrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-                                  ] else ...[
-                                    Text('₹${packagePrice.toStringAsFixed(0)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-                                  ],
-                                ],
+                              Text('$quantity', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen)),
+                              InkWell(
+                                onTap: () => onQtyChanged(quantity + 1),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  child: Icon(Icons.add, size: 14, color: AppTheme.primaryGreen),
+                                ),
                               ),
                             ],
                           ),
-                          
-                          if (isOutOfStock)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.grey,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text('Add to Cart', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
-                            )
-                          else if (quantity == 0)
-                            InkWell(
-                              onTap: () => onQtyChanged(1),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryGreen,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text('Add', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-                              ),
-                            )
-                          else
-                            Container(
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  InkWell(
-                                    onTap: () => onQtyChanged(quantity - 1),
-                                    child: const Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      child: Icon(Icons.remove, size: 14, color: AppTheme.primaryGreen),
-                                    ),
-                                  ),
-                                  Text('$quantity', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen)),
-                                  InkWell(
-                                    onTap: () => onQtyChanged(quantity + 1),
-                                    child: const Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      child: Icon(Icons.add, size: 14, color: AppTheme.primaryGreen),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
+                        ),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -862,7 +890,6 @@ class _FruitCard extends StatelessWidget {
         if (fruitId.isNotEmpty) context.push('/fruits/$fruitId');
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -875,80 +902,95 @@ class _FruitCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Image (matches admin style layout/constraints)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: Container(
-                    color: AppTheme.primaryGreen.withValues(alpha: 0.08),
-                    child: fullImageUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: fullImageUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            errorWidget: (_, __, ___) => const Icon(Icons.eco_rounded, size: 24, color: AppTheme.primaryGreen),
-                          )
-                        : const Icon(Icons.eco_rounded, size: 24, color: AppTheme.primaryGreen),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: SizedBox(
+                    height: 105,
+                    width: double.infinity,
+                    child: Container(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.08),
+                      child: fullImageUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: fullImageUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                              errorWidget: (_, __, ___) => const Icon(Icons.eco_rounded, size: 36, color: AppTheme.primaryGreen),
+                            )
+                          : const Icon(Icons.eco_rounded, size: 36, color: AppTheme.primaryGreen),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              
-              // Details
-              Expanded(
+                if (!available && statusLabel.isNotEmpty)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: GoogleFonts.inter(fontSize: 9, color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            
+            // Details
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      (fruit['name'] ?? 'Fruit').toString(),
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.textPrimary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '₹${price.toStringAsFixed(0)} / KG',
-                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
-                    ),
-                    if (!available && statusLabel.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          (fruit['name'] ?? 'Fruit').toString(),
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.textPrimary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        child: Text(
-                          statusLabel,
-                          style: GoogleFonts.inter(fontSize: 8, color: statusColor, fontWeight: FontWeight.w600),
+                        const SizedBox(height: 2),
+                        Text(
+                          '₹${price.toStringAsFixed(0)} / KG',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                    
+                    // Qty Control
+                    available
+                        ? _QtyStepper(quantity: quantity, onChanged: onQtyChanged)
+                        : Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              statusLabel.isEmpty ? 'Unavailable' : statusLabel,
+                              style: GoogleFonts.inter(fontSize: 10, color: AppTheme.textLight, fontWeight: FontWeight.w600),
+                            ),
+                          ),
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
-              
-              // Qty Stepper Controls (Placed on right)
-              SizedBox(
-                width: 90,
-                child: available
-                    ? _QtyStepper(quantity: quantity, onChanged: onQtyChanged)
-                    : Center(
-                        child: Text(
-                          statusLabel.isEmpty ? 'Unavailable' : statusLabel,
-                          style: GoogleFonts.inter(fontSize: 10, color: AppTheme.textLight, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

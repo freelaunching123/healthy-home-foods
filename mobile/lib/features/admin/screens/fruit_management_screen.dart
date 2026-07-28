@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../core/services/api_client.dart';
@@ -85,7 +83,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Fruit?'),
-        content: Text('This will deactivate "${fruit['name']}" and hide it from customers.'),
+        content: Text('Are you sure you want to completely delete "${fruit['name']}"? This action cannot be undone.'),
         actions: [
           TextButton(onPressed: () => ctx.pop(false), child: const Text('Cancel')),
           TextButton(
@@ -249,7 +247,6 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
                                     await context.push('/admin/fruits/edit/${fruit['id']}');
                                     _loadFruits();
                                   },
-                                  onToggleActive: () => _toggleActive(fruit),
                                   onAvailability: () => _showAvailabilitySheet(fruit),
                                   onDelete: () => _deleteFruit(fruit),
                                 );
@@ -297,13 +294,12 @@ class _FruitTile extends StatelessWidget {
   final Map<String, dynamic> fruit;
   final String baseUrl;
   final VoidCallback onEdit;
-  final VoidCallback onToggleActive;
   final VoidCallback onAvailability;
   final VoidCallback onDelete;
 
   const _FruitTile({
     required this.fruit, required this.baseUrl,
-    required this.onEdit, required this.onToggleActive,
+    required this.onEdit,
     required this.onAvailability, required this.onDelete,
   });
 
@@ -396,17 +392,11 @@ class _FruitTile extends StatelessWidget {
               onSelected: (value) {
                 if (value == 'edit') onEdit();
                 else if (value == 'availability') onAvailability();
-                else if (value == 'toggle') onToggleActive();
                 else if (value == 'delete') onDelete();
               },
               itemBuilder: (_) => [
                 PopupMenuItem(value: 'edit', child: Row(children: [const Icon(Icons.edit_rounded, size: 16), const SizedBox(width: 10), Text('Edit', style: GoogleFonts.inter())])),
                 PopupMenuItem(value: 'availability', child: Row(children: [const Icon(Icons.inventory_rounded, size: 16), const SizedBox(width: 10), Text('Set Availability', style: GoogleFonts.inter())])),
-                PopupMenuItem(value: 'toggle', child: Row(children: [
-                  Icon(isActive ? Icons.visibility_off_rounded : Icons.visibility_rounded, size: 16),
-                  const SizedBox(width: 10),
-                  Text(isActive ? 'Deactivate' : 'Activate', style: GoogleFonts.inter()),
-                ])),
                 PopupMenuItem(value: 'delete', child: Row(children: [
                   const Icon(Icons.delete_outline_rounded, size: 16, color: AppTheme.error),
                   const SizedBox(width: 10),

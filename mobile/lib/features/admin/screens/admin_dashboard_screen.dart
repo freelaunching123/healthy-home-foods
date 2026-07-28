@@ -407,7 +407,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   // ── Recent Activity ────────────────────────────────────────────────────────
 
   Widget _buildRecentActivity() {
-    final activities = (_data?['recent_activity'] as List<dynamic>?) ?? [];
+    final activities = ((_data?['recent_activity'] as List<dynamic>?) ?? []).take(5).toList();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -488,7 +488,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 1.6,
+                childAspectRatio: 1.30,
                 children: List.generate(4, (_) => _shimmerBox(color, double.infinity, double.infinity)),
               ),
               const SizedBox(height: 20),

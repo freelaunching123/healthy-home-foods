@@ -124,7 +124,7 @@ async def activate_subscription(db: AsyncSession, subscription: Subscription) ->
     pay_history = SubscriptionPaymentHistory(
         subscription_id=subscription.id,
         payment_id=last_pay.id if last_pay else None,
-        amount=float(subscription.total_amount),
+        amount=float(subscription.total_amount) if subscription.total_amount is not None else float(last_pay.amount if last_pay and last_pay.amount is not None else 0.0),
         status="success",
         transaction_id=last_pay.gateway_payment_id if last_pay else None,
     )
