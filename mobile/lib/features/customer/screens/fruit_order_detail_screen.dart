@@ -75,8 +75,6 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
       case 'delivered': return AppTheme.success;
       case 'cancelled': return AppTheme.error;
       case 'out_for_delivery': return AppTheme.outForDelivery;
-      case 'preparing': return AppTheme.info;
-      case 'ready': return AppTheme.warning;
       default: return AppTheme.pending;
     }
   }
@@ -430,8 +428,6 @@ class _StatusTracker extends StatelessWidget {
 
   static const _steps = [
     ('pending', 'Order Placed', Icons.check_circle_outline_rounded),
-    ('preparing', 'Preparing', Icons.restaurant_rounded),
-    ('ready', 'Ready', Icons.inventory_2_rounded),
     ('out_for_delivery', 'Out for Delivery', Icons.delivery_dining_rounded),
     ('delivered', 'Delivered', Icons.home_rounded),
   ];

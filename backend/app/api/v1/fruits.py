@@ -901,7 +901,7 @@ async def admin_assign_fruit_order(
         # Unassign
         if assignment:
             await db.delete(assignment)
-            order.order_status = FruitOrderStatus.READY
+            order.order_status = FruitOrderStatus.PENDING
             await db.commit()
         return MessageResponse(message="Delivery partner unassigned successfully")
 
@@ -924,9 +924,25 @@ async def admin_assign_fruit_order(
         )
         db.add(assignment)
 
-    order.order_status = FruitOrderStatus.OUT_FOR_DELIVERY
+    order.order_status = FruitOrderStatus.PENDING
 
     await db.commit()
+
+    # Notify customer
+    try:
+        from app.services.notification_service import NotificationService
+        cust_res = await db.execute(select(Customer).where(Customer.id == order.customer_id))
+        cust = cust_res.scalar_one_or_none()
+        if cust:
+            await NotificationService.create_in_app_notification(
+                db=db, user_id=cust.user_id, title="Delivery Assigned",
+                body=f"Your fruit order {order.order_number} has been assigned to a delivery partner.",
+                category="delivery", action_type="fruit_order", reference_id=str(order.id)
+            )
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to notify customer of assignment: {e}")
+
     return MessageResponse(message="Delivery partner assigned successfully")
 
 

@@ -23,7 +23,7 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
   final _searchController = TextEditingController();
 
   static const _orderStatuses = [
-    'pending', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled',
+    'pending', 'out_for_delivery', 'delivered', 'cancelled',
   ];
 
   @override
@@ -72,19 +72,7 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
     }
   }
 
-  Future<void> _updateOrderStatus(Map<String, dynamic> order, String newStatus) async {
-    try {
-      await _api.patch('${ApiConstants.adminFruitOrders}/${order['id']}/status', data: {'order_status': newStatus});
-      _loadOrders();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Order status updated to ${_statusLabel(newStatus)}'), backgroundColor: AppTheme.success),
-      );
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update status'), backgroundColor: AppTheme.error),
-      );
-    }
-  }
+
 
   Future<void> _assignPartner(Map<String, dynamic> order, String? partnerId) async {
     try {
@@ -100,52 +88,13 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
     }
   }
 
-  void _showStatusPicker(Map<String, dynamic> order) {
-    final currentStatus = order['order_status'] as String? ?? 'pending';
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Update Order Status', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16)),
-            const SizedBox(height: 8),
-            Text('Order: ${order['order_number']}', style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 13)),
-            const SizedBox(height: 16),
-            ..._orderStatuses.map((status) {
-              final color = _statusColor(status);
-              final isCurrentStatus = status == currentStatus;
-              return ListTile(
-                onTap: isCurrentStatus ? null : () { ctx.pop(); _updateOrderStatus(order, status); },
-                leading: Container(
-                  width: 10, height: 10,
-                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                ),
-                title: Text(_statusLabel(status), style: GoogleFonts.inter(
-                  fontWeight: isCurrentStatus ? FontWeight.w700 : FontWeight.w500,
-                  color: isCurrentStatus ? AppTheme.primaryGreen : AppTheme.textPrimary,
-                )),
-                trailing: isCurrentStatus ? const Icon(Icons.check_rounded, color: AppTheme.primaryGreen) : null,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                tileColor: isCurrentStatus ? AppTheme.primaryGreen.withValues(alpha: 0.06) : null,
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Color _statusColor(String status) {
     switch (status) {
       case 'delivered': return AppTheme.success;
       case 'cancelled': return AppTheme.error;
       case 'out_for_delivery': return AppTheme.outForDelivery;
-      case 'preparing': return AppTheme.info;
-      case 'ready': return AppTheme.warning;
       default: return AppTheme.pending;
     }
   }
@@ -256,7 +205,6 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
                                   partners: _partners,
                                   statusColor: _statusColor(order['order_status'] as String? ?? 'pending'),
                                   statusLabel: _statusLabel(order['order_status'] as String? ?? 'pending'),
-                                  onUpdateStatus: () => _showStatusPicker(order),
                                   onAssignPartner: (partnerId) => _assignPartner(order, partnerId),
                                 );
                               },
@@ -274,12 +222,11 @@ class _AdminOrderCard extends StatelessWidget {
   final List<Map<String, dynamic>> partners;
   final Color statusColor;
   final String statusLabel;
-  final VoidCallback onUpdateStatus;
   final Function(String?) onAssignPartner;
 
   const _AdminOrderCard({
     required this.order, required this.partners, required this.statusColor,
-    required this.statusLabel, required this.onUpdateStatus, required this.onAssignPartner,
+    required this.statusLabel, required this.onAssignPartner,
   });
 
   @override
@@ -383,17 +330,6 @@ class _AdminOrderCard extends StatelessWidget {
                         textStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
                       ),
                       child: const Text('Details'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: onUpdateStatus,
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(0, 32),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        textStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
-                      ),
-                      child: const Text('Status'),
                     ),
                   ],
                 ),
