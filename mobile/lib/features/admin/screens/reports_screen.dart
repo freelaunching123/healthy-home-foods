@@ -18,6 +18,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   final _api = ApiClient();
   bool _isLoadingSummary = true;
   bool _isLoadingCategoryData = false;
+  bool _showFruits = false;
   Map<String, dynamic>? _summaryData;
   List<dynamic> _categories = [];
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -342,6 +343,45 @@ class _ReportsScreenState extends State<ReportsScreen> {
           : ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _showFruits = false),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: !_showFruits ? AppTheme.primaryGreen : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: !_showFruits ? [BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
+                              ),
+                              child: Text('Products', textAlign: TextAlign.center, style: TextStyle(color: !_showFruits ? Colors.white : AppTheme.textSecondary, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _showFruits = true),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _showFruits ? AppTheme.primaryGreen : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: _showFruits ? [BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
+                              ),
+                              child: Text('Fruits', textAlign: TextAlign.center, style: TextStyle(color: _showFruits ? Colors.white : AppTheme.textSecondary, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   _buildStatRow(),
                   const SizedBox(height: 24),
                   _buildPerformanceLists(),
@@ -361,9 +401,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildStatRow() {
-    final total = _summaryData?['total_products']?.toString() ?? '0';
-    final active = _summaryData?['active_products']?.toString() ?? '0';
-    final inactive = _summaryData?['inactive_products']?.toString() ?? '0';
+    final prefix = _showFruits ? 'fruits' : 'products';
+    final total = _summaryData?['total_$prefix']?.toString() ?? '0';
+    final active = _summaryData?['active_$prefix']?.toString() ?? '0';
+    final inactive = _summaryData?['inactive_$prefix']?.toString() ?? '0';
 
     return Column(
       children: [
@@ -390,14 +431,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildPerformanceLists() {
-    final topList = _summaryData?['top_performing'] as List<dynamic>? ?? [];
-    final worstList = _summaryData?['worst_performing'] as List<dynamic>? ?? [];
+    final suffix = _showFruits ? '_fruits' : '';
+    final name = _showFruits ? 'Fruits' : 'Products';
+    final topList = _summaryData?['top_performing$suffix'] as List<dynamic>? ?? [];
+    final worstList = _summaryData?['worst_performing$suffix'] as List<dynamic>? ?? [];
 
     return Column(
       children: [
-        _buildPerformanceCard('Best Performing Products (Top 5)', topList, Colors.green),
+        _buildPerformanceCard('Best Performing $name (Top 5)', topList, Colors.green),
         const SizedBox(height: 16),
-        _buildPerformanceCard('Worst Performing Products (Bottom 5)', worstList, Colors.red),
+        _buildPerformanceCard('Worst Performing $name (Bottom 5)', worstList, Colors.red),
       ],
     );
   }

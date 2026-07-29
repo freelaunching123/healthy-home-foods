@@ -4,7 +4,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, desc, or_
+from sqlalchemy import select, func, and_, desc, or_, case
 import io
 
 from app.db.session import get_db
@@ -277,12 +277,53 @@ async def get_product_performance_summary(
     # Sort for worst performing (ascending)
     worst_performing = sorted(performance_list, key=lambda x: x["delivered_count"])[:5]
 
+    # Total, Active, Inactive fruit counts
+    total_fruits = await db.scalar(select(func.count(Fruit.id)))
+    active_fruits = await db.scalar(select(func.count(Fruit.id)).where(Fruit.is_active == True))
+    inactive_fruits = await db.scalar(select(func.count(Fruit.id)).where(Fruit.is_active == False))
+
+    fruit_query = (
+        select(
+            Fruit.id,
+            Fruit.name,
+            func.sum(
+                case(
+                    (FruitOrder.order_status == FruitOrderStatus.DELIVERED, FruitOrderItem.quantity),
+                    else_=0
+                )
+            ).label("delivered_count")
+        )
+        .outerjoin(FruitOrderItem, FruitOrderItem.fruit_id == Fruit.id)
+        .outerjoin(FruitOrder, FruitOrder.id == FruitOrderItem.order_id)
+        .group_by(Fruit.id, Fruit.name)
+    )
+
+    fruit_result = await db.execute(fruit_query)
+    fruit_rows = fruit_result.all()
+    
+    fruit_performance_list = [
+        {
+            "id": str(row[0]),
+            "name": row[1],
+            "delivered_count": int(row[2] or 0)
+        }
+        for row in fruit_rows
+    ]
+
+    top_performing_fruits = sorted(fruit_performance_list, key=lambda x: x["delivered_count"], reverse=True)[:5]
+    worst_performing_fruits = sorted(fruit_performance_list, key=lambda x: x["delivered_count"])[:5]
+
     return {
         "total_products": total_products or 0,
         "active_products": active_products or 0,
         "inactive_products": inactive_products or 0,
         "top_performing": top_performing,
         "worst_performing": worst_performing,
+        "total_fruits": total_fruits or 0,
+        "active_fruits": active_fruits or 0,
+        "inactive_fruits": inactive_fruits or 0,
+        "top_performing_fruits": top_performing_fruits,
+        "worst_performing_fruits": worst_performing_fruits,
     }
 
 
