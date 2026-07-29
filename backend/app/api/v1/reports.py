@@ -575,7 +575,7 @@ async def get_admin_overview(
                 "timestamp": row[2].isoformat() if row[2] else None,
             })
 
-    # Recent successful payments
+    # Recent successful package payments
     recent_payments_result = await db.execute(
         select(Payment.id, Payment.amount, Payment.paid_at)
         .where(Payment.status == PaymentStatus.SUCCESS)
@@ -586,7 +586,22 @@ async def get_admin_overview(
         if row[2]:
             activity.append({
                 "type": "payment_received",
-                "description": f"Payment received: \u20b9{float(row[1]):.0f}",
+                "description": f"Package payment: \u20b9{float(row[1]):.0f}",
+                "timestamp": row[2].isoformat(),
+            })
+
+    # Recent successful fruit payments
+    recent_fruit_payments_result = await db.execute(
+        select(FruitOrder.id, FruitOrder.total_amount, FruitOrder.paid_at)
+        .where(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS)
+        .order_by(desc(FruitOrder.paid_at))
+        .limit(5)
+    )
+    for row in recent_fruit_payments_result.all():
+        if row[2]:
+            activity.append({
+                "type": "payment_received",
+                "description": f"Fruit payment: \u20b9{float(row[1]):.0f}",
                 "timestamp": row[2].isoformat(),
             })
 
