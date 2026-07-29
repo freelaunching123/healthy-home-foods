@@ -199,17 +199,17 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
         future: _api.get('/api/v1/admin/deliveries/${delivery['id']}'),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Container(
+            return Container(
               height: 300,
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-              child: Center(child: CircularProgressIndicator()),
+              decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+              child: const Center(child: CircularProgressIndicator()),
             );
           }
           if (snapshot.hasError || !snapshot.hasData) {
-            return const Container(
+            return Container(
               height: 300,
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-              child: Center(child: Text('Failed to load details')),
+              decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+              child: const Center(child: Text('Failed to load details')),
             );
           }
           final details = snapshot.data!.data as Map<String, dynamic>;
