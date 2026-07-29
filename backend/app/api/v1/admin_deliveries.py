@@ -158,6 +158,93 @@ async def list_deliveries(
             payment_status=pay_status,
             status=deliv.status.value if hasattr(deliv.status, "value") else str(deliv.status),
         ))
+
+    from app.models.fruit import FruitOrder, FruitOrderStatus
+    fruit_stmt = (
+        select(
+            FruitOrder,
+            Customer,
+            CustomerUser,
+            DeliveryAssignment,
+            DeliveryPartner,
+            PartnerUser,
+            Address,
+        )
+        .join(Customer, Customer.id == FruitOrder.customer_id)
+        .join(CustomerUser, CustomerUser.id == Customer.user_id)
+        .outerjoin(Address, Address.id == FruitOrder.address_id)
+        .outerjoin(DeliveryAssignment, DeliveryAssignment.fruit_order_id == FruitOrder.id)
+        .outerjoin(DeliveryPartner, DeliveryPartner.id == DeliveryAssignment.delivery_partner_id)
+        .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
+    )
+
+    if start_date and end_date:
+        fruit_stmt = fruit_stmt.where(FruitOrder.delivery_date.between(start_date, end_date))
+    elif selected_date:
+        fruit_stmt = fruit_stmt.where(FruitOrder.delivery_date == selected_date)
+    else:
+        fruit_stmt = fruit_stmt.where(FruitOrder.delivery_date == date.today())
+
+    if status:
+        if status in ("failed", "missed", "cancelled", "skipped"):
+            fruit_status = "cancelled"
+        else:
+            fruit_status = status
+            
+        try:
+            valid_status = FruitOrderStatus(fruit_status)
+            fruit_stmt = fruit_stmt.where(FruitOrder.order_status == valid_status)
+        except ValueError:
+            fruit_stmt = fruit_stmt.where(False)
+
+    if delivery_partner_id:
+        fruit_stmt = fruit_stmt.where(DeliveryAssignment.delivery_partner_id == delivery_partner_id)
+
+    if search:
+        fruit_stmt = fruit_stmt.where(
+            or_(
+                cast(FruitOrder.id, String).ilike(f"%{search}%"),
+                FruitOrder.order_number.ilike(f"%{search}%"),
+                CustomerUser.full_name.ilike(f"%{search}%"),
+                PartnerUser.full_name.ilike(f"%{search}%"),
+            )
+        )
+
+    fruit_stmt = fruit_stmt.order_by(FruitOrder.delivery_date.desc().nulls_last(), FruitOrder.created_at.desc())
+    fruit_res = await db.execute(fruit_stmt)
+    fruit_rows = fruit_res.all()
+
+    for row in fruit_rows:
+        f_order, cust, c_user, assign, partner, p_user, addr = row
+
+        addr_str = "No address provided"
+        if addr:
+            addr_str = f"{addr.address_line1}"
+            if addr.address_line2:
+                addr_str += f", {addr.address_line2}"
+            addr_str += f", {addr.city} - {addr.pincode}"
+
+        pay_status = "Paid" if f_order.payment_status.value == "paid" else "Pending"
+
+        items.append(AdminDeliveryListItem(
+            id=f_order.id,
+            subscription_id=None,
+            customer_name=c_user.full_name,
+            phone=c_user.phone,
+            delivery_partner_id=partner.id if partner else None,
+            delivery_partner_name=p_user.full_name if p_user else None,
+            delivery_partner_phone=p_user.phone if p_user else None,
+            delivery_address=addr_str,
+            scheduled_date=f_order.delivery_date or f_order.created_at.date(),
+            delivery_time=f_order.delivery_slot or "Standard",
+            amount=float(f_order.total_amount),
+            payment_status=pay_status,
+            status=f_order.order_status.value if hasattr(f_order.order_status, "value") else str(f_order.order_status),
+        ))
+
+    # Re-sort combined list by date desc
+    items.sort(key=lambda x: x.scheduled_date, reverse=True)
+
     return items
 
 

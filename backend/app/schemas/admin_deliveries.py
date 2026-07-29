@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class AdminDeliveryListItem(BaseModel):
     id: uuid.UUID
-    subscription_id: uuid.UUID
+    subscription_id: Optional[uuid.UUID] = None
     customer_name: str
     phone: str
     delivery_partner_id: Optional[uuid.UUID] = None
