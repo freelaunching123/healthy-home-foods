@@ -41,7 +41,13 @@ async def get_dashboard_stats(
                         func.date(Payment.paid_at) >= start,
                         func.date(Payment.paid_at) <= end))
         )
-        return float(result.scalar_one())
+        fruit_result = await db.execute(
+            select(func.coalesce(func.sum(FruitOrder.total_amount), 0))
+            .where(and_(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS,
+                        func.date(FruitOrder.paid_at) >= start,
+                        func.date(FruitOrder.paid_at) <= end))
+        )
+        return float(result.scalar_one()) + float(fruit_result.scalar_one())
 
     daily_rev = await revenue_between(today, today)
     weekly_rev = await revenue_between(week_ago, today)
@@ -155,7 +161,12 @@ async def export_excel(
                 select(func.coalesce(func.sum(Payment.amount), 0))
                 .where(and_(Payment.status == PaymentStatus.SUCCESS, func.date(Payment.paid_at) == d))
             )
-            ws.append([str(d), float(rev_result.scalar_one()), 0, 0])
+            fruit_result = await db.execute(
+                select(func.coalesce(func.sum(FruitOrder.total_amount), 0))
+                .where(and_(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS, func.date(FruitOrder.paid_at) == d))
+            )
+            total = float(rev_result.scalar_one()) + float(fruit_result.scalar_one())
+            ws.append([str(d), total, 0, 0])
 
     elif report_type == "deliveries":
         headers = ["Date", "Total", "Delivered", "Missed", "Success Rate (%)"]
@@ -354,7 +365,14 @@ async def get_admin_overview(
             func.date(Payment.paid_at) == today,
         )
     )
-    todays_revenue = float(todays_revenue_result.scalar_one())
+    todays_fruit_revenue_result = await db.execute(
+        select(func.coalesce(func.sum(FruitOrder.total_amount), 0))
+        .where(
+            FruitOrder.payment_status == FruitPaymentStatus.SUCCESS,
+            func.date(FruitOrder.paid_at) == today,
+        )
+    )
+    todays_revenue = float(todays_revenue_result.scalar_one()) + float(todays_fruit_revenue_result.scalar_one())
 
     # Orders today = subscription deliveries scheduled today + fruit orders created today
     sub_deliveries_today = await db.scalar(
@@ -468,9 +486,16 @@ async def get_admin_overview(
                 func.date(Payment.paid_at) == chart_date,
             )
         )
+        fruit_rev_result = await db.execute(
+            select(func.coalesce(func.sum(FruitOrder.total_amount), 0))
+            .where(
+                FruitOrder.payment_status == FruitPaymentStatus.SUCCESS,
+                func.date(FruitOrder.paid_at) == chart_date,
+            )
+        )
         revenue_chart.append({
             "date": str(chart_date),
-            "revenue": float(rev_result.scalar_one()),
+            "revenue": float(rev_result.scalar_one()) + float(fruit_rev_result.scalar_one()),
         })
 
     # ── 4. Recent Activity Feed ────────────────────────────────────────────────
