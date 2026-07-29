@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
+
 import '../../../../core/services/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import 'package:intl/intl.dart';
@@ -88,26 +88,6 @@ class _FruitPerformanceState extends State<FruitPerformance> {
       ],
     );
   }
-
-  Widget _buildPieChart() {
-    List<PieChartSectionData> sections = [];
-    for (int i = 0; i < _topSelling.length; i++) {
-                            const SizedBox(width: 4),
-                            Text(_topSelling[index]['name'], style: const TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      );
-                    }),
-                  )
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildList(String title, List<dynamic> items, bool isTop) {
     final formatCurrency = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
     return Card(
