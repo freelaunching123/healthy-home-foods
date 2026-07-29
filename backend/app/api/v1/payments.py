@@ -200,210 +200,310 @@ async def download_invoice(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate and return the invoice PDF for a payment transaction."""
-    # Retrieve customer profile
-    customer = await _get_customer(db, current_user.id)
+    try:
+        # Retrieve customer profile
+        customer = await _get_customer(db, current_user.id)
 
-    # Fetch payment with relationships
-    from sqlalchemy.orm import selectinload
-    result = await db.execute(
-        select(Payment)
-        .where(Payment.id == payment_id, Payment.customer_id == customer.id)
-        .options(
-            selectinload(Payment.invoice),
-            selectinload(Payment.subscription).selectinload(Subscription.product),
-            selectinload(Payment.subscription).selectinload(Subscription.plan)
+        # Fetch payment with relationships
+        from sqlalchemy.orm import selectinload
+        result = await db.execute(
+            select(Payment)
+            .where(Payment.id == payment_id, Payment.customer_id == customer.id)
+            .options(
+                selectinload(Payment.invoice),
+                selectinload(Payment.subscription).selectinload(Subscription.product),
+                selectinload(Payment.subscription).selectinload(Subscription.plan)
+            )
         )
-    )
-    payment = result.scalar_one_or_none()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment transaction not found")
+        payment = result.scalar_one_or_none()
+        if not payment:
+            raise HTTPException(status_code=404, detail="Payment transaction not found")
 
-    # Fallback to subscription details if invoice record does not exist
-    invoice = payment.invoice
-    sub = payment.subscription
-    
-    invoice_no = invoice.invoice_number if invoice else f"INV-{payment.created_at.strftime('%Y%m')}-{str(payment.id)[:8].upper()}"
-    cust_name = invoice.customer_name if (invoice and invoice.customer_name != "Customer") else current_user.full_name
-    cust_phone = invoice.customer_phone if invoice else current_user.phone
-    cust_email = invoice.customer_email if invoice else current_user.email
-    billing_addr = invoice.billing_address if (invoice and invoice.billing_address) else "Registered Address"
-    prod_name = invoice.product_name if (invoice and invoice.product_name) else (sub.product.name if sub and sub.product else "Healthy Meal Plan")
-    plan_name = invoice.plan_name if (invoice and invoice.plan_name) else (sub.plan.name if sub and sub.plan else "Subscription Plan")
-    total_del = invoice.total_deliveries if invoice else (sub.total_deliveries if sub else 0)
-    price_per = float(invoice.price_per_delivery) if invoice else (float(sub.price_per_delivery) if (sub and sub.price_per_delivery is not None) else 0.0)
-    subtotal = float(invoice.subtotal) if invoice else (price_per * total_del)
-    del_charge = float(invoice.delivery_charge) if invoice else (float(sub.delivery_charge) if (sub and sub.delivery_charge is not None) else 0.0)
-    tax_amt = float(invoice.tax_amount) if invoice else (float(sub.tax_amount) if (sub and sub.tax_amount is not None) else 0.0)
-    total_amt = float(invoice.total_amount) if invoice else float(payment.amount)
-    paid_date = payment.paid_at.strftime('%B %d, %Y') if payment.paid_at else payment.created_at.strftime('%B %d, %Y')
-    pmt_method = payment.payment_method.value if payment.payment_method and hasattr(payment.payment_method, "value") else (payment.payment_method or "Razorpay")
+        # Fallback to subscription details if invoice record does not exist
+        invoice = payment.invoice
+        sub = payment.subscription
 
-    # Generate PDF using ReportLab
-    import io
-    from fastapi.responses import StreamingResponse
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from datetime import datetime
+        now_str = datetime.now().strftime('%Y%m')
+        created_str = payment.created_at.strftime('%Y%m') if (payment.created_at is not None) else now_str
 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=36
-    )
+        invoice_no = (
+            invoice.invoice_number
+            if (invoice and invoice.invoice_number)
+            else f"INV-{created_str}-{str(payment.id)[:8].upper()}"
+        )
+        cust_name = (
+            invoice.customer_name
+            if (invoice and invoice.customer_name and invoice.customer_name != "Customer")
+            else (current_user.full_name if (current_user and current_user.full_name) else "Customer")
+        ) or "Customer"
 
-    styles = getSampleStyleSheet()
+        cust_phone = (
+            invoice.customer_phone
+            if (invoice and invoice.customer_phone)
+            else (current_user.phone if (current_user and current_user.phone) else "N/A")
+        ) or "N/A"
 
-    title_style = ParagraphStyle(
-        'DocTitle',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=20,
-        leading=24,
-        textColor=colors.HexColor('#2E7D32')
-    )
-    subtitle_style = ParagraphStyle(
-        'DocSubtitle',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=10,
-        leading=13,
-        textColor=colors.HexColor('#666666')
-    )
-    h2_style = ParagraphStyle(
-        'H2Style',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
-        fontSize=11,
-        leading=14,
-        textColor=colors.HexColor('#2E7D32')
-    )
-    normal_style = ParagraphStyle(
-        'NormalText',
-        parent=styles['Normal'],
-        fontName='Helvetica',
-        fontSize=10,
-        leading=14,
-        textColor=colors.HexColor('#333333')
-    )
-    right_normal = ParagraphStyle(
-        'RightNormal',
-        parent=normal_style,
-        alignment=2
-    )
-    right_bold = ParagraphStyle(
-        'RightBold',
-        parent=normal_style,
-        fontName='Helvetica-Bold',
-        alignment=2
-    )
+        cust_email = (
+            invoice.customer_email
+            if invoice
+            else (current_user.email if current_user else None)
+        )
 
-    story = []
+        billing_addr = (
+            invoice.billing_address
+            if (invoice and invoice.billing_address)
+            else "Registered Address"
+        ) or "Registered Address"
 
-    # Header
-    story.append(Paragraph("HEALTHY HOME FOODS", title_style))
-    story.append(Paragraph("Fresh, Healthy & Home-Cooked Meals", subtitle_style))
-    story.append(Spacer(1, 12))
-    story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#2E7D32'), spaceAfter=15))
+        prod_name = (
+            invoice.product_name
+            if (invoice and invoice.product_name)
+            else (
+                sub.product.name
+                if (sub and sub.product and sub.product.name)
+                else ("Multi-package subscription" if (sub and not getattr(sub, "product_id", None)) else "Healthy Meal Plan")
+            )
+        ) or "Healthy Meal Plan"
 
-    # Billed To and Invoice Details
-    left_info = [
-        Paragraph("BILLED TO", h2_style),
-        Spacer(1, 4),
-        Paragraph(f"<b>{cust_name}</b>", normal_style),
-        Paragraph(f"Phone: {cust_phone}", normal_style),
-    ]
-    if cust_email:
-        left_info.append(Paragraph(f"Email: {cust_email}", normal_style))
-    if billing_addr:
-        left_info.append(Paragraph(f"Address: {billing_addr}", normal_style))
+        plan_name = (
+            invoice.plan_name
+            if (invoice and invoice.plan_name)
+            else (
+                sub.plan.name
+                if (sub and sub.plan and sub.plan.name)
+                else (f"{sub.plan_type.upper()} Plan" if (sub and getattr(sub, "plan_type", None)) else "Subscription Plan")
+            )
+        ) or "Subscription Plan"
 
-    status_str = payment.status.value if hasattr(payment.status, "value") else str(payment.status)
-    right_info = [
-        Paragraph("INVOICE DETAILS", h2_style),
-        Spacer(1, 4),
-        Paragraph(f"<b>Invoice No:</b> {invoice_no}", normal_style),
-        Paragraph(f"<b>Date:</b> {paid_date}", normal_style),
-        Paragraph(f"<b>Payment Method:</b> {pmt_method.upper()}", normal_style),
-        Paragraph(f"<b>Status:</b> <font color='#2E7D32'><b>{status_str.upper()}</b></font>", normal_style),
-    ]
+        total_del = (
+            invoice.total_deliveries
+            if (invoice and invoice.total_deliveries is not None)
+            else (sub.total_deliveries if (sub and sub.total_deliveries is not None) else 0)
+        ) or 0
 
-    info_table = Table([[left_info, right_info]], colWidths=[270, 270])
-    info_table.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('LEFTPADDING', (0,0), (-1,-1), 0),
-        ('RIGHTPADDING', (0,0), (-1,-1), 0),
-    ]))
-    story.append(info_table)
-    story.append(Spacer(1, 20))
+        price_per = (
+            float(invoice.price_per_delivery)
+            if (invoice and invoice.price_per_delivery is not None)
+            else (float(sub.price_per_delivery) if (sub and sub.price_per_delivery is not None) else 0.0)
+        )
 
-    # Items Table
-    headers = [
-        Paragraph("<b>Item Description</b>", ParagraphStyle('TH1', parent=normal_style, textColor=colors.white, fontName='Helvetica-Bold')),
-        Paragraph("<b>Price / Del.</b>", ParagraphStyle('TH2', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
-        Paragraph("<b>Deliveries</b>", ParagraphStyle('TH3', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
-        Paragraph("<b>Total</b>", ParagraphStyle('TH4', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
-    ]
-    
-    item_row = [
-        Paragraph(f"<b>{prod_name}</b><br/><font size=8 color='#666666'>Plan: {plan_name.title()}</font>", normal_style),
-        Paragraph(f"INR {price_per:.2f}", right_normal),
-        Paragraph(f"{total_del}", right_normal),
-        Paragraph(f"INR {subtotal:.2f}", right_bold),
-    ]
+        subtotal = (
+            float(invoice.subtotal)
+            if (invoice and invoice.subtotal is not None)
+            else (price_per * total_del)
+        )
 
-    table_data = [headers, item_row]
-    items_table = Table(table_data, colWidths=[240, 100, 80, 120])
-    items_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2E7D32')),
-        ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-        ('TOPPADDING', (0,0), (-1,-1), 8),
-        ('LINEBELOW', (0,1), (-1,1), 1, colors.HexColor('#EEEEEE')),
-    ]))
-    story.append(items_table)
-    story.append(Spacer(1, 15))
+        del_charge = (
+            float(invoice.delivery_charge)
+            if (invoice and invoice.delivery_charge is not None)
+            else (float(sub.delivery_charge) if (sub and sub.delivery_charge is not None) else 0.0)
+        )
 
-    # Summary
-    summary_data = [
-        [Paragraph("Subtotal", normal_style), Paragraph(f"INR {subtotal:.2f}", right_normal)],
-        [Paragraph("Delivery Charge", normal_style), Paragraph(f"INR {del_charge:.2f}", right_normal)],
-        [Paragraph("Tax Amount", normal_style), Paragraph(f"INR {tax_amt:.2f}", right_normal)],
-        [Paragraph("<b>Total Paid</b>", ParagraphStyle('TotL', parent=normal_style, fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#2E7D32'))),
-         Paragraph(f"<b>INR {total_amt:.2f}</b>", ParagraphStyle('TotR', parent=right_normal, fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#2E7D32')))],
-    ]
-    summary_table = Table(summary_data, colWidths=[140, 100])
-    summary_table.setStyle(TableStyle([
-        ('ALIGN', (1,0), (1,-1), 'RIGHT'),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('LINEABOVE', (0,-1), (-1,-1), 1.5, colors.HexColor('#2E7D32')),
-    ]))
+        tax_amt = (
+            float(invoice.tax_amount)
+            if (invoice and invoice.tax_amount is not None)
+            else (float(sub.tax_amount) if (sub and sub.tax_amount is not None) else 0.0)
+        )
 
-    wrapper_table = Table([["", summary_table]], colWidths=[300, 240])
-    wrapper_table.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('LEFTPADDING', (0,0), (-1,-1), 0),
-        ('RIGHTPADDING', (0,0), (-1,-1), 0),
-    ]))
-    story.append(wrapper_table)
-    story.append(Spacer(1, 30))
+        total_amt = (
+            float(invoice.total_amount)
+            if (invoice and invoice.total_amount is not None)
+            else (float(payment.amount) if (payment.amount is not None) else 0.0)
+        )
 
-    # Footer
-    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#CCCCCC'), spaceAfter=10))
-    story.append(Paragraph("Thank you for subscribing to Healthy Home Foods! For support, contact support@healthyhomefoods.com", ParagraphStyle('Footer', parent=normal_style, alignment=1, fontSize=9, textColor=colors.HexColor('#888888'))))
+        paid_date = (
+            payment.paid_at.strftime('%B %d, %Y')
+            if payment.paid_at
+            else (payment.created_at.strftime('%B %d, %Y') if payment.created_at else datetime.now().strftime('%B %d, %Y'))
+        )
 
-    doc.build(story)
-    pdf_bytes = buffer.getvalue()
-    buffer.close()
+        pmt_method = (
+            payment.payment_method.value
+            if (payment.payment_method and hasattr(payment.payment_method, "value"))
+            else (str(payment.payment_method) if payment.payment_method else "Razorpay")
+        ) or "Razorpay"
 
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={invoice_no}.pdf"},
-    )
+        status_str = (
+            payment.status.value
+            if (payment.status and hasattr(payment.status, "value"))
+            else (str(payment.status) if payment.status else "SUCCESS")
+        ) or "SUCCESS"
+
+        # Generate PDF using ReportLab
+        import io
+        from fastapi.responses import StreamingResponse
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=36,
+            leftMargin=36,
+            topMargin=36,
+            bottomMargin=36
+        )
+
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle(
+            'DocTitle',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=20,
+            leading=24,
+            textColor=colors.HexColor('#2E7D32')
+        )
+        subtitle_style = ParagraphStyle(
+            'DocSubtitle',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=10,
+            leading=13,
+            textColor=colors.HexColor('#666666')
+        )
+        h2_style = ParagraphStyle(
+            'H2Style',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=11,
+            leading=14,
+            textColor=colors.HexColor('#2E7D32')
+        )
+        normal_style = ParagraphStyle(
+            'NormalText',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=10,
+            leading=14,
+            textColor=colors.HexColor('#333333')
+        )
+        right_normal = ParagraphStyle(
+            'RightNormal',
+            parent=normal_style,
+            alignment=2
+        )
+        right_bold = ParagraphStyle(
+            'RightBold',
+            parent=normal_style,
+            fontName='Helvetica-Bold',
+            alignment=2
+        )
+
+        story = []
+
+        # Header
+        story.append(Paragraph("HEALTHY HOME FOODS", title_style))
+        story.append(Paragraph("Fresh, Healthy & Home-Cooked Meals", subtitle_style))
+        story.append(Spacer(1, 12))
+        story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor('#2E7D32'), spaceAfter=15))
+
+        # Billed To and Invoice Details
+        left_info = [
+            Paragraph("BILLED TO", h2_style),
+            Spacer(1, 4),
+            Paragraph(f"<b>{cust_name}</b>", normal_style),
+            Paragraph(f"Phone: {cust_phone}", normal_style),
+        ]
+        if cust_email:
+            left_info.append(Paragraph(f"Email: {cust_email}", normal_style))
+        if billing_addr:
+            left_info.append(Paragraph(f"Address: {billing_addr}", normal_style))
+
+        right_info = [
+            Paragraph("INVOICE DETAILS", h2_style),
+            Spacer(1, 4),
+            Paragraph(f"<b>Invoice No:</b> {invoice_no}", normal_style),
+            Paragraph(f"<b>Date:</b> {paid_date}", normal_style),
+            Paragraph(f"<b>Payment Method:</b> {pmt_method.upper()}", normal_style),
+            Paragraph(f"<b>Status:</b> <font color='#2E7D32'><b>{status_str.upper()}</b></font>", normal_style),
+        ]
+
+        info_table = Table([[left_info, right_info]], colWidths=[270, 270])
+        info_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(info_table)
+        story.append(Spacer(1, 20))
+
+        # Items Table
+        headers = [
+            Paragraph("<b>Item Description</b>", ParagraphStyle('TH1', parent=normal_style, textColor=colors.white, fontName='Helvetica-Bold')),
+            Paragraph("<b>Price / Del.</b>", ParagraphStyle('TH2', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
+            Paragraph("<b>Deliveries</b>", ParagraphStyle('TH3', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
+            Paragraph("<b>Total</b>", ParagraphStyle('TH4', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
+        ]
+        
+        item_row = [
+            Paragraph(f"<b>{prod_name}</b><br/><font size=8 color='#666666'>Plan: {str(plan_name).title()}</font>", normal_style),
+            Paragraph(f"INR {price_per:.2f}", right_normal),
+            Paragraph(f"{total_del}", right_normal),
+            Paragraph(f"INR {subtotal:.2f}", right_bold),
+        ]
+
+        table_data = [headers, item_row]
+        items_table = Table(table_data, colWidths=[240, 100, 80, 120])
+        items_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2E7D32')),
+            ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+            ('TOPPADDING', (0,0), (-1,-1), 8),
+            ('LINEBELOW', (0,1), (-1,1), 1, colors.HexColor('#EEEEEE')),
+        ]))
+        story.append(items_table)
+        story.append(Spacer(1, 15))
+
+        # Summary
+        summary_data = [
+            [Paragraph("Subtotal", normal_style), Paragraph(f"INR {subtotal:.2f}", right_normal)],
+            [Paragraph("Delivery Charge", normal_style), Paragraph(f"INR {del_charge:.2f}", right_normal)],
+            [Paragraph("Tax Amount", normal_style), Paragraph(f"INR {tax_amt:.2f}", right_normal)],
+            [Paragraph("<b>Total Paid</b>", ParagraphStyle('TotL', parent=normal_style, fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#2E7D32'))),
+             Paragraph(f"<b>INR {total_amt:.2f}</b>", ParagraphStyle('TotR', parent=right_normal, fontName='Helvetica-Bold', fontSize=12, textColor=colors.HexColor('#2E7D32')))],
+        ]
+        summary_table = Table(summary_data, colWidths=[140, 100])
+        summary_table.setStyle(TableStyle([
+            ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+            ('TOPPADDING', (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+            ('LINEABOVE', (0,-1), (-1,-1), 1.5, colors.HexColor('#2E7D32')),
+        ]))
+
+        wrapper_table = Table([["", summary_table]], colWidths=[300, 240])
+        wrapper_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 0),
+        ]))
+        story.append(wrapper_table)
+        story.append(Spacer(1, 30))
+
+        # Footer
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#CCCCCC'), spaceAfter=10))
+        story.append(Paragraph("Thank you for subscribing to Healthy Home Foods! For support, contact support@healthyhomefoods.com", ParagraphStyle('Footer', parent=normal_style, alignment=1, fontSize=9, textColor=colors.HexColor('#888888'))))
+
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={invoice_no}.pdf"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error generating invoice PDF for payment {payment_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate invoice PDF: {str(e)}"
+        )

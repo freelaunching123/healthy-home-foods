@@ -756,28 +756,48 @@ async def admin_delete_fruit(
     if not fruit:
         raise HTTPException(status_code=404, detail="Fruit not found")
 
-    # Delete fruit image file if present
-    if fruit.image_url:
-        old_path = os.path.join(settings.UPLOAD_DIR, fruit.image_url.lstrip("/uploads/"))
-        if os.path.exists(old_path):
-            try:
-                os.remove(old_path)
-            except OSError:
-                pass
+    try:
+        # Delete fruit image file if present
+        if fruit.image_url:
+            old_path = os.path.join(settings.UPLOAD_DIR, fruit.image_url.lstrip("/uploads/"))
+            if os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except OSError:
+                    pass
 
-    # Delete any cart items referencing this fruit
-    cart_result = await db.execute(select(FruitCart).where(FruitCart.fruit_id == fruit_id))
-    for cart_item in cart_result.scalars().all():
-        await db.delete(cart_item)
+        # Delete associated reviews
+        from app.models.review import Review, ReviewItemType
+        reviews_res = await db.execute(
+            select(Review).where(
+                Review.item_id == fruit_id,
+                Review.item_type == ReviewItemType.FRUIT
+            )
+        )
+        for review in reviews_res.scalars().all():
+            await db.delete(review)
 
-    # Disassociate order items (set fruit_id=None) so past order history remains intact
-    order_items_result = await db.execute(select(FruitOrderItem).where(FruitOrderItem.fruit_id == fruit_id))
-    for item in order_items_result.scalars().all():
-        item.fruit_id = None
+        # Delete any cart items referencing this fruit
+        cart_result = await db.execute(select(FruitCart).where(FruitCart.fruit_id == fruit_id))
+        for cart_item in cart_result.scalars().all():
+            await db.delete(cart_item)
 
-    await db.delete(fruit)
-    await db.commit()
-    return MessageResponse(message="Fruit deleted successfully")
+        # Disassociate order items (set fruit_id=None) so past order history remains intact
+        order_items_result = await db.execute(select(FruitOrderItem).where(FruitOrderItem.fruit_id == fruit_id))
+        for item in order_items_result.scalars().all():
+            item.fruit_id = None
+
+        await db.delete(fruit)
+        await db.commit()
+        return MessageResponse(message="Fruit deleted successfully")
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete fruit: {str(e)}"
+        )
 
 
 # ── Admin: Fruit Orders ────────────────────────────────────────────────────────

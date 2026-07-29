@@ -350,11 +350,11 @@ async def get_assignment_details(
         from app.models.fruit import FruitOrderItem, Fruit
         items_result = await db.execute(
             select(FruitOrderItem, Fruit)
-            .join(Fruit, Fruit.id == FruitOrderItem.fruit_id)
+            .outerjoin(Fruit, Fruit.id == FruitOrderItem.fruit_id)
             .where(FruitOrderItem.order_id == fo.id)
         )
         items_rows = items_result.all()
-        items_summary = ", ".join([f"{f.name} ({item.quantity_kg} kg)" for item, f in items_rows])
+        items_summary = ", ".join([f"{f.name if f else 'Fresh Fruit'} ({item.quantity_kg} kg)" for item, f in items_rows])
         
         return ActiveDeliveryResponse(
             id=a.id,

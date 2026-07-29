@@ -117,7 +117,7 @@ class FruitCheckoutRequest(BaseModel):
 
 class FruitOrderItemResponse(BaseModel):
     id: uuid.UUID
-    fruit_id: uuid.UUID
+    fruit_id: Optional[uuid.UUID] = None
     fruit_name: str
     fruit_image_url: Optional[str]
     quantity_kg: float
