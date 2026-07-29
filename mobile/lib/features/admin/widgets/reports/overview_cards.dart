@@ -36,7 +36,7 @@ class _OverviewCardsState extends State<OverviewCards> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final res = await _api.get('/api/v1/reports/overview', queryParameters: {
+      final res = await _api.get('/reports/overview', queryParameters: {
         if (widget.startDate != null) 'start_date': widget.startDate,
         if (widget.endDate != null) 'end_date': widget.endDate,
       });

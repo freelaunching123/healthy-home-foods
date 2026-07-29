@@ -43,7 +43,7 @@ class _FruitPerformanceState extends State<FruitPerformance> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final res = await _api.get('/api/v1/reports/fruits', queryParameters: {
+      final res = await _api.get('/reports/fruits', queryParameters: {
         if (widget.startDate != null) 'start_date': widget.startDate,
         if (widget.endDate != null) 'end_date': widget.endDate,
       });

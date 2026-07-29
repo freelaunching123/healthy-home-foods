@@ -36,7 +36,7 @@ class _DeliveryAnalyticsState extends State<DeliveryAnalytics> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final res = await _api.get('/api/v1/reports/deliveries', queryParameters: {
+      final res = await _api.get('/reports/deliveries', queryParameters: {
         if (widget.startDate != null) 'start_date': widget.startDate,
         if (widget.endDate != null) 'end_date': widget.endDate,
       });

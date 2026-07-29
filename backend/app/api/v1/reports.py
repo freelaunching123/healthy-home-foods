@@ -255,3 +255,63 @@ async def export_excel(_: User = Depends(require_super_admin)):
 async def export_pdf(_: User = Depends(require_super_admin)):
     html = "<html><body><h1>Report</h1><p>Not fully implemented</p></body></html>"
     return StreamingResponse(io.BytesIO(b"PDF Mock"), media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=report.pdf"})
+
+@router.get("/admin-overview")
+async def get_admin_overview(
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    today = date.today()
+    sd_7 = today - timedelta(days=6)
+    
+    # Summary
+    todays_pkg_rev = await db.scalar(select(func.sum(Payment.amount)).where(and_(Payment.status == PaymentStatus.SUCCESS, func.date(Payment.paid_at) == today)))
+    todays_frt_rev = await db.scalar(select(func.sum(FruitOrder.total_amount)).where(and_(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS, func.date(FruitOrder.paid_at) == today)))
+    todays_revenue = float(todays_pkg_rev or 0) + float(todays_frt_rev or 0)
+    
+    orders_pkg = await db.scalar(select(func.count(Subscription.id)).where(func.date(Subscription.created_at) == today))
+    orders_frt = await db.scalar(select(func.count(FruitOrder.id)).where(func.date(FruitOrder.created_at) == today))
+    orders_today = (orders_pkg or 0) + (orders_frt or 0)
+    
+    active_subscribers = await db.scalar(select(func.count(Subscription.id)).where(Subscription.status == SubscriptionStatus.ACTIVE))
+    
+    pending_deliveries = await db.scalar(select(func.count(SubscriptionDelivery.id)).where(and_(SubscriptionDelivery.status == DeliveryStatus.PENDING, func.date(SubscriptionDelivery.scheduled_date) == today)))
+    
+    # Insights
+    top_pkg_res = await db.execute(select(Product.name, func.count(Subscription.id).label('c')).join(Subscription, Subscription.product_id == Product.id).group_by(Product.id).order_by(desc('c')).limit(1))
+    top_pkg_row = top_pkg_res.first()
+    top_selling_package = {"name": top_pkg_row[0], "count": top_pkg_row[1]} if top_pkg_row else None
+    
+    top_frt_res = await db.execute(select(Fruit.name, func.count(FruitOrderItem.id).label('c')).join(FruitOrderItem, FruitOrderItem.fruit_id == Fruit.id).group_by(Fruit.id).order_by(desc('c')).limit(1))
+    top_frt_row = top_frt_res.first()
+    most_ordered_fruit = {"name": top_frt_row[0], "count": top_frt_row[1]} if top_frt_row else None
+    
+    low_stock = await db.scalars(select(Fruit).where(Fruit.availability_status != FruitAvailability.IN_STOCK).limit(5))
+    low_stock_alerts = [{"name": f.name, "status": f.availability_status.value} for f in low_stock]
+    
+    # Revenue Chart (Last 7 days)
+    chart_data = []
+    for i in range(7):
+        d = sd_7 + timedelta(days=i)
+        p_rev = await db.scalar(select(func.sum(Payment.amount)).where(and_(Payment.status == PaymentStatus.SUCCESS, func.date(Payment.paid_at) == d)))
+        f_rev = await db.scalar(select(func.sum(FruitOrder.total_amount)).where(and_(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS, func.date(FruitOrder.paid_at) == d)))
+        chart_data.append({
+            "date": d.strftime("%Y-%m-%d"),
+            "revenue": float(p_rev or 0) + float(f_rev or 0)
+        })
+        
+    return {
+        "summary": {
+            "todays_revenue": todays_revenue,
+            "orders_today": orders_today,
+            "active_subscribers": active_subscribers or 0,
+            "pending_deliveries": pending_deliveries or 0,
+        },
+        "quick_insights": {
+            "top_selling_package": top_selling_package,
+            "most_ordered_fruit": most_ordered_fruit,
+            "low_stock_alerts": low_stock_alerts,
+        },
+        "revenue_chart": chart_data,
+        "recent_activity": []
+    }

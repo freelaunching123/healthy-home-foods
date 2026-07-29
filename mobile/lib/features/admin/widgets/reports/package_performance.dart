@@ -38,7 +38,7 @@ class _PackagePerformanceState extends State<PackagePerformance> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final res = await _api.get('/api/v1/reports/packages', queryParameters: {
+      final res = await _api.get('/reports/packages', queryParameters: {
         if (widget.startDate != null) 'start_date': widget.startDate,
         if (widget.endDate != null) 'end_date': widget.endDate,
       });

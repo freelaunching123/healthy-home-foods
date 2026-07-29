@@ -43,6 +43,12 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
   bool _isActionInProgress = false;
   Timer? _pollingTimer;
 
+  // Filter Chips Options
+  final List<String> _filterChips = [
+    'All', 'Packages', 'Fruits', 'Pending', 'Assigned', 'Out for Delivery', 'Delivered', 'Cancelled', 'Failed'
+  ];
+  String _activeChip = 'All';
+
   @override
   void initState() {
     super.initState();
@@ -58,7 +64,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
   }
 
   void _startPolling() {
-    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (mounted && !_isActionInProgress) {
         _loadDeliveries();
       }
@@ -141,10 +147,10 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
 
   Future<void> _loadPartners() async {
     try {
-      final res = await _api.get('/api/v1/admin/delivery-partners/');
-      if (mounted && res.data != null) {
+      final res = await _api.get('/delivery-partners');
+      if (mounted && res.data is List) {
         setState(() {
-          _partners = List<Map<String, dynamic>>.from(res.data['items'] ?? res.data);
+          _partners = List<Map<String, dynamic>>.from(res.data);
         });
       }
     } catch (e) {
@@ -152,286 +158,471 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
     }
   }
 
-  void _showErrorSnackBar(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: AppTheme.error,
+    ));
+  }
+  
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: AppTheme.success,
+    ));
   }
 
-  void _showSuccessSnackBar(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppTheme.success));
+  void _handleChipSelection(String chip) {
+    setState(() {
+      _activeChip = chip;
+      // Reset complex filters
+      _selectedOrderType = 'all';
+      _selectedStatus = 'all';
+
+      switch (chip) {
+        case 'Packages': _selectedOrderType = 'subscription'; break;
+        case 'Fruits': _selectedOrderType = 'fruit'; break;
+        case 'Pending': _selectedStatus = 'pending'; break;
+        case 'Assigned': _selectedStatus = 'assigned'; break;
+        case 'Out for Delivery': _selectedStatus = 'out_for_delivery'; break;
+        case 'Delivered': _selectedStatus = 'delivered'; break;
+        case 'Cancelled': _selectedStatus = 'cancelled'; break;
+        case 'Failed': _selectedStatus = 'failed'; break;
+        default: break;
+      }
+      _isLoading = true;
+    });
+    _loadDeliveries();
   }
 
-  Future<void> _handleAssignPartner(Map<String, dynamic> delivery) async {
+  Future<void> _assignPartner(String orderType, String id, String partnerId) async {
+    setState(() => _isActionInProgress = true);
+    try {
+      if (orderType == 'subscription') {
+        // Find subscription_id
+        final deliv = _deliveries.firstWhere((d) => d['id'] == id);
+        final subId = deliv['subscription_id'];
+        await _api.post('/api/v1/packages/orders/admin/package-orders/$subId/assign', data: {
+          'delivery_partner_id': partnerId
+        });
+      } else {
+        await _api.post('/api/v1/fruits/admin/orders/$id/assign', data: {
+          'delivery_partner_id': partnerId
+        });
+      }
+      _showSuccessSnackBar('Partner assigned successfully');
+      await _loadDeliveries();
+    } catch (e) {
+      _showErrorSnackBar('Failed to assign partner');
+    } finally {
+      setState(() => _isActionInProgress = false);
+    }
+  }
+
+  Future<void> _updateStatus(String id, String status) async {
+    setState(() => _isActionInProgress = true);
+    try {
+      await _api.put('/api/v1/admin/deliveries/$id/status', data: {
+        'status': status
+      });
+      _showSuccessSnackBar('Status updated');
+      await _loadDeliveries();
+    } catch (e) {
+      _showErrorSnackBar('Failed to update status');
+    } finally {
+      setState(() => _isActionInProgress = false);
+    }
+  }
+
+  void _showAssignDialog(Map<String, dynamic> delivery) {
     showDialog(
       context: context,
       builder: (context) => DeliveryPartnerDialog(
         partners: _partners,
-        onAssign: (partnerId) async {
-          Navigator.pop(context);
-          setState(() => _isActionInProgress = true);
-          try {
-            String endpoint = '';
-            if (delivery['order_type'] == 'subscription') {
-              endpoint = '/api/v1/admin/deliveries/subscription/${delivery['subscription_id']}/assign';
-            } else {
-              endpoint = '/api/v1/admin/deliveries/fruit/${delivery['fruit_order_id']}/assign';
-            }
-
-            await _api.post(endpoint, data: {'delivery_partner_id': partnerId});
-            _showSuccessSnackBar('Delivery Partner Assigned Successfully');
-            await _loadDeliveries();
-            await _loadPartners();
-          } catch (e) {
-            _showErrorSnackBar('Failed to assign partner: $e');
-          } finally {
-            setState(() => _isActionInProgress = false);
-          }
+        onAssign: (partnerId) {
+          _assignPartner(delivery['order_type'], delivery['id'], partnerId);
         },
       ),
     );
   }
 
-  Future<void> _showDeliveryDetails(Map<String, dynamic> delivery) async {
+  void _showDeliveryDetails(Map<String, dynamic> delivery) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => FutureBuilder(
-        future: _api.get('/api/v1/admin/deliveries/${delivery['id']}'),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Container(
-              height: 300,
-              decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-              child: const Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (snapshot.hasError || !snapshot.hasData) {
-            return Container(
-              height: 300,
-              decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-              child: const Center(child: Text('Failed to load details')),
-            );
-          }
-          final details = snapshot.data!.data as Map<String, dynamic>;
-          return SizedBox(
-            height: MediaQuery.of(context).size.height * 0.8,
-            child: DeliveryDetailsSheet(details: details),
+      builder: (context) => DeliveryDetailsSheet(details: delivery),
+    );
+  }
+
+  void _showFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 20, right: 20, top: 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Filters', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                
+                // Date Filter
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Date'),
+                  subtitle: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
+                  trailing: const Icon(Icons.calendar_today, color: AppTheme.primaryGreen),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setModalState(() => _selectedDate = picked);
+                      setState(() => _selectedDate = picked);
+                    }
+                  },
+                ),
+                const Divider(),
+                
+                // Status Filter
+                const Text('Status', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: _selectedStatus,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Statuses')),
+                    DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                    DropdownMenuItem(value: 'assigned', child: Text('Assigned')),
+                    DropdownMenuItem(value: 'out_for_delivery', child: Text('Out for Delivery')),
+                    DropdownMenuItem(value: 'delivered', child: Text('Delivered')),
+                    DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
+                    DropdownMenuItem(value: 'failed', child: Text('Failed')),
+                  ],
+                  onChanged: (val) {
+                    setModalState(() => _selectedStatus = val!);
+                    setState(() => _selectedStatus = val!);
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Order Type
+                const Text('Order Type', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: _selectedOrderType,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All')),
+                    DropdownMenuItem(value: 'subscription', child: Text('Packages')),
+                    DropdownMenuItem(value: 'fruit', child: Text('Fruits')),
+                  ],
+                  onChanged: (val) {
+                    setModalState(() => _selectedOrderType = val!);
+                    setState(() => _selectedOrderType = val!);
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Delivery Partner
+                const Text('Delivery Partner', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: _selectedPartnerId,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  items: [
+                    const DropdownMenuItem(value: 'all', child: Text('All Partners')),
+                    ..._partners.map((p) => DropdownMenuItem(
+                      value: p['id'].toString(),
+                      child: Text(p['full_name'] ?? 'Unknown'),
+                    ))
+                  ],
+                  onChanged: (val) {
+                    setModalState(() => _selectedPartnerId = val!);
+                    setState(() => _selectedPartnerId = val!);
+                  },
+                ),
+                
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setModalState(() {
+                            _selectedDate = DateTime.now();
+                            _selectedStatus = 'all';
+                            _selectedOrderType = 'all';
+                            _selectedPartnerId = 'all';
+                            _activeChip = 'All';
+                          });
+                          setState(() {
+                            _selectedDate = DateTime.now();
+                            _selectedStatus = 'all';
+                            _selectedOrderType = 'all';
+                            _selectedPartnerId = 'all';
+                            _activeChip = 'All';
+                            _isLoading = true;
+                          });
+                          Navigator.pop(context);
+                          _loadDeliveries();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Reset', style: TextStyle(fontSize: 16)),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _activeChip = ''; // clear chip if advanced filters used
+                            _isLoading = true;
+                          });
+                          Navigator.pop(context);
+                          _loadDeliveries();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryGreen,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Apply', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
           );
         },
       ),
     );
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppTheme.primaryGreen,
-              onPrimary: Colors.white,
-              onSurface: AppTheme.textPrimary,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-        _isLoading = true;
-      });
-      _loadDeliveries();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
+      backgroundColor: const Color(0xFFF5F7FA), // Modern light grey background
       drawer: const AdminDrawer(),
-      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Deliveries', style: TextStyle(color: Colors.black)),
+        leading: IconButton(
+          icon: const Icon(Icons.menu, size: 28),
+          color: AppTheme.textPrimary,
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
+        title: const Text(
+          'Deliveries',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
+          ),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadAllData,
-          )
+            icon: const Icon(Icons.notifications_none, color: AppTheme.textPrimary),
+            onPressed: () {},
+          ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
-          : Column(
-              children: [
-                _buildDashboardSummary(),
-                _buildFilters(),
-                Expanded(
-                  child: _deliveries.isEmpty
-                      ? _buildEmptyState()
-                      : RefreshIndicator(
-                          onRefresh: _loadDeliveries,
-                          color: AppTheme.primaryGreen,
-                          child: ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _deliveries.length,
-                            itemBuilder: (context, index) {
-                              final delivery = _deliveries[index];
-                              return DeliveryUnifiedCard(
-                                delivery: delivery,
-                                onAssignTap: () => _handleAssignPartner(delivery),
-                                onTap: () => _showDeliveryDetails(delivery),
-                              );
-                            },
-                          ),
-                        ),
-                ),
-              ],
-            ),
-    );
-  }
-
-  Widget _buildDashboardSummary() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
+      body: SafeArea(
+        child: Column(
           children: [
-            _StatBadge('Total', _dashboardStats['total'].toString(), Colors.grey[700]!),
-            _StatBadge('Pending', _dashboardStats['pending'].toString(), AppTheme.warning),
-            _StatBadge('Assigned', _dashboardStats['assigned'].toString(), AppTheme.primaryGreen),
-            _StatBadge('Out', _dashboardStats['out'].toString(), AppTheme.primaryBlue),
-            _StatBadge('Delivered', _dashboardStats['delivered'].toString(), AppTheme.success),
-            _StatBadge('Failed', _dashboardStats['failed'].toString(), AppTheme.error),
-            _StatBadge('Cancelled', _dashboardStats['cancelled'].toString(), AppTheme.error),
+            // Summary Grid
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: 2.5,
+                children: [
+                  _buildSummaryCard("Today's Deliveries", _dashboardStats['total'] ?? 0, Icons.local_shipping, AppTheme.primaryBlue),
+                  _buildSummaryCard("Pending", _dashboardStats['pending'] ?? 0, Icons.hourglass_empty, AppTheme.accentOrange),
+                  _buildSummaryCard("Assigned", _dashboardStats['assigned'] ?? 0, Icons.assignment_ind, Colors.teal),
+                  _buildSummaryCard("Completed", _dashboardStats['delivered'] ?? 0, Icons.check_circle, AppTheme.primaryGreen),
+                ],
+              ),
+            ),
+            
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by Order ID, Name, Mobile, Partner...',
+                  hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+                  prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                ),
+                onSubmitted: (val) {
+                  setState(() {
+                    _searchQuery = val;
+                    _isLoading = true;
+                  });
+                  _loadDeliveries();
+                },
+              ),
+            ),
+
+            // Filter Chips Row
+            SizedBox(
+              height: 40,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _filterChips.length,
+                itemBuilder: (context, index) {
+                  final chip = _filterChips[index];
+                  final isActive = _activeChip == chip;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(chip),
+                      selected: isActive,
+                      onSelected: (val) {
+                        if (val) _handleChipSelection(chip);
+                      },
+                      selectedColor: AppTheme.primaryGreen,
+                      backgroundColor: Colors.white,
+                      labelStyle: TextStyle(
+                        color: isActive ? Colors.white : AppTheme.textPrimary,
+                        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: isActive ? AppTheme.primaryGreen : Colors.grey.shade300,
+                        ),
+                      ),
+                      showCheckmark: false,
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Deliveries List
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
+                  : _deliveries.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          itemCount: _deliveries.length,
+                          itemBuilder: (context, index) {
+                            final delivery = _deliveries[index];
+                            return DeliveryUnifiedCard(
+                              delivery: delivery,
+                              onTap: () => _showDeliveryDetails(delivery),
+                              onAssignTap: () => _showAssignDialog(delivery),
+                              onCancelTap: () => _updateStatus(delivery['id'], 'cancelled'),
+                              onMarkOutTap: () => _updateStatus(delivery['id'], 'out_for_delivery'),
+                              onDeliveredTap: () => _updateStatus(delivery['id'], 'delivered'),
+                              onFailedTap: () => _updateStatus(delivery['id'], 'failed'),
+                              onNavigateTap: () {}, // Optional feature
+                              onInvoiceTap: () {}, // Optional feature
+                            );
+                          },
+                        ),
+            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildFilters() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search orders, customers...',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onSubmitted: (val) {
-                    setState(() {
-                      _searchQuery = val;
-                      _isLoading = true;
-                    });
-                    _loadDeliveries();
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.calendar_today, size: 18),
-                label: Text(DateFormat('MMM dd').format(_selectedDate)),
-                onPressed: () => _selectDate(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppTheme.primaryGreen,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdown(
-                  value: _selectedOrderType,
-                  items: const {
-                    'all': 'All Types',
-                    'subscription': 'Subscriptions',
-                    'fruit': 'Fruit Orders',
-                  },
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedOrderType = val!;
-                      _isLoading = true;
-                    });
-                    _loadDeliveries();
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildDropdown(
-                  value: _selectedStatus,
-                  items: const {
-                    'all': 'All Statuses',
-                    'pending': 'Pending',
-                    'assigned': 'Assigned',
-                    'out_for_delivery': 'Out',
-                    'delivered': 'Delivered',
-                    'failed': 'Failed',
-                  },
-                  onChanged: (val) {
-                    setState(() {
-                      _selectedStatus = val!;
-                      _isLoading = true;
-                    });
-                    _loadDeliveries();
-                  },
-                ),
-              ),
-            ],
-          )
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showFilterBottomSheet,
+        backgroundColor: AppTheme.primaryGreen,
+        child: const Icon(Icons.filter_list, color: Colors.white),
       ),
     );
   }
 
-  Widget _buildDropdown({
-    required String value,
-    required Map<String, String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
+  Widget _buildSummaryCard(String title, int count, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          items: items.entries.map((e) {
-            return DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis));
-          }).toList(),
-          onChanged: onChanged,
-        ),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  count.toString(),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.textPrimary),
+                ),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          )
+        ],
       ),
     );
   }
@@ -441,49 +632,33 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.inbox_outlined, size: 80, color: Colors.grey[300]),
-          const SizedBox(height: 16),
-          const Text(
-            'No deliveries available for the selected date.',
-            style: TextStyle(color: Colors.grey, fontSize: 16),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryGreen,
-              foregroundColor: Colors.white,
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            onPressed: _loadDeliveries,
-          )
-        ],
-      ),
-    );
-  }
-}
-
-class _StatBadge extends StatelessWidget {
-  final String label;
-  final String count;
-  final Color color;
-
-  const _StatBadge(this.label, this.count, this.color);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.5)),
-      ),
-      child: Column(
-        children: [
-          Text(count, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 18)),
-          Text(label, style: TextStyle(color: color, fontSize: 12)),
+            child: const Icon(Icons.inventory_2_outlined, size: 64, color: AppTheme.primaryGreen),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'No deliveries available',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'When new customer orders arrive, they will appear here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+          const SizedBox(height: 24),
         ],
       ),
     );

@@ -37,7 +37,7 @@ class _PaymentAnalyticsState extends State<PaymentAnalytics> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final res = await _api.get('/api/v1/reports/payments', queryParameters: {
+      final res = await _api.get('/reports/payments', queryParameters: {
         if (widget.startDate != null) 'start_date': widget.startDate,
         if (widget.endDate != null) 'end_date': widget.endDate,
       });

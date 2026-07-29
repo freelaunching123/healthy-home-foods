@@ -38,7 +38,7 @@ class _SalesAnalyticsState extends State<SalesAnalytics> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final res = await _api.get('/api/v1/reports/sales', queryParameters: {
+      final res = await _api.get('/reports/sales', queryParameters: {
         if (widget.startDate != null) 'start_date': widget.startDate,
         if (widget.endDate != null) 'end_date': widget.endDate,
       });
