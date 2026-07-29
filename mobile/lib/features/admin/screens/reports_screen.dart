@@ -126,16 +126,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ),
       drawer: const AdminDrawer(),
       body: SafeArea(
-        child: RefreshIndicator(
-          color: AppTheme.primaryGreen,
-          onRefresh: () async {
-            // Re-apply filter to trigger rebuild of children widgets
-            _applyFilter(_selectedFilter);
-          },
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(

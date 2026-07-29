@@ -81,10 +81,12 @@ class _CustomerAnalyticsState extends State<CustomerAnalytics> {
           children: [
             const Text('Customer Activity', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            Row(
+            Column(
               children: [
                 _buildStatItem('Total Customers', '${_data!['total'] ?? 0}', Colors.purple),
+                const SizedBox(height: 12),
                 _buildStatItem('New (Period)', '${_data!['new'] ?? 0}', AppTheme.primaryGreen),
+                const SizedBox(height: 12),
                 _buildStatItem('Active', '${_data!['active'] ?? 0}', AppTheme.primaryBlue),
               ],
             ),
@@ -95,14 +97,12 @@ class _CustomerAnalyticsState extends State<CustomerAnalytics> {
   }
 
   Widget _buildStatItem(String label, String value, Color color) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+      ],
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../widgets/admin_drawer.dart';
@@ -95,7 +96,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
       if (_selectedPartnerId != 'all') qParams['delivery_partner_id'] = _selectedPartnerId;
       if (_searchQuery.isNotEmpty) qParams['search'] = _searchQuery;
 
-      final res = await _api.get('/api/v1/admin/deliveries/', queryParameters: qParams);
+      final res = await _api.get(ApiConstants.adminDeliveries, queryParameters: qParams);
       
       if (mounted) {
         setState(() {
@@ -202,11 +203,11 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
         // Find subscription_id
         final deliv = _deliveries.firstWhere((d) => d['id'] == id);
         final subId = deliv['subscription_id'];
-        await _api.post('/api/v1/packages/orders/admin/package-orders/$subId/assign', data: {
+        await _api.post('/packages/orders/admin/package-orders/$subId/assign', data: {
           'delivery_partner_id': partnerId
         });
       } else {
-        await _api.post('/api/v1/fruits/admin/orders/$id/assign', data: {
+        await _api.post('/fruits/admin/orders/$id/assign', data: {
           'delivery_partner_id': partnerId
         });
       }
@@ -222,7 +223,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
   Future<void> _updateStatus(String id, String status) async {
     setState(() => _isActionInProgress = true);
     try {
-      await _api.put('/api/v1/admin/deliveries/$id/status', data: {
+      await _api.put('/admin/deliveries/$id/status', data: {
         'status': status
       });
       _showSuccessSnackBar('Status updated');

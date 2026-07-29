@@ -81,7 +81,6 @@ class _FruitPerformanceState extends State<FruitPerformance> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildPieChart(),
         const SizedBox(height: 16),
         _buildList('Top Selling Fruits', _topSelling, true),
         const SizedBox(height: 16),
@@ -93,49 +92,6 @@ class _FruitPerformanceState extends State<FruitPerformance> {
   Widget _buildPieChart() {
     List<PieChartSectionData> sections = [];
     for (int i = 0; i < _topSelling.length; i++) {
-      final val = (_topSelling[i]['quantity'] as num).toDouble();
-      sections.add(PieChartSectionData(
-        value: val,
-        color: _colors[i % _colors.length],
-        title: '${val.toInt()}kg',
-        radius: 50,
-        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-      ));
-    }
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Quantity Sold Breakdown (Top 5)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: PieChart(
-                      PieChartData(
-                        sectionsSpace: 2,
-                        centerSpaceRadius: 40,
-                        sections: sections,
-                      ),
-                    ),
-                  ),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: List.generate(_topSelling.length, (index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4.0),
-                        child: Row(
-                          children: [
-                            Container(width: 12, height: 12, color: _colors[index % _colors.length]),
                             const SizedBox(width: 4),
                             Text(_topSelling[index]['name'], style: const TextStyle(fontSize: 12)),
                           ],

@@ -70,8 +70,8 @@ class _OrderAnalyticsState extends State<OrderAnalytics> {
       );
     }
 
-    final subStats = _data!['subscription_status'] as Map;
-    final fruitStats = _data!['fruit_order_status'] as Map;
+    final subStats = _data!['package_orders'] as Map? ?? {};
+    final fruitStats = _data!['fruit_orders'] as Map? ?? {};
 
     return Column(
       children: [

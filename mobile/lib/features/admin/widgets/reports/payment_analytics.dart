@@ -64,14 +64,15 @@ class _PaymentAnalyticsState extends State<PaymentAnalytics> {
       );
     }
 
-    if (_data == null || (_data!['status_breakdown'] as Map).isEmpty) {
+    if (_data == null || _data!['status_counts'] == null || (_data!['status_counts'] as Map).isEmpty) {
       return const EmptyState(
         icon: Icons.payments,
         message: 'No payment statistics available.',
       );
     }
 
-    final stats = _data!['status_breakdown'] as Map;
+    final stats = _data!['status_counts'] as Map;
+    final totalCollected = _data!['total_collected'] ?? 0;
     final formatCurrency = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
 
     return Card(
@@ -84,11 +85,12 @@ class _PaymentAnalyticsState extends State<PaymentAnalytics> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Payments by Status', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Total Collected: ${formatCurrency.format(totalCollected)}', style: const TextStyle(color: AppTheme.success, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             ...stats.entries.map((e) {
               final statusStr = e.key.toString().toUpperCase();
-              final count = e.value['count'] ?? 0;
-              final amount = e.value['amount'] ?? 0;
+              final count = e.value;
               Color color = Colors.grey;
               if (statusStr == 'SUCCESS') color = AppTheme.success;
               if (statusStr == 'PENDING') color = AppTheme.warning;
@@ -100,8 +102,8 @@ class _PaymentAnalyticsState extends State<PaymentAnalytics> {
                   children: [
                     Icon(Icons.circle, size: 12, color: color),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('$statusStr ($count)')),
-                    Text(formatCurrency.format(amount), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Expanded(child: Text(statusStr)),
+                    Text('$count', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
               );

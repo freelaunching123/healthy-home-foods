@@ -36,7 +36,8 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
         _loading = false;
       });
     } catch (e) {
-      setState(() { _error = 'Failed to load package orders.'; _loading = false; });
+      debugPrint('Error loading package orders: $e');
+      setState(() { _error = 'Failed to load package orders.\n\nError: $e'; _loading = false; });
     }
   }
 

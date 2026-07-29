@@ -405,7 +405,7 @@ async def list_admin_package_orders(
     for sub in subscriptions:
         latest_payment = None
         if sub.payments:
-            sorted_payments = sorted(sub.payments, key=lambda p: p.created_at or datetime.min, reverse=True)
+            sorted_payments = sorted(sub.payments, key=lambda p: p.created_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
             latest_payment = sorted_payments[0]
             
         c_user = sub.customer.user if sub.customer else None
