@@ -10,6 +10,8 @@ class AppTheme {
   static const Color primaryDark = Color(0xFF1B5E20);
   static const Color accent = Color(0xFF66BB6A);
   static const Color accentLight = Color(0xFFA5D6A7);
+  static const Color primaryBlue = Color(0xFF1976D2);
+  static const Color accentOrange = Color(0xFFF57C00);
   
   // Surface colors
   static const Color surface = Color(0xFFF8FBF8);

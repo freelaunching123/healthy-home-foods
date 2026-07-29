@@ -124,7 +124,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ],
       ),
-      drawer: const AdminDrawer(currentRoute: '/admin/reports'),
+      drawer: const AdminDrawer(),
       body: SafeArea(
         child: RefreshIndicator(
           color: AppTheme.primaryGreen,
