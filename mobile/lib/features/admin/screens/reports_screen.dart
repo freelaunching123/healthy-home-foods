@@ -381,6 +381,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         ),
                       ],
                     ),
+                  ), // Closing bracket for Container
                   // _buildStatRow() has been removed as per request
                   _buildPerformanceLists(),
                   const SizedBox(height: 32),
