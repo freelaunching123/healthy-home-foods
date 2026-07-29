@@ -430,6 +430,7 @@ async def list_admin_package_orders(
             })
 
         orders_list.append({
+            "id": str(sub.id),
             "order_number": f"PKG-{str(sub.id)[:8].upper()}",
             "customer_name": c_user.full_name if c_user else "Unknown Customer",
             "customer_phone": c_user.phone if c_user else "N/A",
@@ -439,8 +440,62 @@ async def list_admin_package_orders(
             "total_amount": float(sub.total_amount),
             "created_at": sub.created_at.isoformat() if sub.created_at else datetime.now().isoformat(),
             "items": items_list,
+            "delivery_partner_id": str(sub.delivery_partner_id) if sub.delivery_partner_id else None,
         })
         
     return orders_list
+
+from pydantic import BaseModel
+class AdminPackageAssignRequest(BaseModel):
+    delivery_partner_id: UUID | None = None
+
+@router.post("/orders/admin/package-orders/{sub_id}/assign", response_model=MessageResponse)
+async def assign_package_delivery_partner(
+    sub_id: UUID,
+    payload: AdminPackageAssignRequest,
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Assign a delivery partner to an entire subscription package."""
+    sub_result = await db.execute(select(Subscription).where(Subscription.id == sub_id))
+    subscription = sub_result.scalar_one_or_none()
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    subscription.delivery_partner_id = payload.delivery_partner_id
+    await db.commit()
+
+    if payload.delivery_partner_id:
+        # Also assign any current PENDING deliveries
+        from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
+        from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
+        
+        pending_deliveries_result = await db.execute(
+            select(SubscriptionDelivery).where(
+                SubscriptionDelivery.subscription_id == subscription.id,
+                SubscriptionDelivery.status == DeliveryStatus.PENDING
+            )
+        )
+        for delivery in pending_deliveries_result.scalars().all():
+            # Update or create assignment
+            assignment_result = await db.execute(
+                select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
+            )
+            assignment = assignment_result.scalar_one_or_none()
+            if assignment:
+                assignment.delivery_partner_id = payload.delivery_partner_id
+                assignment.status = AssignmentStatus.PENDING
+                assignment.assigned_at = datetime.now(timezone.utc)
+            else:
+                new_assignment = DeliveryAssignment(
+                    subscription_delivery_id=delivery.id,
+                    delivery_partner_id=payload.delivery_partner_id,
+                    status=AssignmentStatus.PENDING,
+                    assigned_at=datetime.now(timezone.utc)
+                )
+                db.add(new_assignment)
+        await db.commit()
+
+    return MessageResponse(message="Delivery partner assigned to package successfully")
 
 

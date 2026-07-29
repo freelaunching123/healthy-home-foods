@@ -174,6 +174,16 @@ async def _generate_next_delivery(db: AsyncSession, subscription: Subscription) 
     )
     db.add(del_history)
 
+    if subscription.delivery_partner_id:
+        from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
+        assignment = DeliveryAssignment(
+            subscription_delivery_id=delivery.id,
+            delivery_partner_id=subscription.delivery_partner_id,
+            status=AssignmentStatus.PENDING,
+            assigned_at=datetime.now(timezone.utc)
+        )
+        db.add(assignment)
+
     logger.info(f"Generated delivery for sub {subscription.id} on {next_date}")
     return delivery
 
@@ -293,6 +303,16 @@ async def handle_missed_delivery(db: AsyncSession, delivery: SubscriptionDeliver
             notes="Carry-forward due to missed delivery"
         )
         db.add(del_history_cf)
+
+        if sub.delivery_partner_id:
+            from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
+            cf_assignment = DeliveryAssignment(
+                subscription_delivery_id=carry_delivery.id,
+                delivery_partner_id=sub.delivery_partner_id,
+                status=AssignmentStatus.PENDING,
+                assigned_at=datetime.now(timezone.utc)
+            )
+            db.add(cf_assignment)
 
         logger.info(f"Carry-forward delivery created for sub {sub.id} on {carry_date}")
     await db.flush()
@@ -569,6 +589,16 @@ async def skip_delivery(db: AsyncSession, delivery: SubscriptionDelivery) -> Sub
         notes="Carry-forward due to skipped delivery day"
     )
     db.add(del_history_cf)
+
+    if sub.delivery_partner_id:
+        from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
+        cf_assignment2 = DeliveryAssignment(
+            subscription_delivery_id=carry_delivery.id,
+            delivery_partner_id=sub.delivery_partner_id,
+            status=AssignmentStatus.PENDING,
+            assigned_at=datetime.now(timezone.utc)
+        )
+        db.add(cf_assignment2)
 
     await db.flush()
     logger.info(f"Skipped delivery {delivery.id}. Carry-forward delivery created for sub {sub.id} on {carry_date}")

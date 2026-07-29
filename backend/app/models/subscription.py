@@ -58,6 +58,10 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         SAEnum(SubscriptionStatus, name="subscription_status_enum", values_callable=lambda x: [e.value for e in x]),
         default=SubscriptionStatus.PENDING_PAYMENT, nullable=False, index=True
     )
+    delivery_partner_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("delivery_partners.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
 
     # Delivery tracking
     total_deliveries: Mapped[int] = mapped_column(Integer, nullable=False)   # copied from plan
@@ -91,6 +95,7 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     plan: Mapped[Optional["SubscriptionPlan"]] = relationship("SubscriptionPlan", back_populates="subscriptions")
     product: Mapped[Optional["Product"]] = relationship("Product", back_populates="subscriptions")
     address: Mapped["Address"] = relationship("Address", back_populates="subscriptions")
+    delivery_partner: Mapped[Optional["DeliveryPartner"]] = relationship("DeliveryPartner")
     deliveries: Mapped[List["SubscriptionDelivery"]] = relationship("SubscriptionDelivery", back_populates="subscription", cascade="all, delete-orphan")
     payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="subscription")
     

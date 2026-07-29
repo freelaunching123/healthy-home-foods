@@ -15,6 +15,7 @@ class PackageOrdersScreen extends StatefulWidget {
 class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
   final _api = ApiClient();
   List<Map<String, dynamic>> _orders = [];
+  List<Map<String, dynamic>> _partners = [];
   bool _loading = true;
   String? _error;
 
@@ -28,12 +29,26 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final res = await _api.get(ApiConstants.adminPackageOrders);
+      final dpRes = await _api.get(ApiConstants.adminDeliveryPartners);
       setState(() {
         _orders = List<Map<String, dynamic>>.from(res.data as List);
+        _partners = List<Map<String, dynamic>>.from(dpRes.data as List);
         _loading = false;
       });
     } catch (e) {
       setState(() { _error = 'Failed to load package orders.'; _loading = false; });
+    }
+  }
+
+  Future<void> _assignPartner(String orderId, String? partnerId) async {
+    try {
+      await _api.post('/packages/orders/admin/package-orders/$orderId/assign', data: {'delivery_partner_id': partnerId});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Delivery partner assigned successfully')));
+        _loadOrders();
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to assign delivery partner')));
     }
   }
 
@@ -68,6 +83,8 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
                           final order = _orders[i];
                           return _AdminPackageOrderCard(
                             order: order,
+                            partners: _partners,
+                            onAssign: (partnerId) => _assignPartner(order['id'], partnerId),
                             onViewDetails: () => _showOrderDetails(context, order),
                           );
                         },
@@ -138,10 +155,12 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
 
 class _AdminPackageOrderCard extends StatelessWidget {
   final Map<String, dynamic> order;
+  final List<Map<String, dynamic>> partners;
+  final Function(String?) onAssign;
   final VoidCallback onViewDetails;
 
   const _AdminPackageOrderCard({
-    required this.order, required this.onViewDetails,
+    required this.order, required this.partners, required this.onAssign, required this.onViewDetails,
   });
 
   @override
@@ -236,6 +255,37 @@ class _AdminPackageOrderCard extends StatelessWidget {
                         textStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
                       ),
                       child: const Text('Details'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.delivery_dining_rounded, size: 16, color: AppTheme.textSecondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: order['delivery_partner_id'] as String?,
+                          hint: Text('Assign Partner', style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary)),
+                          isExpanded: true,
+                          icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primaryGreen),
+                          style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textPrimary, fontWeight: FontWeight.w500),
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('Unassigned'),
+                            ),
+                            ...partners.map((p) => DropdownMenuItem<String>(
+                                  value: p['id'] as String,
+                                  child: Text(p['name'] ?? 'Unknown Partner'),
+                                )),
+                          ],
+                          onChanged: onAssign,
+                        ),
+                      ),
                     ),
                   ],
                 ),
