@@ -395,13 +395,27 @@ async def get_admin_overview(
     )
 
     # Pending deliveries today
-    pending_deliveries = await db.scalar(
+    sub_pending = await db.scalar(
         select(func.count(SubscriptionDelivery.id))
         .where(
             SubscriptionDelivery.scheduled_date == today,
             SubscriptionDelivery.status == DeliveryStatus.PENDING,
         )
     )
+    fruit_pending = await db.scalar(
+        select(func.count(FruitOrder.id))
+        .where(
+            FruitOrder.delivery_date == today,
+            FruitOrder.payment_status == FruitPaymentStatus.SUCCESS,
+            FruitOrder.order_status.in_([
+                FruitOrderStatus.PENDING, 
+                FruitOrderStatus.PREPARING, 
+                FruitOrderStatus.READY, 
+                FruitOrderStatus.OUT_FOR_DELIVERY
+            ])
+        )
+    )
+    pending_deliveries = (sub_pending or 0) + (fruit_pending or 0)
 
     # ── 2. Quick Insights ──────────────────────────────────────────────────────
 
