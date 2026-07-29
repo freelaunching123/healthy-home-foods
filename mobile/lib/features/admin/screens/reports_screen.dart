@@ -381,9 +381,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         ),
                       ],
                     ),
-                  ),
-                  _buildStatRow(),
-                  const SizedBox(height: 24),
+                  // _buildStatRow() has been removed as per request
                   _buildPerformanceLists(),
                   const SizedBox(height: 32),
                   const Text(
