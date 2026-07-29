@@ -65,7 +65,7 @@ async def get_filtered_deliveries_query(
         .join(Subscription, Subscription.id == SubscriptionDelivery.subscription_id)
         .join(Customer, Customer.id == Subscription.customer_id)
         .join(CustomerUser, CustomerUser.id == Customer.user_id)
-        .join(Address, Address.id == Subscription.address_id)
+        .outerjoin(Address, Address.id == Subscription.address_id)
         .outerjoin(DeliveryAssignment, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
         .outerjoin(DeliveryPartner, DeliveryPartner.id == DeliveryAssignment.delivery_partner_id)
         .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
@@ -136,16 +136,20 @@ async def list_deliveries(
         deliv, sub, cust, c_user, assign, partner, p_user, addr = row
 
         # Build address label
-        addr_str = f"{addr.address_line1}"
-        if addr.address_line2:
-            addr_str += f", {addr.address_line2}"
-        addr_str += f", {addr.city} - {addr.pincode}"
+        addr_str = "No address provided"
+        if addr:
+            addr_str = f"{addr.address_line1}"
+            if addr.address_line2:
+                addr_str += f", {addr.address_line2}"
+            addr_str += f", {addr.city} - {addr.pincode}"
 
         pay_status = "Paid" if sub.status in [SubscriptionStatus.ACTIVE, SubscriptionStatus.COMPLETED] else "Pending"
 
         items.append(AdminDeliveryListItem(
             id=deliv.id,
+            order_type="subscription",
             subscription_id=sub.id,
+            fruit_order_id=None,
             customer_name=c_user.full_name,
             phone=c_user.phone,
             delivery_partner_id=partner.id if partner else None,
@@ -157,6 +161,7 @@ async def list_deliveries(
             amount=float(sub.price_per_delivery) if sub.price_per_delivery is not None else 0.0,
             payment_status=pay_status,
             status=deliv.status.value if hasattr(deliv.status, "value") else str(deliv.status),
+            item_summary="Subscription Package",
         ))
 
     from app.models.fruit import FruitOrder, FruitOrderStatus
@@ -228,7 +233,9 @@ async def list_deliveries(
 
         items.append(AdminDeliveryListItem(
             id=f_order.id,
+            order_type="fruit",
             subscription_id=None,
+            fruit_order_id=f_order.id,
             customer_name=c_user.full_name,
             phone=c_user.phone,
             delivery_partner_id=partner.id if partner else None,
@@ -240,6 +247,7 @@ async def list_deliveries(
             amount=float(f_order.total_amount),
             payment_status=pay_status,
             status=f_order.order_status.value if hasattr(f_order.order_status, "value") else str(f_order.order_status),
+            item_summary=f"Fruit Order #{f_order.order_number}",
         ))
 
     # Re-sort combined list by date desc
@@ -466,8 +474,117 @@ async def get_delivery_details(
     )
     result = await db.execute(stmt)
     row = result.first()
+    
     if not row:
-        raise HTTPException(status_code=404, detail="Delivery not found")
+        # Check if it's a Fruit Order
+        from app.models.fruit import FruitOrder, FruitOrderItem, Fruit
+        fruit_stmt = (
+            select(
+                FruitOrder,
+                Customer,
+                CustomerUser,
+                DeliveryAssignment,
+                DeliveryPartner,
+                PartnerUser,
+                Address,
+            )
+            .join(Customer, Customer.id == FruitOrder.customer_id)
+            .join(CustomerUser, CustomerUser.id == Customer.user_id)
+            .outerjoin(Address, Address.id == FruitOrder.address_id)
+            .outerjoin(DeliveryAssignment, DeliveryAssignment.fruit_order_id == FruitOrder.id)
+            .outerjoin(DeliveryPartner, DeliveryPartner.id == DeliveryAssignment.delivery_partner_id)
+            .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
+            .where(FruitOrder.id == id)
+        )
+        fruit_res = await db.execute(fruit_stmt)
+        f_row = fruit_res.first()
+        if not f_row:
+            raise HTTPException(status_code=404, detail="Delivery not found")
+        
+        f_order, cust, c_user, assign, partner, p_user, addr = f_row
+
+        customer_detail = AdminDeliveryCustomer(
+            id=cust.id,
+            full_name=c_user.full_name,
+            phone=c_user.phone,
+            email=c_user.email,
+            customer_code=cust.customer_code
+        )
+
+        partner_detail = None
+        if partner and p_user:
+            partner_detail = AdminDeliveryPartner(
+                id=partner.id,
+                full_name=p_user.full_name,
+                phone=p_user.phone,
+                employee_code=partner.employee_code,
+                vehicle_type=partner.vehicle_type.value if hasattr(partner.vehicle_type, "value") and partner.vehicle_type else str(partner.vehicle_type or ""),
+                vehicle_number=partner.vehicle_number
+            )
+
+        address_detail = AdminDeliveryAddress(
+            id=addr.id if addr else uuid.uuid4(),
+            address_line1=addr.address_line1 if addr else "No Address",
+            address_line2=addr.address_line2 if addr else None,
+            city=addr.city if addr else "",
+            state=addr.state if addr else "",
+            pincode=addr.pincode if addr else "",
+            latitude=float(addr.latitude) if addr and addr.latitude else None,
+            longitude=float(addr.longitude) if addr and addr.longitude else None,
+        )
+
+        f_items_stmt = select(FruitOrderItem, Fruit).join(Fruit, Fruit.id == FruitOrderItem.fruit_id).where(FruitOrderItem.order_id == f_order.id)
+        f_items_res = await db.execute(f_items_stmt)
+        products_list = []
+        for fi, fr in f_items_res.all():
+            products_list.append(AdminDeliveryProduct(
+                id=fr.id,
+                name=fr.name,
+                quantity=fi.quantity,
+                unit=fr.unit.value if hasattr(fr.unit, "value") else str(fr.unit)
+            ))
+
+        timeline = [AdminDeliveryTimelineEvent(
+            status="Order Placed",
+            description=f"Fruit order created",
+            timestamp=f_order.created_at
+        )]
+        if assign:
+            timeline.append(AdminDeliveryTimelineEvent(
+                status="Assigned",
+                description=f"Assigned to {p_user.full_name}",
+                timestamp=assign.assigned_at
+            ))
+            if assign.out_at:
+                timeline.append(AdminDeliveryTimelineEvent(status="Out for Delivery", description="Driver is on the way", timestamp=assign.out_at))
+            if assign.delivered_at:
+                timeline.append(AdminDeliveryTimelineEvent(status="Delivered", description="Order completed", timestamp=assign.delivered_at))
+            elif assign.failed_at:
+                timeline.append(AdminDeliveryTimelineEvent(status="Failed", description=assign.failure_reason or "Delivery failed", timestamp=assign.failed_at))
+
+        assignment_history = []
+        
+        return AdminDeliveryDetail(
+            id=f_order.id,
+            subscription_id=None,
+            scheduled_date=f_order.delivery_date or f_order.created_at.date(),
+            status=f_order.order_status.value if hasattr(f_order.order_status, "value") else str(f_order.order_status),
+            delivered_at=assign.delivered_at if assign else None,
+            delivery_proof_url=None,
+            customer_rating=f_order.rating,
+            customer_feedback=f_order.review_text,
+            notes=f_order.notes,
+            amount=float(f_order.total_amount),
+            payment_method=None,
+            payment_status="Paid" if f_order.payment_status.value == "paid" else "Pending",
+            preferred_delivery_time=f_order.delivery_slot or "Standard",
+            customer=customer_detail,
+            delivery_partner=partner_detail,
+            address=address_detail,
+            products=products_list,
+            timeline=timeline,
+            assignment_history=assignment_history
+        )
 
     deliv, sub, cust, c_user, assign, partner, p_user, addr = row
 
@@ -726,6 +843,141 @@ async def assign_or_reassign_partner(
     )
 
     return MessageResponse(message=f"Delivery assigned to {partner_user.full_name}")
+
+
+@router.post("/subscription/{subscription_id}/assign", response_model=MessageResponse)
+async def assign_subscription_partner(
+    subscription_id: uuid.UUID,
+    payload: AdminDeliveryAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """Assign a delivery partner to an entire subscription and all its future scheduled deliveries."""
+    subscription = await db.get(Subscription, subscription_id)
+    if not subscription:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    partner = await db.get(DeliveryPartner, payload.delivery_partner_id)
+    if not partner:
+        raise HTTPException(status_code=404, detail="Delivery partner not found")
+
+    partner_user = await db.get(User, partner.user_id)
+
+    # Update subscription
+    subscription.delivery_partner_id = partner.id
+
+    # Find all future or pending deliveries for this subscription
+    deliveries_stmt = select(SubscriptionDelivery).where(
+        SubscriptionDelivery.subscription_id == subscription.id,
+        SubscriptionDelivery.status.in_([DeliveryStatus.SCHEDULED, DeliveryStatus.ASSIGNED, DeliveryStatus.PENDING])
+    )
+    deliveries_result = await db.execute(deliveries_stmt)
+    future_deliveries = deliveries_result.scalars().all()
+
+    for delivery in future_deliveries:
+        assignment_stmt = select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
+        assignment_result = await db.execute(assignment_stmt)
+        assignment = assignment_result.scalar_one_or_none()
+
+        prev_partner_id = None
+        if assignment:
+            prev_partner_id = assignment.delivery_partner_id
+            assignment.delivery_partner_id = partner.id
+            assignment.status = AssignmentStatus.PENDING
+            assignment.assigned_at = datetime.now(timezone.utc)
+            assignment.picked_up_at = None
+            assignment.out_at = None
+            assignment.delivered_at = None
+            assignment.failed_at = None
+            assignment.failure_reason = None
+        else:
+            assignment = DeliveryAssignment(
+                subscription_delivery_id=delivery.id,
+                delivery_partner_id=partner.id,
+                status=AssignmentStatus.PENDING,
+                assigned_at=datetime.now(timezone.utc),
+            )
+            db.add(assignment)
+
+        old_del_status = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
+        delivery.status = DeliveryStatus.ASSIGNED
+
+        history_log = DeliveryAssignmentHistory(
+            delivery_id=delivery.id,
+            previous_partner_id=prev_partner_id,
+            new_partner_id=partner.id,
+            changed_by_id=current_user.id,
+            changed_at=datetime.now(timezone.utc),
+        )
+        db.add(history_log)
+
+        del_history = SubscriptionDeliveryHistory(
+            delivery_id=delivery.id,
+            old_status=old_del_status,
+            new_status=DeliveryStatus.ASSIGNED.value,
+            notes=f"Assigned to {partner_user.full_name} via Subscription Bulk Assign",
+            changed_by_id=current_user.id,
+        )
+        db.add(del_history)
+
+    await db.commit()
+    return MessageResponse(message=f"Subscription assigned to {partner_user.full_name}")
+
+
+@router.post("/fruit/{fruit_order_id}/assign", response_model=MessageResponse)
+async def assign_fruit_order_partner(
+    fruit_order_id: uuid.UUID,
+    payload: AdminDeliveryAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """Assign a delivery partner to a specific fruit order."""
+    from app.models.fruit import FruitOrder, FruitOrderStatus
+    f_order = await db.get(FruitOrder, fruit_order_id)
+    if not f_order:
+        raise HTTPException(status_code=404, detail="Fruit Order not found")
+
+    partner = await db.get(DeliveryPartner, payload.delivery_partner_id)
+    if not partner:
+        raise HTTPException(status_code=404, detail="Delivery partner not found")
+
+    partner_user = await db.get(User, partner.user_id)
+
+    assignment_stmt = select(DeliveryAssignment).where(DeliveryAssignment.fruit_order_id == f_order.id)
+    assignment_result = await db.execute(assignment_stmt)
+    assignment = assignment_result.scalar_one_or_none()
+
+    if assignment:
+        assignment.delivery_partner_id = partner.id
+        assignment.status = AssignmentStatus.PENDING
+        assignment.assigned_at = datetime.now(timezone.utc)
+        assignment.picked_up_at = None
+        assignment.out_at = None
+        assignment.delivered_at = None
+        assignment.failed_at = None
+        assignment.failure_reason = None
+    else:
+        assignment = DeliveryAssignment(
+            fruit_order_id=f_order.id,
+            delivery_partner_id=partner.id,
+            status=AssignmentStatus.PENDING,
+            assigned_at=datetime.now(timezone.utc),
+        )
+        db.add(assignment)
+
+    f_order.order_status = FruitOrderStatus.ASSIGNED
+    await db.commit()
+
+    await NotificationService.send_notification_to_user(
+        db=db,
+        user_id=partner.user_id,
+        title="New Fruit Order Assigned",
+        body="You have been assigned a new fruit order delivery.",
+        notification_type="delivery",
+        reference_id=str(f_order.id)
+    )
+
+    return MessageResponse(message=f"Fruit Order assigned to {partner_user.full_name}")
 
 
 @router.put("/{id}/status", response_model=MessageResponse)

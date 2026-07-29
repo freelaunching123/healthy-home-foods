@@ -175,6 +175,9 @@ async def get_delivery_partner(
         )
     )
 
+    completed_count = completed.scalar_one()
+    pending_count = pending.scalar_one()
+
     return {
         "id": str(dp.id),
         "user_id": str(user.id),
@@ -186,9 +189,9 @@ async def get_delivery_partner(
         "photo_url": dp.photo_url,
         "is_active": (user.status.value if hasattr(user.status, "value") else str(user.status)) == "active",
         "is_available": dp.is_available,
-        "total_deliveries": dp.total_deliveries,
-        "completed_deliveries": completed.scalar_one(),
-        "pending_deliveries": pending.scalar_one(),
+        "total_deliveries": completed_count + pending_count,
+        "completed_deliveries": completed_count,
+        "pending_deliveries": pending_count,
         "rating": float(dp.rating) if dp.rating else None,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }

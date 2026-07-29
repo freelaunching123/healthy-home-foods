@@ -6,7 +6,9 @@ from pydantic import BaseModel
 
 class AdminDeliveryListItem(BaseModel):
     id: uuid.UUID
+    order_type: str = "subscription"
     subscription_id: Optional[uuid.UUID] = None
+    fruit_order_id: Optional[uuid.UUID] = None
     customer_name: str
     phone: str
     delivery_partner_id: Optional[uuid.UUID] = None
@@ -18,6 +20,7 @@ class AdminDeliveryListItem(BaseModel):
     amount: float
     payment_status: str
     status: str
+    item_summary: Optional[str] = None
 
     class Config:
         from_attributes = True
