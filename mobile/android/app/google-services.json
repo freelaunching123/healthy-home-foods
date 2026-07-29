@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "123456789012",
-    "project_id": "healthy-home-foods-mock",
-    "storage_bucket": "healthy-home-foods-mock.appspot.com"
+    "project_number": "160472789112",
+    "project_id": "healthy-home-foods-3d7f0",
+    "storage_bucket": "healthy-home-foods-3d7f0.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:123456789012:android:9876543210abcdef000000",
+        "mobilesdk_app_id": "1:160472789112:android:b54077155c509b21917d8d",
         "android_client_info": {
-          "package_name": "com.healthyhomefoods.app"
+          "package_name": "com.healthyhomefoods.mobile"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "mock-api-key-for-development-only"
+          "current_key": "AIzaSyBH12TcS3KegWhgx1MiqjY-4ylM482sLYs"
         }
       ],
       "services": {

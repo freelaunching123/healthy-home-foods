@@ -62,4 +62,16 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 5
 
 
+import socket
+
+def _normalize_db_url(url: str) -> str:
+    if "@db:5432" in url:
+        try:
+            socket.gethostbyname("db")
+        except socket.gaierror:
+            return url.replace("@db:5432", "@127.0.0.1:5432")
+    return url
+
 settings = Settings()
+settings.DATABASE_URL = _normalize_db_url(settings.DATABASE_URL)
+settings.SYNC_DATABASE_URL = _normalize_db_url(settings.SYNC_DATABASE_URL)
