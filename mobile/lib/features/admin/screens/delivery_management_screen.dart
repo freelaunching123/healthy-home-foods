@@ -247,13 +247,27 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
     );
   }
 
-  void _showDeliveryDetails(Map<String, dynamic> delivery) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DeliveryDetailsSheet(details: delivery),
-    );
+  Future<void> _showDeliveryDetails(Map<String, dynamic> delivery) async {
+    setState(() => _isActionInProgress = true);
+    try {
+      final res = await _api.get('/admin/deliveries/${delivery['id']}');
+      if (mounted) {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => DeliveryDetailsSheet(details: res.data),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Failed to load delivery details');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isActionInProgress = false);
+      }
+    }
   }
 
   void _showFilterBottomSheet() {

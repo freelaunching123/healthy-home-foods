@@ -14,6 +14,7 @@ class DeliveryDetailsSheet extends StatelessWidget {
     final customer = details['customer'] ?? {};
     final address = details['address'] ?? {};
     final timeline = List<Map<String, dynamic>>.from(details['timeline'] ?? []);
+    final products = List<Map<String, dynamic>>.from(details['products'] ?? []);
     final partner = details['delivery_partner'];
     
     final lat = address['latitude'];
@@ -50,7 +51,7 @@ class DeliveryDetailsSheet extends StatelessWidget {
             Expanded(
               child: TabBarView(
                 children: [
-                  _buildDetailsTab(customer, address, timeline, partner),
+                  _buildDetailsTab(customer, address, timeline, products, partner),
                   _buildMapTab(lat, lng, partner),
                 ],
               ),
@@ -65,10 +66,35 @@ class DeliveryDetailsSheet extends StatelessWidget {
       Map<String, dynamic> customer,
       Map<String, dynamic> address,
       List<Map<String, dynamic>> timeline,
+      List<Map<String, dynamic>> products,
       Map<String, dynamic>? partner) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const Text('Products', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        if (products.isEmpty)
+          const Text('No products listed.', style: TextStyle(color: Colors.grey))
+        else
+          ...products.map((p) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.inventory_2_outlined, size: 16, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('${p['product_name'] ?? p['name']} (x${p['quantity']})'),
+                  ),
+                ],
+              ),
+            );
+          }),
+        
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 16),
+
         const Text('Customer Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Text('Name: ${customer['full_name'] ?? 'Unknown'}'),

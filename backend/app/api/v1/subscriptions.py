@@ -781,7 +781,6 @@ async def skip_delivery_endpoint(
 ):
     """Skip a specific delivery day. Triggers carry-forward extension and registers skipped status history."""
     is_admin = _is_admin(current_user)
-    del_status_val = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
 
     delivery_result = await db.execute(
         select(SubscriptionDelivery).where(SubscriptionDelivery.id == delivery_id)
@@ -789,6 +788,8 @@ async def skip_delivery_endpoint(
     delivery = delivery_result.scalar_one_or_none()
     if not delivery:
         raise HTTPException(status_code=404, detail="Delivery not found")
+        
+    del_status_val = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
 
     sub = await db.get(Subscription, delivery.subscription_id)
     if not sub:

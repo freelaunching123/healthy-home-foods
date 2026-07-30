@@ -240,12 +240,40 @@ async def get_payments(
     }
 
 @router.get("/export/excel")
-async def export_excel(_: User = Depends(require_super_admin)):
+async def export_excel(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_super_admin)
+):
     import openpyxl
+    overview = await get_admin_overview(db=db)
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Reports"
-    ws.append(["Feature not fully implemented in this version."])
+    ws.title = "Overview Report"
+    
+    ws.append(["Report generated on", date.today().isoformat()])
+    ws.append([])
+    
+    ws.append(["--- SUMMARY ---"])
+    summary = overview["summary"]
+    ws.append(["Today's Revenue", f"Rs. {summary['todays_revenue']:.2f}"])
+    ws.append(["Orders Today", summary['orders_today']])
+    ws.append(["Active Subscribers", summary['active_subscribers']])
+    ws.append(["Pending Deliveries", summary['pending_deliveries']])
+    ws.append([])
+    
+    ws.append(["--- QUICK INSIGHTS ---"])
+    insights = overview["quick_insights"]
+    if insights["top_selling_package"]:
+        ws.append(["Top Selling Package", f"{insights['top_selling_package']['name']} (x{insights['top_selling_package']['count']})"])
+    if insights["most_ordered_fruit"]:
+        ws.append(["Most Ordered Fruit", f"{insights['most_ordered_fruit']['name']} (x{insights['most_ordered_fruit']['count']})"])
+    ws.append([])
+    
+    ws.append(["--- REVENUE CHART (LAST 7 DAYS) ---"])
+    ws.append(["Date", "Revenue"])
+    for day in overview["revenue_chart"]:
+        ws.append([day["date"], f"Rs. {day['revenue']:.2f}"])
+        
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
@@ -256,9 +284,55 @@ async def export_excel(_: User = Depends(require_super_admin)):
     )
 
 @router.get("/export/pdf")
-async def export_pdf(_: User = Depends(require_super_admin)):
-    html = "<html><body><h1>Report</h1><p>Not fully implemented</p></body></html>"
-    return StreamingResponse(io.BytesIO(b"PDF Mock"), media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=report.pdf"})
+async def export_pdf(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_super_admin)
+):
+    from fpdf import FPDF
+    
+    overview = await get_admin_overview(db=db)
+    summary = overview["summary"]
+    insights = overview["quick_insights"]
+    
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("helvetica", size=16, style="B")
+    pdf.cell(200, 10, txt="Healthy Home Foods - Admin Report", ln=True, align='C')
+    pdf.set_font("helvetica", size=10)
+    pdf.cell(200, 10, txt=f"Generated on: {date.today().isoformat()}", ln=True, align='C')
+    pdf.ln(10)
+    
+    pdf.set_font("helvetica", size=14, style="B")
+    pdf.cell(200, 10, txt="Summary", ln=True)
+    pdf.set_font("helvetica", size=12)
+    pdf.cell(200, 10, txt=f"Today's Revenue: Rs. {summary['todays_revenue']:.2f}", ln=True)
+    pdf.cell(200, 10, txt=f"Orders Today: {summary['orders_today']}", ln=True)
+    pdf.cell(200, 10, txt=f"Active Subscribers: {summary['active_subscribers']}", ln=True)
+    pdf.cell(200, 10, txt=f"Pending Deliveries: {summary['pending_deliveries']}", ln=True)
+    pdf.ln(5)
+    
+    pdf.set_font("helvetica", size=14, style="B")
+    pdf.cell(200, 10, txt="Quick Insights", ln=True)
+    pdf.set_font("helvetica", size=12)
+    if insights["top_selling_package"]:
+        pdf.cell(200, 10, txt=f"Top Selling Package: {insights['top_selling_package']['name']} (x{insights['top_selling_package']['count']})", ln=True)
+    if insights["most_ordered_fruit"]:
+        pdf.cell(200, 10, txt=f"Most Ordered Fruit: {insights['most_ordered_fruit']['name']} (x{insights['most_ordered_fruit']['count']})", ln=True)
+    pdf.ln(5)
+    
+    pdf.set_font("helvetica", size=14, style="B")
+    pdf.cell(200, 10, txt="Revenue Last 7 Days", ln=True)
+    pdf.set_font("helvetica", size=12)
+    for day in overview["revenue_chart"]:
+        pdf.cell(200, 10, txt=f"{day['date']}: Rs. {day['revenue']:.2f}", ln=True)
+    
+    pdf_bytes = pdf.output(dest='S')
+    
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf", 
+        headers={"Content-Disposition": "attachment; filename=report.pdf"}
+    )
 
 @router.get("/admin-overview")
 async def get_admin_overview(

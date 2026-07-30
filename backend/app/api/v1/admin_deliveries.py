@@ -988,41 +988,66 @@ async def update_status(
     current_user: User = Depends(require_super_admin),
 ):
     """Admin updates delivery status manually, executing business engine hooks."""
+    from app.models.fruit import FruitOrder, FruitOrderStatus
+    
     delivery = await db.get(SubscriptionDelivery, id)
+    is_fruit_order = False
+    
     if not delivery:
-        raise HTTPException(status_code=404, detail="Delivery not found")
+        # Check if it's a Fruit Order
+        f_order = await db.get(FruitOrder, id)
+        if not f_order:
+            raise HTTPException(status_code=404, detail="Delivery not found")
+        delivery = f_order
+        is_fruit_order = True
 
-    old_status_val = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status)
+    old_status_val = delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status) if not is_fruit_order else (delivery.order_status.value if hasattr(delivery.order_status, "value") else str(delivery.order_status))
     new_status_val = payload.status
 
-    assignment_stmt = select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
+    if is_fruit_order:
+        assignment_stmt = select(DeliveryAssignment).where(DeliveryAssignment.fruit_order_id == delivery.id)
+    else:
+        assignment_stmt = select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
+        
     assignment_result = await db.execute(assignment_stmt)
     assignment = assignment_result.scalar_one_or_none()
 
     now = datetime.now(timezone.utc)
 
     if new_status_val == "pending":
-        delivery.status = DeliveryStatus.PENDING
+        if is_fruit_order:
+            delivery.order_status = FruitOrderStatus.PENDING
+        else:
+            delivery.status = DeliveryStatus.PENDING
         if assignment:
             await db.delete(assignment)
 
     elif new_status_val == "assigned":
         if not assignment:
             raise HTTPException(status_code=400, detail="Cannot assign status without delivery assignment")
-        delivery.status = DeliveryStatus.ASSIGNED
+        if is_fruit_order:
+            delivery.order_status = FruitOrderStatus.ASSIGNED
+        else:
+            delivery.status = DeliveryStatus.ASSIGNED
         assignment.status = AssignmentStatus.PENDING
 
     elif new_status_val == "picked_up":
         if not assignment:
             raise HTTPException(status_code=400, detail="Cannot set picked_up without assignment")
-        delivery.status = DeliveryStatus.ASSIGNED
+        if is_fruit_order:
+            delivery.order_status = FruitOrderStatus.ASSIGNED
+        else:
+            delivery.status = DeliveryStatus.ASSIGNED
         assignment.status = AssignmentStatus.ACCEPTED
         assignment.picked_up_at = now
 
     elif new_status_val == "out_for_delivery":
         if not assignment:
             raise HTTPException(status_code=400, detail="Cannot set out_for_delivery without assignment")
-        delivery.status = DeliveryStatus.OUT_FOR_DELIVERY
+        if is_fruit_order:
+            delivery.order_status = FruitOrderStatus.OUT_FOR_DELIVERY
+        else:
+            delivery.status = DeliveryStatus.OUT_FOR_DELIVERY
         assignment.status = AssignmentStatus.OUT_FOR_DELIVERY
         assignment.out_at = now
 
@@ -1031,7 +1056,10 @@ async def update_status(
             raise HTTPException(status_code=400, detail="Cannot mark delivered without assignment")
         assignment.status = AssignmentStatus.DELIVERED
         assignment.delivered_at = now
-        await subscription_engine.mark_delivered(db, delivery)
+        if not is_fruit_order:
+            await subscription_engine.mark_delivered(db, delivery)
+        else:
+            delivery.order_status = FruitOrderStatus.DELIVERED
 
     elif new_status_val == "failed":
         if not assignment:
@@ -1039,22 +1067,29 @@ async def update_status(
         assignment.status = AssignmentStatus.FAILED
         assignment.failed_at = now
         assignment.failure_reason = payload.failure_reason or "Marked failed by admin"
-        await subscription_engine.handle_missed_delivery(db, delivery)
+        if not is_fruit_order:
+            await subscription_engine.handle_missed_delivery(db, delivery)
+        else:
+            delivery.order_status = FruitOrderStatus.CANCELLED
 
     elif new_status_val == "cancelled":
-        await subscription_engine.skip_delivery(db, delivery)
+        if not is_fruit_order:
+            await subscription_engine.skip_delivery(db, delivery)
+        else:
+            delivery.order_status = FruitOrderStatus.CANCELLED
 
     else:
         raise HTTPException(status_code=400, detail=f"Invalid status: {new_status_val}")
 
-    del_history = SubscriptionDeliveryHistory(
-        delivery_id=delivery.id,
-        old_status=old_status_val,
-        new_status=delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status),
-        notes=f"Status updated by admin to {new_status_val}",
-        changed_by_id=current_user.id,
-    )
-    db.add(del_history)
+    if not is_fruit_order:
+        del_history = SubscriptionDeliveryHistory(
+            delivery_id=delivery.id,
+            old_status=old_status_val,
+            new_status=delivery.status.value if hasattr(delivery.status, "value") else str(delivery.status),
+            notes=f"Status updated by admin to {new_status_val}",
+            changed_by_id=current_user.id,
+        )
+        db.add(del_history)
     await db.commit()
 
     return MessageResponse(message=f"Status updated successfully to {new_status_val}")
