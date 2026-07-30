@@ -505,42 +505,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
               ),
             ),
 
-            // Filter Chips Row
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _filterChips.length,
-                itemBuilder: (context, index) {
-                  final chip = _filterChips[index];
-                  final isActive = _activeChip == chip;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(chip),
-                      selected: isActive,
-                      onSelected: (val) {
-                        if (val) _handleChipSelection(chip);
-                      },
-                      selectedColor: AppTheme.primaryGreen,
-                      backgroundColor: Colors.white,
-                      labelStyle: TextStyle(
-                        color: isActive ? Colors.white : AppTheme.textPrimary,
-                        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(
-                          color: isActive ? AppTheme.primaryGreen : Colors.grey.shade300,
-                        ),
-                      ),
-                      showCheckmark: false,
-                    ),
-                  );
-                },
-              ),
-            ),
+
 
             const SizedBox(height: 12),
 

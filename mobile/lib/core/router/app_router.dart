@@ -48,6 +48,7 @@ import '../../features/admin/screens/create_delivery_partner_screen.dart';
 import '../../features/admin/screens/delivery_partner_profile_screen.dart';
 import '../../features/admin/screens/reports_screen.dart';
 import '../../features/admin/screens/admin_settings_screen.dart';
+import '../../features/admin/screens/admin_change_password_screen.dart';
 import '../../features/admin/screens/delivery_settings_screen.dart';
 import '../../features/admin/screens/package_orders_screen.dart';
 // Fruit screens (Admin)
@@ -217,6 +218,7 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(path: '/admin/settings', builder: (_, __) => const AdminSettingsScreen()),
+    GoRoute(path: '/admin/change-password', builder: (_, __) => const AdminChangePasswordScreen()),
     GoRoute(path: '/admin/delivery-settings', builder: (_, __) => const DeliverySettingsScreen()),
 
     // ── Fruit admin routes ─────────────────────────────────────────────────────

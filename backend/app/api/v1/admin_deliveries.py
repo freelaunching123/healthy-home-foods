@@ -108,7 +108,7 @@ async def get_filtered_deliveries_query(
     return stmt
 
 
-@router.get("/", response_model=List[AdminDeliveryListItem])
+@router.get("", response_model=List[AdminDeliveryListItem])
 async def list_deliveries(
     selected_date: Optional[date] = Query(None),
     start_date: Optional[date] = Query(None),

@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'dart:math' as math;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -228,8 +231,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
           const SizedBox(height: 16),
           _buildBusinessSummary(),
           const SizedBox(height: 16),
-          _buildRevenueTrend(),
-          const SizedBox(height: 16),
           _buildSalesDistribution(),
           const SizedBox(height: 16),
           _buildTopItems('Top 5 Fruits', _fruitsData?['top_selling'] as List?),
@@ -326,106 +327,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildRevenueTrend() {
-    final dailySales = (_salesData?['daily_sales'] as List?) ?? [];
-    if (dailySales.isEmpty) return const SizedBox.shrink();
-
-    List<FlSpot> spots = [];
-    double maxY = 0;
-    
-    for (int i = 0; i < dailySales.length; i++) {
-      final sale = dailySales[i] as Map<String, dynamic>;
-      final rev = (sale['revenue'] as num).toDouble();
-      if (rev > maxY) maxY = rev;
-      spots.add(FlSpot(i.toDouble(), rev));
-    }
-
-    if (maxY == 0) maxY = 100;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Revenue Trend', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 180,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true, 
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.shade200, strokeWidth: 1),
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 22,
-                      interval: math.max(1, (spots.length / 5).floorToDouble()),
-                      getTitlesWidget: (value, meta) {
-                        if (value.toInt() >= 0 && value.toInt() < dailySales.length) {
-                          final dateStr = (dailySales[value.toInt()] as Map)['date'] as String;
-                          final dt = DateTime.parse(dateStr);
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(DateFormat('d MMM').format(dt), style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 40,
-                      getTitlesWidget: (value, meta) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 4.0),
-                          child: Text(_formatCurrency(value), style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                minX: 0,
-                maxX: math.max(0, spots.length - 1.0),
-                minY: 0,
-                maxY: maxY * 1.2,
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    color: AppTheme.primaryGreen,
-                    barWidth: 3,
-                    isStrokeCapRound: true,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: AppTheme.primaryGreen.withOpacity(0.1),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildSalesDistribution() {
     final fruitOrd = (_overviewData?['fruit_orders_count'] as num?)?.toDouble() ?? 0.0;
@@ -675,9 +576,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Exporting report...')));
-        },
+        onPressed: _showExportOptions,
         icon: const Icon(Icons.download_rounded, size: 20),
         label: const Text('Export Report'),
         style: ElevatedButton.styleFrom(
@@ -689,5 +588,68 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ),
       ),
     );
+  }
+
+  void _showExportOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Export As', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.picture_as_pdf, color: Colors.redAccent),
+                title: const Text('PDF Document'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _downloadAndShare(ApiConstants.reportsExportPdf, 'report.pdf');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.table_chart, color: Colors.green),
+                title: const Text('Excel Spreadsheet'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _downloadAndShare(ApiConstants.reportsExportExcel, 'report.xlsx');
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadAndShare(String endpoint, String filename) async {
+    setState(() => _isLoading = true);
+    try {
+      final dir = await getTemporaryDirectory();
+      final savePath = '${dir.path}/$filename';
+      
+      final queryParams = <String, dynamic>{};
+      if (_startDate != null) queryParams['start_date'] = _startDate;
+      if (_endDate != null) queryParams['end_date'] = _endDate;
+
+      await _api.dio.download(
+        endpoint,
+        savePath,
+        queryParameters: queryParams,
+      );
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        await Share.shareXFiles([XFile(savePath)], text: 'Here is the report you requested.');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to export: $e'), backgroundColor: Colors.red));
+      }
+    }
   }
 }
