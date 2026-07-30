@@ -33,7 +33,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       duration: const Duration(milliseconds: 1400),
     )..repeat();
     _loadOverview();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _loadOverview(silent: true);
     });
   }
@@ -257,14 +257,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final insights = (_data?['quick_insights'] as Map<String, dynamic>?) ?? {};
     final topPackage = insights['top_selling_package'] as Map<String, dynamic>?;
     final topFruit = insights['most_ordered_fruit'] as Map<String, dynamic>?;
-    final lowStockList = (insights['low_stock_alerts'] as List<dynamic>?) ?? [];
-    
-    final firstLowStock = lowStockList.isNotEmpty ? lowStockList.first as Map<String, dynamic> : null;
-    String? lowStockSubtitle;
-    if (firstLowStock != null) {
-      final status = firstLowStock['status'] as String? ?? '';
-      lowStockSubtitle = status == 'out_of_stock' ? 'No low stock alerts' : 'Low stock';
-    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -291,15 +283,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 ? '${topFruit['count']} Orders'
                 : null,
             emptyText: 'No fruit orders yet',
-          ),
-          _InsightCard(
-            icon: Icons.warning_amber_rounded,
-            iconColor: AppTheme.error,
-            iconBg: const Color(0xFFFEE2E2),
-            title: 'Low Stock',
-            name: firstLowStock != null ? (firstLowStock['name'] as String?) ?? '—' : null,
-            subtitle: lowStockSubtitle,
-            emptyText: 'No low stock alerts',
           ),
         ],
       ),
@@ -431,7 +414,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     Icon(Icons.history_rounded, size: 36, color: AppTheme.textLight),
                     SizedBox(height: 8),
                     Text(
-                      'No recent activity.',
+                      'No recent activity yet.',
                       style: TextStyle(
                         color: AppTheme.textSecondary,
                         fontSize: 13,
@@ -958,35 +941,29 @@ class _ActivityTile extends StatelessWidget {
 
   _ActivityIconConfig _activityConfig(String type) {
     switch (type) {
-      case 'new_customer':
+      case 'customer':
         return _ActivityIconConfig(
           icon: Icons.person_add_rounded,
           color: AppTheme.info,
           bg: const Color(0xFFE3F2FD),
         );
-      case 'new_subscription':
+      case 'subscription':
         return _ActivityIconConfig(
           icon: Icons.card_membership_rounded,
           color: AppTheme.primaryGreen,
           bg: const Color(0xFFE8F5E9),
         );
-      case 'delivery_completed':
+      case 'delivery':
         return _ActivityIconConfig(
-          icon: Icons.check_circle_rounded,
+          icon: Icons.local_shipping_rounded,
           color: AppTheme.success,
           bg: const Color(0xFFD1FAE5),
         );
-      case 'product_added':
+      case 'fruit_order':
         return _ActivityIconConfig(
-          icon: Icons.inventory_2_rounded,
+          icon: Icons.shopping_basket_rounded,
           color: const Color(0xFF8B5CF6),
           bg: const Color(0xFFF3E8FF),
-        );
-      case 'payment_received':
-        return _ActivityIconConfig(
-          icon: Icons.currency_rupee_rounded,
-          color: AppTheme.warning,
-          bg: const Color(0xFFFFF8E1),
         );
       default:
         return _ActivityIconConfig(

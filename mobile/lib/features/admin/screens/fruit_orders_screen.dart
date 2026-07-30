@@ -355,10 +355,32 @@ class _AdminOrderCard extends StatelessWidget {
                           ),
                           ...partners.map((p) => DropdownMenuItem<String?>(
                                 value: p['id'].toString(),
-                                child: Text(p['full_name'] ?? 'Driver', style: GoogleFonts.inter(fontSize: 13)),
+                                child: Text(p['full_name'] ?? 'Unknown Partner', style: GoogleFonts.inter(fontSize: 13)),
                               )),
                         ],
-                        onChanged: onAssignPartner,
+                        onChanged: (val) async {
+                          if (val == order['assigned_partner_id']?.toString()) return;
+                          final partnerName = val == null ? 'Unassigned' : partners.firstWhere((p) => p['id'].toString() == val, orElse: () => {'full_name': 'Unknown Partner'})['full_name'] ?? 'Unknown Partner';
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Confirm Assignment'),
+                              content: Text('Assign this order to $partnerName?'),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(ctx, true), 
+                                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen, foregroundColor: Colors.white),
+                                  child: const Text('Confirm')
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            onAssignPartner(val);
+                          }
+                        },
                       ),
                     ),
                   ],

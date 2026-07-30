@@ -67,7 +67,11 @@ async def get_overview(
 
     return {
         "total_revenue": total_revenue,
+        "package_revenue": float(pkg_rev or 0),
+        "fruit_revenue": float(frt_rev or 0),
         "total_orders": total_orders,
+        "package_orders_count": pkg_orders or 0,
+        "fruit_orders_count": frt_orders or 0,
         "total_customers": total_customers or 0,
         "total_deliveries": total_deliv or 0,
         "pending_deliveries": pending_deliv or 0,
@@ -286,9 +290,6 @@ async def get_admin_overview(
     top_frt_row = top_frt_res.first()
     most_ordered_fruit = {"name": top_frt_row[0], "count": top_frt_row[1]} if top_frt_row else None
     
-    low_stock = await db.scalars(select(Fruit).where(Fruit.availability_status != FruitAvailability.IN_STOCK).limit(5))
-    low_stock_alerts = [{"name": f.name, "status": f.availability_status.value} for f in low_stock]
-    
     # Revenue Chart (Last 7 days)
     chart_data = []
     for i in range(7):
@@ -300,6 +301,60 @@ async def get_admin_overview(
             "revenue": float(p_rev or 0) + float(f_rev or 0)
         })
         
+    # Recent Activity Logic
+    activities = []
+    
+    # 1. Fruit Orders
+    frt_stmt = select(FruitOrder, User.full_name).join(Customer, FruitOrder.customer_id == Customer.id).join(User, Customer.user_id == User.id).order_by(FruitOrder.created_at.desc()).limit(5)
+    frt_res = await db.execute(frt_stmt)
+    for fo, fname in frt_res:
+        activities.append({
+            "type": "fruit_order", "title": "New Fruit Order",
+            "description": f"{fname or 'Customer'} placed Order #{fo.order_number}",
+            "timestamp": fo.created_at
+        })
+
+    # 2. Subscriptions
+    sub_stmt = select(Subscription, User.full_name).join(Customer, Subscription.customer_id == Customer.id).join(User, Customer.user_id == User.id).order_by(Subscription.created_at.desc()).limit(5)
+    sub_res = await db.execute(sub_stmt)
+    for sub, fname in sub_res:
+        activities.append({
+            "type": "subscription", "title": "New Subscription",
+            "description": f"{fname or 'Customer'} purchased a package",
+            "timestamp": sub.created_at
+        })
+
+    # 3. Deliveries
+    del_stmt = select(DeliveryAssignment, User.full_name).join(DeliveryPartner, DeliveryAssignment.delivery_partner_id == DeliveryPartner.id).join(User, DeliveryPartner.user_id == User.id).order_by(func.coalesce(DeliveryAssignment.delivered_at, DeliveryAssignment.out_at, DeliveryAssignment.assigned_at).desc()).limit(5)
+    del_res = await db.execute(del_stmt)
+    for assign, dpname in del_res:
+        ts = assign.delivered_at or assign.out_at or assign.assigned_at
+        if assign.status == AssignmentStatus.DELIVERED:
+            title, activity_desc = "Order Delivered", f"{dpname} delivered an order"
+        elif assign.status == AssignmentStatus.OUT_FOR_DELIVERY:
+            title, activity_desc = "Out for Delivery", f"{dpname} is out for delivery"
+        else:
+            title, activity_desc = "Delivery Partner Assigned", f"Assigned to {dpname}"
+        activities.append({
+            "type": "delivery", "title": title, "description": activity_desc, "timestamp": ts
+        })
+
+    # 4. Customers
+    cust_stmt = select(Customer, User.full_name).join(User, Customer.user_id == User.id).order_by(Customer.created_at.desc()).limit(5)
+    cust_res = await db.execute(cust_stmt)
+    for cust, fname in cust_res:
+        activities.append({
+            "type": "customer", "title": "New Customer",
+            "description": f"{fname or 'A new customer'} registered",
+            "timestamp": cust.created_at
+        })
+
+    activities.sort(key=lambda x: x["timestamp"] if x["timestamp"] else datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    recent_activity = []
+    for a in activities[:5]:
+        a["timestamp"] = a["timestamp"].isoformat() if a["timestamp"] else None
+        recent_activity.append(a)
+
     return {
         "summary": {
             "todays_revenue": todays_revenue,
@@ -310,8 +365,7 @@ async def get_admin_overview(
         "quick_insights": {
             "top_selling_package": top_selling_package,
             "most_ordered_fruit": most_ordered_fruit,
-            "low_stock_alerts": low_stock_alerts,
         },
         "revenue_chart": chart_data,
-        "recent_activity": []
+        "recent_activity": recent_activity
     }

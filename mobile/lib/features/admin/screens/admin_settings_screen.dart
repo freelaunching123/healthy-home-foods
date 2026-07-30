@@ -173,22 +173,36 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
 
             // Change Password Card
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _passwordFormKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Change Password',
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.grey.shade200),
+              ),
+              child: ExpansionTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.lock_outline, color: AppTheme.primaryGreen),
+                ),
+                title: Text(
+                  'Change Password',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                subtitle: Text(
+                  'Update your admin account password',
+                  style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+                childrenPadding: const EdgeInsets.all(16),
+                children: [
+                  Form(
+                    key: _passwordFormKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+
                       TextFormField(
                         controller: _oldPasswordController,
                         obscureText: _obscureOldPassword,
