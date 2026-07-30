@@ -110,36 +110,6 @@ class AdminDrawer extends StatelessWidget {
 
                   _buildDrawerItem(
                     context: context,
-                    icon: Icons.people_outline,
-                    title: 'Manage Customers',
-                    isSelected: currentRoute == '/admin/customers',
-                    onTap: () {
-                      context.pop();
-                      if (currentRoute != '/admin/customers') context.push('/admin/customers');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.local_shipping_outlined,
-                    title: 'Manage Delivery Partners',
-                    isSelected: currentRoute == '/admin/delivery-partners',
-                    onTap: () {
-                      context.pop();
-                      if (currentRoute != '/admin/delivery-partners') context.push('/admin/delivery-partners');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.card_membership_outlined,
-                    title: 'Manage Subscriptions',
-                    isSelected: currentRoute == '/admin/subscriptions',
-                    onTap: () {
-                      context.pop();
-                      if (currentRoute != '/admin/subscriptions') context.push('/admin/subscriptions');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    context: context,
                     icon: Icons.receipt_long_outlined,
                     title: 'Package Orders',
                     isSelected: currentRoute == '/admin/packages/orders',
@@ -156,6 +126,36 @@ class AdminDrawer extends StatelessWidget {
                     onTap: () {
                       context.pop();
                       if (currentRoute != '/admin/fruits/orders') context.push('/admin/fruits/orders');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.card_membership_outlined,
+                    title: 'Manage Subscriptions',
+                    isSelected: currentRoute == '/admin/subscriptions',
+                    onTap: () {
+                      context.pop();
+                      if (currentRoute != '/admin/subscriptions') context.push('/admin/subscriptions');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.people_outline,
+                    title: 'Manage Customers',
+                    isSelected: currentRoute == '/admin/customers',
+                    onTap: () {
+                      context.pop();
+                      if (currentRoute != '/admin/customers') context.push('/admin/customers');
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context: context,
+                    icon: Icons.local_shipping_outlined,
+                    title: 'Manage Delivery Partners',
+                    isSelected: currentRoute == '/admin/delivery-partners',
+                    onTap: () {
+                      context.pop();
+                      if (currentRoute != '/admin/delivery-partners') context.push('/admin/delivery-partners');
                     },
                   ),
                   _buildDrawerItem(
