@@ -229,7 +229,8 @@ async def list_deliveries(
                 addr_str += f", {addr.address_line2}"
             addr_str += f", {addr.city} - {addr.pincode}"
 
-        pay_status = "Paid" if f_order.payment_status.value == "paid" else "Pending"
+        ps_val = f_order.payment_status.value if hasattr(f_order.payment_status, "value") else str(f_order.payment_status)
+        pay_status = "Paid" if ps_val == "success" else "Pending"
 
         items.append(AdminDeliveryListItem(
             id=f_order.id,
@@ -576,7 +577,7 @@ async def get_delivery_details(
             notes=f_order.notes,
             amount=float(f_order.total_amount),
             payment_method=None,
-            payment_status="Paid" if f_order.payment_status.value == "paid" else "Pending",
+            payment_status="Paid" if (f_order.payment_status.value if hasattr(f_order.payment_status, "value") else str(f_order.payment_status)) == "success" else "Pending",
             preferred_delivery_time=f_order.delivery_slot or "Standard",
             customer=customer_detail,
             delivery_partner=partner_detail,

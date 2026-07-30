@@ -13,7 +13,7 @@ from app.models.user import User
 from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionItem
 from app.models.payment import Payment, PaymentStatus
 from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
-from app.models.delivery_assignment import DeliveryAssignment
+from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
 from app.models.delivery_partner import DeliveryPartner
 from app.models.customer import Customer
 from app.models.product import Product, ProductCategory

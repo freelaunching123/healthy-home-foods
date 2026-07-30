@@ -113,6 +113,12 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
       }
     } catch (e) {
       debugPrint('Error loading deliveries: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
