@@ -38,7 +38,7 @@ class AuthService {
     // Sync FCM Token
     try {
       final fcmService = FcmService();
-      await fcmService.syncTokenToBackend();
+      fcmService.syncTokenToBackend(); // Run asynchronously without awaiting
     } catch (_) {}
 
     return response.data;
