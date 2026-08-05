@@ -1,3 +1,6 @@
+import os
+import shutil
+import uuid as uuid_lib
 from uuid import UUID
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
@@ -86,7 +89,7 @@ async def get_product_analytics(
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product(product_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product_id))
-    product = result.scalar_one_or_none()
+    product = result.unique().scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
@@ -149,7 +152,7 @@ async def create_product(
         logger.error(f"General notification processing error: {e}")
     
     res = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product.id))
-    return res.scalar_one()
+    return res.unique().scalar_one()
 
 
 
@@ -176,7 +179,7 @@ async def update_product(
     await db.commit()
     
     res = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product_id))
-    return res.scalar_one()
+    return res.unique().scalar_one()
 
 
 @router.delete("/{product_id}", response_model=MessageResponse)
@@ -258,7 +261,7 @@ async def upload_product_image(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    ext = os.path.splitext(file.filename)[1].lower()
+    ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
         raise HTTPException(status_code=400, detail="Invalid image format")
 
@@ -283,7 +286,7 @@ async def upload_product_image(
     product.image_url = f"/uploads/products/{filename}"
     await db.commit()
     res = await db.execute(select(Product).options(joinedload(Product.category)).where(Product.id == product_id))
-    return res.scalar_one()
+    return res.unique().scalar_one()
 
 
 @router.get("/{product_id}/reviews", response_model=__import__('app.schemas.review', fromlist=['ReviewListResponse']).ReviewListResponse)

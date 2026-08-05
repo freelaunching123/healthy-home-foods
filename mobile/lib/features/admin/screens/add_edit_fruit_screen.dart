@@ -27,6 +27,8 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
 
   String _availability = 'in_stock';
   bool _isActive = true;
+  String? _selectedCategoryId;
+  List<dynamic> _groceryCategories = [];
   String? _existingImageUrl;
   XFile? _pickedImage;
   Uint8List? _pickedImageBytes;
@@ -41,7 +43,24 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
   @override
   void initState() {
     super.initState();
+    _loadGroceryCategories();
     if (_isEdit) _loadFruit();
+  }
+
+  Future<void> _loadGroceryCategories() async {
+    try {
+      final res = await _api.get(ApiConstants.categories, queryParameters: {
+        'active_only': true,
+        'category_type': 'grocery',
+      });
+      if (mounted) {
+        setState(() {
+          _groceryCategories = res.data is List ? res.data : [];
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading grocery categories: $e');
+    }
   }
 
   @override
@@ -61,6 +80,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
       _descCtrl.text = data['description'] as String? ?? '';
       _priceCtrl.text = (data['price_per_kg'] as num?)?.toString() ?? '';
       setState(() {
+        _selectedCategoryId = data['category_id'] as String?;
         _availability = data['availability_status'] as String? ?? 'in_stock';
         _isActive = data['is_active'] as bool? ?? true;
         _existingImageUrl = data['image_url'] as String?;
@@ -91,6 +111,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
 
     try {
       final payload = {
+        'category_id': _selectedCategoryId,
         'name': _nameCtrl.text.trim(),
         'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         'price_per_kg': double.parse(_priceCtrl.text.trim()),
@@ -171,7 +192,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: Text(_isEdit ? 'Edit Fruit' : 'Add Fruit', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        title: Text(_isEdit ? 'Edit Grocery Item' : 'Add Grocery Item', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
         leading: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => context.pop()),
         actions: [
@@ -269,10 +290,25 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
 
                     // Form fields
                     _formCard(children: [
-                      _label('Fruit Name *'),
+                      _label('Grocery Category'),
+                      DropdownButtonFormField<String>(
+                        value: _groceryCategories.any((c) => c['id'] == _selectedCategoryId)
+                            ? _selectedCategoryId
+                            : null,
+                        decoration: _inputDecoration('Select Category (Optional)'),
+                        items: _groceryCategories.map((c) {
+                          return DropdownMenuItem<String>(
+                            value: c['id'] as String,
+                            child: Text(c['name'] as String? ?? 'Unnamed Category'),
+                          );
+                        }).toList(),
+                        onChanged: (val) => setState(() => _selectedCategoryId = val),
+                      ),
+                      const SizedBox(height: 16),
+                      _label('Item Name *'),
                       TextFormField(
                         controller: _nameCtrl,
-                        decoration: _inputDecoration('e.g. Apple'),
+                        decoration: _inputDecoration('e.g. Fresh Apples / Organic Carrots'),
                         validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
                       ),
                       const SizedBox(height: 16),
@@ -283,7 +319,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
                         decoration: _inputDecoration('Brief description (optional)'),
                       ),
                       const SizedBox(height: 16),
-                      _label('Price per KG (₹) *'),
+                      _label('Price per KG / Unit (₹) *'),
                       TextFormField(
                         controller: _priceCtrl,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -350,7 +386,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
                       style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 52)),
                       child: _saving || _uploadingImage
                           ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : Text(_isEdit ? 'Update Fruit' : 'Add Fruit',
+                          : Text(_isEdit ? 'Update Grocery Item' : 'Add Grocery Item',
                               style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16)),
                     ),
                     SizedBox(height: MediaQuery.of(context).padding.bottom + 16),

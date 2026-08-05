@@ -33,6 +33,7 @@ class ProductCategory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("product_categories.id"), nullable=True
     )
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    category_type: Mapped[str] = mapped_column(String(50), default="package", nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Self-referential

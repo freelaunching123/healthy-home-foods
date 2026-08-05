@@ -88,7 +88,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen>
     setState(() => _downloadingPaymentId = paymentId);
     try {
       final response = await _api.dio.get(
-        '${ApiConstants.paymentHistory.replaceAll('/history', '')}/$paymentId/invoice',
+        ApiConstants.paymentInvoice(paymentId),
         options: Options(responseType: ResponseType.bytes),
       );
 

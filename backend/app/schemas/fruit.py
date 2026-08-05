@@ -7,6 +7,7 @@ from pydantic import BaseModel, field_validator
 # ── Fruit Schemas ──────────────────────────────────────────────────────────────
 
 class FruitCreate(BaseModel):
+    category_id: Optional[uuid.UUID] = None
     name: str
     description: Optional[str] = None
     price_per_kg: float
@@ -30,6 +31,7 @@ class FruitCreate(BaseModel):
 
 
 class FruitUpdate(BaseModel):
+    category_id: Optional[uuid.UUID] = None
     name: Optional[str] = None
     description: Optional[str] = None
     price_per_kg: Optional[float] = None
@@ -46,6 +48,8 @@ class FruitUpdate(BaseModel):
 
 class FruitResponse(BaseModel):
     id: uuid.UUID
+    category_id: Optional[uuid.UUID] = None
+    category_name: Optional[str] = None
     name: str
     description: Optional[str]
     price_per_kg: float

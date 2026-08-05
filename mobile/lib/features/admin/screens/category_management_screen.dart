@@ -5,7 +5,8 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
 
 class CategoryManagementScreen extends StatefulWidget {
-  const CategoryManagementScreen({super.key});
+  final String categoryType; // 'package' or 'grocery'
+  const CategoryManagementScreen({super.key, this.categoryType = 'package'});
 
   @override
   State<CategoryManagementScreen> createState() => _CategoryManagementScreenState();
@@ -27,6 +28,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     try {
       final res = await _api.get(ApiConstants.categories, queryParameters: {
         'active_only': false,
+        'category_type': widget.categoryType,
       });
       setState(() => _categories = res.data is List ? res.data : []);
     } catch (e) {
@@ -58,7 +60,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(category == null ? 'Add Category' : 'Edit Category',
+                  Text(category == null 
+                      ? (widget.categoryType == 'grocery' ? 'Add Grocery Category' : 'Add Package Category') 
+                      : (widget.categoryType == 'grocery' ? 'Edit Grocery Category' : 'Edit Package Category'),
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 20),
                   TextFormField(
@@ -93,6 +97,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                               'slug': nameCtrl.text.toLowerCase().replaceAll(' ', '-'),
                               'description': descCtrl.text,
                               'is_active': isActive,
+                              'category_type': widget.categoryType,
                             };
                             if (category == null) {
                               await _api.post(ApiConstants.categories, data: payload);
@@ -106,10 +111,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                           }
                         }
                       },
-                      child: Text(category == null ? 'Create' : 'Update'),
+                      child: Text(category == null ? 'Save' : 'Update'),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),

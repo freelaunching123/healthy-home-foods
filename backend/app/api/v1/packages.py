@@ -257,37 +257,13 @@ async def checkout(
     if not cart_items:
         raise HTTPException(status_code=400, detail="Cart is empty")
         
-    # 1. Determine highest days and pricing
-    highest_days = 6 # default fallback
-    selected_price = 0.0
-    first_plan_type = None
-    items_data = []
-    
-    for item in cart_items:
-        qty = item.quantity
-        product = item.product
-        item_price = float(product.discount_price if product.discount_price else product.package_price)
-        selected_price += item_price * qty
-        
-        if product.package_days > highest_days:
-            highest_days = product.package_days
-            
-        if first_plan_type is None:
-            first_plan_type = product.plan_type
-            
-        items_data.append({
-            "product": product,
-            "quantity": qty,
-            "package_price": item_price
-        })
-        
-    # 2. Get delivery distance & calculate delivery charge
+    # 1. Get delivery distance & calculate delivery charge per delivery day
     settings_result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
     settings_obj = settings_result.scalar_one_or_none()
     
     distance = 0.0
-    delivery_charge = 0.0
-    tax_amount = 0.0
+    charge_per_delivery = 0.0
+    tax_rate = 0.0
     
     if settings_obj:
         if address.latitude and address.longitude:
@@ -303,50 +279,68 @@ async def checkout(
                 status_code=400,
                 detail=f"There is no service beyond {max_dist}km. Please select an address within the range."
             )
-        # Calculate daily charge
         from app.services.delivery_engine import calculate_charge_for_distance
         charge_per_delivery = calculate_charge_for_distance(distance, settings_obj)
-        # Apply for highest days
-        delivery_charge = highest_days * charge_per_delivery
-        
         tax_rate = float(settings_obj.tax_percentage) / 100
-        tax_amount = round(selected_price * tax_rate, 2)
-        
-    # 3. Retrieve SubscriptionPlan matching the highest_days/plan_type
-    plan_result = await db.execute(
-        select(SubscriptionPlan)
-        .where(and_(SubscriptionPlan.plan_type == first_plan_type, SubscriptionPlan.is_active == True))
-        .limit(1)
-    )
-    sub_plan = plan_result.scalar_one_or_none()
-    plan_id = sub_plan.id if sub_plan else None
-    
-    # 4. Create the Subscription (pending_payment)
-    sub = await subscription_engine.create_subscription(
-        db=db,
-        customer=customer,
-        items_data=items_data,
-        plan_type=first_plan_type or "weekly",
-        total_deliveries=highest_days,
-        plan_id=plan_id,
-        address_id=address.id,
-        delivery_charge=delivery_charge,
-        tax_amount=tax_amount
-    )
-    
-    # 5. Save Payment record using PaymentService
+
+    # 2. Create an individual Subscription per product item in cart
+    subs_created = []
+    total_checkout_amount = 0.0
+
+    for item in cart_items:
+        qty = item.quantity
+        product = item.product
+        unit_price = float(product.discount_price if product.discount_price else product.package_price)
+        item_total_price = unit_price * qty
+        package_days = product.package_days if (product.package_days and product.package_days > 0) else 6
+
+        item_del_charge = package_days * charge_per_delivery
+        item_tax_amt = round(item_total_price * tax_rate, 2)
+
+        # Retrieve SubscriptionPlan matching plan_type
+        plan_result = await db.execute(
+            select(SubscriptionPlan)
+            .where(and_(SubscriptionPlan.plan_type == product.plan_type, SubscriptionPlan.is_active == True))
+            .limit(1)
+        )
+        sub_plan = plan_result.scalar_one_or_none()
+        plan_id = sub_plan.id if sub_plan else None
+
+        item_data = [{
+            "product": product,
+            "quantity": qty,
+            "package_price": unit_price
+        }]
+
+        sub = await subscription_engine.create_subscription(
+            db=db,
+            customer=customer,
+            items_data=item_data,
+            plan_type=product.plan_type or "weekly",
+            total_deliveries=package_days,
+            plan_id=plan_id,
+            address_id=address.id,
+            delivery_charge=item_del_charge,
+            tax_amount=item_tax_amt
+        )
+        subs_created.append(sub)
+        total_checkout_amount += float(sub.total_amount)
+
+    first_sub = subs_created[0]
+
+    # 3. Save Payment record using PaymentService with combined total amount
     payment = await PaymentService.initiate_mock_payment(
         db=db,
         customer_id=customer.id,
-        subscription_id=sub.id,
-        amount=float(sub.total_amount)
+        subscription_id=first_sub.id,
+        amount=round(total_checkout_amount, 2)
     )
     
     return {
         "gateway_order_id": payment.gateway_order_id,
         "razorpay_key_id": settings.RAZORPAY_KEY_ID or "mock_key",
-        "total_amount": float(sub.total_amount),
-        "order_number": str(sub.id)[:8].upper()
+        "total_amount": round(total_checkout_amount, 2),
+        "order_number": str(first_sub.id)[:8].upper()
     }
 
 

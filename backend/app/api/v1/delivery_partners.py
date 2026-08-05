@@ -2,6 +2,9 @@
 Delivery Partner management API — separate router with /delivery-partners prefix
 so it doesn't conflict with /users/{user_id} wildcard routes.
 """
+import os
+import shutil
+import uuid as uuid_lib
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query

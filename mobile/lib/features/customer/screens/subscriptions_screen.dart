@@ -18,8 +18,8 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
     with SingleTickerProviderStateMixin {
   final _api = ApiClient();
 
-  // Current (active/paused) subscription detail
-  Map<String, dynamic>? _currentSub;
+  // Active/paused subscriptions list
+  List<dynamic> _currentSubs = [];
 
   // All subscriptions history
   List<dynamic> _allSubs = [];
@@ -58,18 +58,27 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
 
   Future<void> _loadAll({bool isSilent = false}) async {
     await Future.wait([
-      _loadCurrentSubscription(isSilent: isSilent),
+      _loadCurrentSubscriptions(isSilent: isSilent),
       _loadAllSubscriptions(isSilent: isSilent)
     ]);
   }
 
-  Future<void> _loadCurrentSubscription({bool isSilent = false}) async {
+  Future<void> _loadCurrentSubscriptions({bool isSilent = false}) async {
     if (!isSilent) setState(() => _isLoadingCurrent = true);
     try {
-      final res = await _api.get(ApiConstants.subscriptionCurrent);
-      setState(() => _currentSub = res.data is Map ? Map<String, dynamic>.from(res.data) : null);
+      final res = await _api.get(ApiConstants.subscriptions);
+      if (res.data is List) {
+        final all = res.data as List;
+        final activeList = all.where((s) {
+          final st = (s['status'] ?? '').toString().toLowerCase();
+          return st == 'active' || st == 'paused';
+        }).toList();
+        setState(() => _currentSubs = activeList);
+      } else {
+        setState(() => _currentSubs = []);
+      }
     } catch (e) {
-      setState(() => _currentSub = null);
+      setState(() => _currentSubs = []);
     } finally {
       if (!isSilent) setState(() => _isLoadingCurrent = false);
     }
@@ -156,41 +165,46 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
         title: const Text('My Subscriptions'),
       ),
       body: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Current Active/Paused Subscription ──────────────────────────
-              _isLoadingCurrent
-                  ? const Center(child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: CircularProgressIndicator(color: AppTheme.primaryGreen),
-                    ))
-                  : _currentSub == null
-                      ? _buildNoActivePlan()
-                      : _buildCurrentSubscriptionCard(),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Current Active/Paused Subscriptions ──────────────────────────
+            _isLoadingCurrent
+                ? const Center(child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(color: AppTheme.primaryGreen),
+                  ))
+                : _currentSubs.isEmpty
+                    ? _buildNoActivePlan()
+                    : Column(
+                        children: _currentSubs.map((sub) {
+                          final mapData = sub is Map ? Map<String, dynamic>.from(sub) : <String, dynamic>{};
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: _buildSingleSubscriptionCard(mapData),
+                          );
+                        }).toList(),
+                      ),
 
-              if (_currentSub != null) ...[
-                const SizedBox(height: 24),
-                // ── All Plans History ──────────────────────────────────────
-                const Text(
-                  'All Plans',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
-                ),
-                const SizedBox(height: 12),
-                _buildHistorySection(),
-              ],
-            ],
-          ),
+            const SizedBox(height: 12),
+            // ── All Plans History ──────────────────────────────────────
+            const Text(
+              'All Plans',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
+            ),
+            const SizedBox(height: 12),
+            _buildHistorySection(),
+          ],
         ),
+      ),
     );
   }
 
-  // ── Current subscription card ─────────────────────────────────────────────
+  // ── Single Subscription card ─────────────────────────────────────────────
 
-  Widget _buildCurrentSubscriptionCard() {
-    final sub = _currentSub!;
+  Widget _buildSingleSubscriptionCard(Map<String, dynamic> sub) {
     final status = (sub['status'] ?? 'unknown').toString();
     final statusColor = _statusColor(status);
     final total = sub['total_deliveries'] ?? 0;

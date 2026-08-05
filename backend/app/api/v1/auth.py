@@ -17,7 +17,6 @@ from app.schemas.auth import (
 )
 from app.schemas.common import MessageResponse
 from app.services.notification_service import NotificationService
-import shortuuid
 import logging
 
 logger = logging.getLogger(__name__)

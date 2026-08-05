@@ -281,16 +281,29 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
 
   Widget _buildActiveDeliveriesList() {
     if (_activeDeliveries.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
+          padding: const EdgeInsets.symmetric(vertical: 24.0, horizontal: 16.0),
           child: Column(
             children: [
-              Icon(Icons.local_shipping_outlined, size: 48, color: Colors.grey),
-              SizedBox(height: 12),
-              Text(
-                'No active deliveries right now.',
-                style: TextStyle(color: Colors.grey, fontSize: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.task_alt_rounded, size: 40, color: AppTheme.primaryGreen),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Today\'s Deliveries Completed!',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.textPrimary),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'All package deliveries for today are complete. Next delivery will show tomorrow.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
               ),
             ],
           ),

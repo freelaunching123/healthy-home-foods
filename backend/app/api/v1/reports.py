@@ -44,8 +44,8 @@ async def get_overview(
     total_revenue = float(pkg_rev or 0) + float(frt_rev or 0)
     
     # 2. Total Orders (Subscriptions + Fruit Orders)
-    pkg_orders = await db.scalar(select(func.count(Subscription.id)).where(and_(func.date(Subscription.created_at) >= sd, func.date(Subscription.created_at) <= ed)))
-    frt_orders = await db.scalar(select(func.count(FruitOrder.id)).where(and_(func.date(FruitOrder.created_at) >= sd, func.date(FruitOrder.created_at) <= ed)))
+    pkg_orders = await db.scalar(select(func.count(Subscription.id)).where(and_(func.date(Subscription.created_at) >= sd, func.date(Subscription.created_at) <= ed, Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED]))))
+    frt_orders = await db.scalar(select(func.count(FruitOrder.id)).where(and_(func.date(FruitOrder.created_at) >= sd, func.date(FruitOrder.created_at) <= ed, FruitOrder.payment_status == FruitPaymentStatus.SUCCESS)))
     total_orders = (pkg_orders or 0) + (frt_orders or 0)
     
     avg_order_value = total_revenue / total_orders if total_orders > 0 else 0
@@ -119,7 +119,7 @@ async def get_packages(
     stmt = (
         select(Product.name, func.count(Subscription.id).label('c'), func.sum(Subscription.total_amount))
         .join(Subscription, Subscription.product_id == Product.id)
-        .where(and_(func.date(Subscription.created_at) >= sd, func.date(Subscription.created_at) <= ed))
+        .where(and_(func.date(Subscription.created_at) >= sd, func.date(Subscription.created_at) <= ed, Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED])))
         .group_by(Product.id, Product.name)
         .order_by(desc('c'))
     )
@@ -145,7 +145,7 @@ async def get_fruits(
         select(Fruit.name, func.sum(FruitOrderItem.quantity_kg).label('q'), func.sum(FruitOrderItem.price_per_kg * FruitOrderItem.quantity_kg).label('rev'))
         .join(FruitOrderItem, FruitOrderItem.fruit_id == Fruit.id)
         .join(FruitOrder, FruitOrder.id == FruitOrderItem.order_id)
-        .where(and_(func.date(FruitOrder.created_at) >= sd, func.date(FruitOrder.created_at) <= ed))
+        .where(and_(func.date(FruitOrder.created_at) >= sd, func.date(FruitOrder.created_at) <= ed, FruitOrder.payment_status == FruitPaymentStatus.SUCCESS))
         .group_by(Fruit.id, Fruit.name)
         .order_by(desc('q'))
     )
@@ -347,8 +347,8 @@ async def get_admin_overview(
     todays_frt_rev = await db.scalar(select(func.sum(FruitOrder.total_amount)).where(and_(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS, func.date(FruitOrder.paid_at) == today)))
     todays_revenue = float(todays_pkg_rev or 0) + float(todays_frt_rev or 0)
     
-    orders_pkg = await db.scalar(select(func.count(Subscription.id)).where(func.date(Subscription.created_at) == today))
-    orders_frt = await db.scalar(select(func.count(FruitOrder.id)).where(func.date(FruitOrder.created_at) == today))
+    orders_pkg = await db.scalar(select(func.count(Subscription.id)).where(and_(func.date(Subscription.created_at) == today, Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED]))))
+    orders_frt = await db.scalar(select(func.count(FruitOrder.id)).where(and_(func.date(FruitOrder.created_at) == today, FruitOrder.payment_status == FruitPaymentStatus.SUCCESS)))
     orders_today = (orders_pkg or 0) + (orders_frt or 0)
     
     active_subscribers = await db.scalar(select(func.count(Subscription.id)).where(Subscription.status == SubscriptionStatus.ACTIVE))
@@ -356,11 +356,26 @@ async def get_admin_overview(
     pending_deliveries = await db.scalar(select(func.count(SubscriptionDelivery.id)).where(and_(SubscriptionDelivery.status == DeliveryStatus.PENDING, func.date(SubscriptionDelivery.scheduled_date) == today)))
     
     # Insights
-    top_pkg_res = await db.execute(select(Product.name, func.count(Subscription.id).label('c')).join(Subscription, Subscription.product_id == Product.id).group_by(Product.id).order_by(desc('c')).limit(1))
+    top_pkg_res = await db.execute(
+        select(Product.name, func.count(Subscription.id).label('c'))
+        .join(Subscription, Subscription.product_id == Product.id)
+        .where(Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED]))
+        .group_by(Product.id)
+        .order_by(desc('c'))
+        .limit(1)
+    )
     top_pkg_row = top_pkg_res.first()
     top_selling_package = {"name": top_pkg_row[0], "count": top_pkg_row[1]} if top_pkg_row else None
     
-    top_frt_res = await db.execute(select(Fruit.name, func.count(FruitOrderItem.id).label('c')).join(FruitOrderItem, FruitOrderItem.fruit_id == Fruit.id).group_by(Fruit.id).order_by(desc('c')).limit(1))
+    top_frt_res = await db.execute(
+        select(Fruit.name, func.count(FruitOrderItem.id).label('c'))
+        .join(FruitOrderItem, FruitOrderItem.fruit_id == Fruit.id)
+        .join(FruitOrder, FruitOrder.id == FruitOrderItem.order_id)
+        .where(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS)
+        .group_by(Fruit.id)
+        .order_by(desc('c'))
+        .limit(1)
+    )
     top_frt_row = top_frt_res.first()
     most_ordered_fruit = {"name": top_frt_row[0], "count": top_frt_row[1]} if top_frt_row else None
     
@@ -379,7 +394,7 @@ async def get_admin_overview(
     activities = []
     
     # 1. Fruit Orders
-    frt_stmt = select(FruitOrder, User.full_name).join(Customer, FruitOrder.customer_id == Customer.id).join(User, Customer.user_id == User.id).order_by(FruitOrder.created_at.desc()).limit(5)
+    frt_stmt = select(FruitOrder, User.full_name).join(Customer, FruitOrder.customer_id == Customer.id).join(User, Customer.user_id == User.id).where(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS).order_by(FruitOrder.created_at.desc()).limit(5)
     frt_res = await db.execute(frt_stmt)
     for fo, fname in frt_res:
         activities.append({
@@ -389,7 +404,7 @@ async def get_admin_overview(
         })
 
     # 2. Subscriptions
-    sub_stmt = select(Subscription, User.full_name).join(Customer, Subscription.customer_id == Customer.id).join(User, Customer.user_id == User.id).order_by(Subscription.created_at.desc()).limit(5)
+    sub_stmt = select(Subscription, User.full_name).join(Customer, Subscription.customer_id == Customer.id).join(User, Customer.user_id == User.id).where(Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED])).order_by(Subscription.created_at.desc()).limit(5)
     sub_res = await db.execute(sub_stmt)
     for sub, fname in sub_res:
         activities.append({

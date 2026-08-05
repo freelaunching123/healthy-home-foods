@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.core.dependencies import get_current_user, require_customer
 from app.models.user import User
 from app.models.customer import Customer
-from app.models.subscription import Subscription, SubscriptionStatus
+from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionItem
 from app.models.payment import Payment, PaymentStatus, PaymentMethod
 from app.models.invoice import Invoice
 from app.schemas.common import PaymentInitiateRequest, PaymentVerifyRequest, PaymentResponse, PaymentSummaryResponse, MessageResponse
@@ -97,10 +97,9 @@ async def payment_history(
     db: AsyncSession = Depends(get_db),
     status: str = None,
 ):
-    """Return enriched payment history for the current customer."""
+    """Return enriched payment history for the current customer (both Packages and Fruit Orders)."""
     from sqlalchemy.orm import selectinload
-    from app.models.product import Product
-    from app.models.subscription import SubscriptionPlan
+    from app.models.fruit import FruitOrder, FruitPaymentStatus
     customer = await _get_customer(db, current_user.id)
     
     query = (
@@ -109,6 +108,7 @@ async def payment_history(
         .options(
             selectinload(Payment.subscription).selectinload(Subscription.product),
             selectinload(Payment.subscription).selectinload(Subscription.plan),
+            selectinload(Payment.subscription).selectinload(Subscription.items).selectinload(SubscriptionItem.product),
         )
         .order_by(Payment.created_at.desc())
     )
@@ -121,8 +121,18 @@ async def payment_history(
     enriched = []
     for pmt in payments:
         sub = pmt.subscription
-        product_name = sub.product.name if sub and sub.product else None
+        product_name = None
         plan_name = sub.plan.name if sub and sub.plan else None
+        if sub:
+            if sub.product and sub.product.name:
+                product_name = sub.product.name
+            elif sub.items:
+                p_names = [it.product.name for it in sub.items if it.product]
+                if len(p_names) == 1:
+                    product_name = p_names[0]
+                elif len(p_names) > 1:
+                    product_name = f"{p_names[0]} + {len(p_names)-1} other(s)"
+
         subscription_name = None
         if product_name and plan_name:
             subscription_name = f"{product_name} ({plan_name})"
@@ -149,6 +159,35 @@ async def payment_history(
             delivery_charge=delivery_charge,
             total_amount=total_amount,
         ))
+
+    # Also include Fruit Orders in Payment History if status is ALL or SUCCESS
+    if not status or status.lower() == "success":
+        fruit_res = await db.execute(
+            select(FruitOrder)
+            .where(FruitOrder.customer_id == customer.id, FruitOrder.payment_status == FruitPaymentStatus.SUCCESS)
+            .order_by(FruitOrder.created_at.desc())
+        )
+        fruit_orders = fruit_res.scalars().all()
+        for fo in fruit_orders:
+            enriched.append(PaymentResponse(
+                id=fo.id,
+                subscription_id=None,
+                gateway_order_id=fo.gateway_order_id,
+                gateway_payment_id=fo.gateway_payment_id,
+                amount=float(fo.total_amount),
+                currency="INR",
+                status="success",
+                payment_method="online",
+                paid_at=fo.paid_at,
+                created_at=fo.created_at,
+                subscription_name=f"Fresh Fruit Order #{fo.order_number}",
+                gst_amount=0.0,
+                delivery_charge=0.0,
+                total_amount=float(fo.total_amount),
+            ))
+
+    # Sort combined history by created_at desc
+    enriched.sort(key=lambda x: x.created_at if x.created_at else datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     return enriched
 
 
@@ -206,147 +245,37 @@ async def download_invoice(
 
         # Fetch payment with relationships
         from sqlalchemy.orm import selectinload
+        from app.models.fruit import FruitOrder, FruitOrderItem
         result = await db.execute(
             select(Payment)
             .where(Payment.id == payment_id, Payment.customer_id == customer.id)
             .options(
                 selectinload(Payment.invoice),
                 selectinload(Payment.subscription).selectinload(Subscription.product),
-                selectinload(Payment.subscription).selectinload(Subscription.plan)
+                selectinload(Payment.subscription).selectinload(Subscription.plan),
+                selectinload(Payment.subscription).selectinload(Subscription.items).selectinload(SubscriptionItem.product),
             )
         )
         payment = result.scalar_one_or_none()
-        if not payment:
-            raise HTTPException(status_code=404, detail="Payment transaction not found")
+        fruit_order = None
 
-        # Fallback to subscription details if invoice record does not exist
-        invoice = payment.invoice
-        sub = payment.subscription
+        if not payment:
+            f_res = await db.execute(
+                select(FruitOrder)
+                .where(FruitOrder.id == payment_id, FruitOrder.customer_id == customer.id)
+                .options(selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit))
+            )
+            fruit_order = f_res.scalar_one_or_none()
+            if not fruit_order:
+                raise HTTPException(status_code=404, detail="Payment transaction not found")
 
         from datetime import datetime
-        now_str = datetime.now().strftime('%Y%m')
-        created_str = payment.created_at.strftime('%Y%m') if (payment.created_at is not None) else now_str
-
-        invoice_no = (
-            invoice.invoice_number
-            if (invoice and invoice.invoice_number)
-            else f"INV-{created_str}-{str(payment.id)[:8].upper()}"
-        )
-        cust_name = (
-            invoice.customer_name
-            if (invoice and invoice.customer_name and invoice.customer_name != "Customer")
-            else (current_user.full_name if (current_user and current_user.full_name) else "Customer")
-        ) or "Customer"
-
-        cust_phone = (
-            invoice.customer_phone
-            if (invoice and invoice.customer_phone)
-            else (current_user.phone if (current_user and current_user.phone) else "N/A")
-        ) or "N/A"
-
-        cust_email = (
-            invoice.customer_email
-            if invoice
-            else (current_user.email if current_user else None)
-        )
-
-        billing_addr = (
-            invoice.billing_address
-            if (invoice and invoice.billing_address)
-            else "Registered Address"
-        ) or "Registered Address"
-
-        prod_name = (
-            invoice.product_name
-            if (invoice and invoice.product_name)
-            else (
-                sub.product.name
-                if (sub and sub.product and sub.product.name)
-                else ("Multi-package subscription" if (sub and not getattr(sub, "product_id", None)) else "Healthy Meal Plan")
-            )
-        ) or "Healthy Meal Plan"
-
-        plan_name = (
-            invoice.plan_name
-            if (invoice and invoice.plan_name)
-            else (
-                sub.plan.name
-                if (sub and sub.plan and sub.plan.name)
-                else (f"{sub.plan_type.upper()} Plan" if (sub and getattr(sub, "plan_type", None)) else "Subscription Plan")
-            )
-        ) or "Subscription Plan"
-
-        total_del = (
-            invoice.total_deliveries
-            if (invoice and invoice.total_deliveries is not None)
-            else (sub.total_deliveries if (sub and sub.total_deliveries is not None) else 0)
-        ) or 0
-
-        price_per = (
-            float(invoice.price_per_delivery)
-            if (invoice and invoice.price_per_delivery is not None)
-            else (float(sub.price_per_delivery) if (sub and sub.price_per_delivery is not None) else 0.0)
-        )
-
-        subtotal = (
-            float(invoice.subtotal)
-            if (invoice and invoice.subtotal is not None)
-            else (price_per * total_del)
-        )
-
-        del_charge = (
-            float(invoice.delivery_charge)
-            if (invoice and invoice.delivery_charge is not None)
-            else (float(sub.delivery_charge) if (sub and sub.delivery_charge is not None) else 0.0)
-        )
-
-        tax_amt = (
-            float(invoice.tax_amount)
-            if (invoice and invoice.tax_amount is not None)
-            else (float(sub.tax_amount) if (sub and sub.tax_amount is not None) else 0.0)
-        )
-
-        total_amt = (
-            float(invoice.total_amount)
-            if (invoice and invoice.total_amount is not None)
-            else (float(payment.amount) if (payment.amount is not None) else 0.0)
-        )
-
-        paid_date = (
-            payment.paid_at.strftime('%B %d, %Y')
-            if payment.paid_at
-            else (payment.created_at.strftime('%B %d, %Y') if payment.created_at else datetime.now().strftime('%B %d, %Y'))
-        )
-
-        pmt_method = (
-            payment.payment_method.value
-            if (payment.payment_method and hasattr(payment.payment_method, "value"))
-            else (str(payment.payment_method) if payment.payment_method else "Razorpay")
-        ) or "Razorpay"
-
-        status_str = (
-            payment.status.value
-            if (payment.status and hasattr(payment.status, "value"))
-            else (str(payment.status) if payment.status else "SUCCESS")
-        ) or "SUCCESS"
-
-        # Generate PDF using ReportLab
         import io
         from fastapi.responses import StreamingResponse
         from reportlab.lib.pagesizes import letter
         from reportlab.lib import colors
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=letter,
-            rightMargin=36,
-            leftMargin=36,
-            topMargin=36,
-            bottomMargin=36
-        )
 
         styles = getSampleStyleSheet()
 
@@ -394,6 +323,185 @@ async def download_invoice(
             alignment=2
         )
 
+        if fruit_order:
+            invoice_no = f"INV-FRUIT-{fruit_order.order_number}"
+            cust_name = (current_user.full_name if (current_user and current_user.full_name) else "Customer") or "Customer"
+            cust_phone = (current_user.phone if (current_user and current_user.phone) else "N/A") or "N/A"
+            cust_email = current_user.email if current_user else None
+            billing_addr = "Registered Address"
+            paid_date = (
+                fruit_order.paid_at.strftime('%B %d, %Y')
+                if fruit_order.paid_at
+                else (fruit_order.created_at.strftime('%B %d, %Y') if fruit_order.created_at else datetime.now().strftime('%B %d, %Y'))
+            )
+            pmt_method = "ONLINE"
+            status_str = "SUCCESS"
+            del_charge = float(getattr(fruit_order, 'delivery_charge', 0.0) or 0.0)
+            tax_amt = 0.0
+            total_amt = float(fruit_order.total_amount or 0.0)
+            subtotal = total_amt - del_charge
+
+            item_rows = []
+            if fruit_order.items:
+                for it in fruit_order.items:
+                    fname = it.fruit.name if (it.fruit and it.fruit.name) else "Fresh Fruit"
+                    u_price = float(it.unit_price_per_kg or 0.0)
+                    qty_kg = float(it.quantity_kg or 0.0)
+                    sub_tot = float(it.subtotal or (u_price * qty_kg))
+                    item_rows.append([
+                        Paragraph(f"<b>{fname}</b>", normal_style),
+                        Paragraph(f"INR {u_price:.2f}/kg", right_normal),
+                        Paragraph(f"{qty_kg} kg", right_normal),
+                        Paragraph(f"INR {sub_tot:.2f}", right_bold),
+                    ])
+            else:
+                item_rows.append([
+                    Paragraph("<b>Fresh Fruits Order</b>", normal_style),
+                    Paragraph("—", right_normal),
+                    Paragraph("1", right_normal),
+                    Paragraph(f"INR {subtotal:.2f}", right_bold),
+                ])
+        else:
+            invoice = payment.invoice
+            sub = payment.subscription
+
+            now_str = datetime.now().strftime('%Y%m')
+            created_str = payment.created_at.strftime('%Y%m') if (payment and payment.created_at is not None) else now_str
+
+            invoice_no = (
+                invoice.invoice_number
+                if (invoice and invoice.invoice_number)
+                else f"INV-{created_str}-{str(payment.id)[:8].upper()}"
+            )
+            cust_name = (
+                invoice.customer_name
+                if (invoice and invoice.customer_name and invoice.customer_name != "Customer")
+                else (current_user.full_name if (current_user and current_user.full_name) else "Customer")
+            ) or "Customer"
+
+            cust_phone = (
+                invoice.customer_phone
+                if (invoice and invoice.customer_phone)
+                else (current_user.phone if (current_user and current_user.phone) else "N/A")
+            ) or "N/A"
+
+            cust_email = (
+                invoice.customer_email
+                if invoice
+                else (current_user.email if current_user else None)
+            )
+
+            billing_addr = (
+                invoice.billing_address
+                if (invoice and invoice.billing_address)
+                else "Registered Address"
+            ) or "Registered Address"
+
+            prod_name = (
+                invoice.product_name
+                if (invoice and invoice.product_name)
+                else (
+                    sub.product.name
+                    if (sub and sub.product and sub.product.name)
+                    else ("Multi-package subscription" if (sub and not getattr(sub, "product_id", None)) else "Healthy Meal Plan")
+                )
+            ) or "Healthy Meal Plan"
+
+            plan_name = (
+                invoice.plan_name
+                if (invoice and invoice.plan_name)
+                else (
+                    sub.plan.name
+                    if (sub and sub.plan and sub.plan.name)
+                    else (f"{str(sub.plan_type).upper()} Plan" if (sub and getattr(sub, "plan_type", None)) else "Subscription Plan")
+                )
+            ) or "Subscription Plan"
+
+            total_del = (
+                invoice.total_deliveries
+                if (invoice and invoice.total_deliveries is not None)
+                else (sub.total_deliveries if (sub and sub.total_deliveries is not None) else 0)
+            ) or 0
+
+            price_per = (
+                float(invoice.price_per_delivery)
+                if (invoice and invoice.price_per_delivery is not None)
+                else (float(getattr(sub, 'price_per_delivery', 0.0) or 0.0) if sub else 0.0)
+            )
+
+            subtotal = (
+                float(invoice.subtotal)
+                if (invoice and invoice.subtotal is not None)
+                else (price_per * total_del)
+            )
+
+            del_charge = (
+                float(invoice.delivery_charge)
+                if (invoice and invoice.delivery_charge is not None)
+                else (float(sub.delivery_charge) if (sub and sub.delivery_charge is not None) else 0.0)
+            )
+
+            tax_amt = (
+                float(invoice.tax_amount)
+                if (invoice and invoice.tax_amount is not None)
+                else (float(sub.tax_amount) if (sub and sub.tax_amount is not None) else 0.0)
+            )
+
+            total_amt = (
+                float(invoice.total_amount)
+                if (invoice and invoice.total_amount is not None)
+                else (float(payment.amount) if (payment and payment.amount is not None) else 0.0)
+            )
+
+            paid_date = (
+                payment.paid_at.strftime('%B %d, %Y')
+                if (payment and payment.paid_at)
+                else (payment.created_at.strftime('%B %d, %Y') if (payment and payment.created_at) else datetime.now().strftime('%B %d, %Y'))
+            )
+
+            pmt_method = (
+                payment.payment_method.value
+                if (payment and payment.payment_method and hasattr(payment.payment_method, "value"))
+                else (str(payment.payment_method) if (payment and payment.payment_method) else "Razorpay")
+            ) or "Razorpay"
+
+            status_str = (
+                payment.status.value
+                if (payment and payment.status and hasattr(payment.status, "value"))
+                else (str(payment.status) if (payment and payment.status) else "SUCCESS")
+            ) or "SUCCESS"
+
+            item_rows = []
+            if sub and sub.items and len(sub.items) > 0:
+                for it in sub.items:
+                    pname = it.product.name if (it.product and it.product.name) else "Meal Package"
+                    p_price = float(it.package_price or 0.0)
+                    it_qty = int(it.quantity or 1)
+                    item_rows.append([
+                        Paragraph(f"<b>{pname}</b><br/><font size=8 color='#666666'>Plan: {str(plan_name).title()}</font>", normal_style),
+                        Paragraph(f"INR {p_price:.2f}", right_normal),
+                        Paragraph(f"{it_qty}", right_normal),
+                        Paragraph(f"INR {(p_price * it_qty):.2f}", right_bold),
+                    ])
+            else:
+                item_rows.append([
+                    Paragraph(f"<b>{prod_name}</b><br/><font size=8 color='#666666'>Plan: {str(plan_name).title()}</font>", normal_style),
+                    Paragraph(f"INR {price_per:.2f}", right_normal),
+                    Paragraph(f"{total_del}", right_normal),
+                    Paragraph(f"INR {subtotal:.2f}", right_bold),
+                ])
+
+        # Generate PDF using ReportLab
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=36,
+            leftMargin=36,
+            topMargin=36,
+            bottomMargin=36
+        )
+
         story = []
 
         # Header
@@ -435,19 +543,12 @@ async def download_invoice(
         # Items Table
         headers = [
             Paragraph("<b>Item Description</b>", ParagraphStyle('TH1', parent=normal_style, textColor=colors.white, fontName='Helvetica-Bold')),
-            Paragraph("<b>Price / Del.</b>", ParagraphStyle('TH2', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
-            Paragraph("<b>Deliveries</b>", ParagraphStyle('TH3', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
+            Paragraph("<b>Unit Price</b>", ParagraphStyle('TH2', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
+            Paragraph("<b>Qty / Del.</b>", ParagraphStyle('TH3', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
             Paragraph("<b>Total</b>", ParagraphStyle('TH4', parent=right_normal, textColor=colors.white, fontName='Helvetica-Bold')),
         ]
         
-        item_row = [
-            Paragraph(f"<b>{prod_name}</b><br/><font size=8 color='#666666'>Plan: {str(plan_name).title()}</font>", normal_style),
-            Paragraph(f"INR {price_per:.2f}", right_normal),
-            Paragraph(f"{total_del}", right_normal),
-            Paragraph(f"INR {subtotal:.2f}", right_bold),
-        ]
-
-        table_data = [headers, item_row]
+        table_data = [headers] + item_rows
         items_table = Table(table_data, colWidths=[240, 100, 80, 120])
         items_table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2E7D32')),

@@ -52,27 +52,23 @@ async def get_dashboard_stats(
     
     assigned_today = len(assignments)
     completed_today = sum(1 for a in assignments if a.status == AssignmentStatus.DELIVERED)
-    pending_deliveries = sum(1 for a in assignments if a.status in [AssignmentStatus.PENDING, AssignmentStatus.ACCEPTED, AssignmentStatus.OUT_FOR_DELIVERY])
     failed_deliveries = sum(1 for a in assignments if a.status == AssignmentStatus.FAILED)
     
+    active_list = await get_active_deliveries(current_user, db)
+    active_count = len(active_list)
+    pending_deliveries = active_count
+
     success_rate = 0.0
     if assigned_today > 0:
         success_rate = (completed_today / assigned_today) * 100.0
-        
-    # Active deliveries: pending/accepted/out across any date (if not finished)
-    active_query = select(func.count(DeliveryAssignment.id)).where(
-        DeliveryAssignment.delivery_partner_id == partner.id,
-        DeliveryAssignment.status.in_([AssignmentStatus.PENDING, AssignmentStatus.ACCEPTED, AssignmentStatus.OUT_FOR_DELIVERY])
-    )
-    active_count = await db.scalar(active_query)
 
     return PartnerDashboardStats(
         assigned_today=assigned_today,
         completed_today=completed_today,
         pending_deliveries=pending_deliveries,
         failed_deliveries=failed_deliveries,
-        success_rate=success_rate,
-        active_deliveries=active_count or 0
+        success_rate=round(success_rate, 1),
+        active_deliveries=active_count
     )
 
 
@@ -82,6 +78,7 @@ async def get_active_deliveries(
     db: AsyncSession = Depends(get_db),
 ):
     partner = await get_my_partner_profile(db, current_user.id)
+    today = date.today()
     
     # Get active assignments
     query = select(DeliveryAssignment).where(
@@ -97,15 +94,32 @@ async def get_active_deliveries(
         if a.subscription_delivery_id:
             # Subscription Delivery
             sd_res = await db.execute(select(SubscriptionDelivery).where(SubscriptionDelivery.id == a.subscription_delivery_id))
-            sd = sd_res.scalar_one()
+            sd = sd_res.scalar_one_or_none()
+            if not sd:
+                continue
+            # CRITICAL RULE: A subscription delivery scheduled for a future calendar date
+            # MUST NOT be shown as an active delivery on today's list. Only one delivery per calendar day.
+            if sd.scheduled_date > today:
+                continue
+            if sd.status in [DeliveryStatus.DELIVERED, DeliveryStatus.SKIPPED]:
+                continue
+
             sub_res = await db.execute(select(Subscription).where(Subscription.id == sd.subscription_id))
-            sub = sub_res.scalar_one()
+            sub = sub_res.scalar_one_or_none()
+            if not sub:
+                continue
             cust_res = await db.execute(select(Customer).where(Customer.id == sub.customer_id))
-            cust = cust_res.scalar_one()
+            cust = cust_res.scalar_one_or_none()
+            if not cust:
+                continue
             addr_res = await db.execute(select(Address).where(Address.id == sub.address_id))
-            addr = addr_res.scalar_one()
+            addr = addr_res.scalar_one_or_none()
+            if not addr:
+                continue
             user_res = await db.execute(select(User).where(User.id == cust.user_id))
-            u = user_res.scalar_one()
+            u = user_res.scalar_one_or_none()
+            if not u:
+                continue
             
             response_list.append(ActiveDeliveryResponse(
                 id=a.id,
@@ -126,13 +140,23 @@ async def get_active_deliveries(
         elif a.fruit_order_id:
             # Fruit Order
             fo_res = await db.execute(select(FruitOrder).where(FruitOrder.id == a.fruit_order_id))
-            fo = fo_res.scalar_one()
+            fo = fo_res.scalar_one_or_none()
+            if not fo:
+                continue
+            if fo.order_status in [FruitOrderStatus.DELIVERED, FruitOrderStatus.CANCELLED]:
+                continue
             cust_res = await db.execute(select(Customer).where(Customer.id == fo.customer_id))
-            cust = cust_res.scalar_one()
+            cust = cust_res.scalar_one_or_none()
+            if not cust:
+                continue
             addr_res = await db.execute(select(Address).where(Address.id == fo.address_id))
-            addr = addr_res.scalar_one()
+            addr = addr_res.scalar_one_or_none()
+            if not addr:
+                continue
             user_res = await db.execute(select(User).where(User.id == cust.user_id))
-            u = user_res.scalar_one()
+            u = user_res.scalar_one_or_none()
+            if not u:
+                continue
             
             response_list.append(ActiveDeliveryResponse(
                 id=a.id,

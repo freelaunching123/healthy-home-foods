@@ -429,14 +429,16 @@ async def get_current_subscription(
     )
     sub = res.scalar_one()
 
-    # Combine product names for multi-product support
+    # Product name resolution
     product_name = "—"
-    if sub.items:
-        prod_names = [item.product.name for item in sub.items]
-        if len(prod_names) > 1:
-            product_name = f"{prod_names[0]} + {len(prod_names) - 1} other(s)"
-        elif len(prod_names) == 1:
+    if sub.product and sub.product.name:
+        product_name = sub.product.name
+    elif sub.items:
+        prod_names = [item.product.name for item in sub.items if item.product]
+        if len(prod_names) == 1:
             product_name = prod_names[0]
+        elif len(prod_names) > 1:
+            product_name = f"{prod_names[0]} + {len(prod_names) - 1} other(s)"
 
     carry_forward_count = await db.scalar(
         select(func.count(SubscriptionDelivery.id))

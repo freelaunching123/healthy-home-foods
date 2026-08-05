@@ -107,7 +107,7 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: Text('Fruit Orders', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        title: Text('Grocery Orders', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
         leading: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => context.pop()),
       ),

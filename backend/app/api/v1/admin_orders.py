@@ -15,7 +15,7 @@ from app.models.customer import Customer
 from app.models.delivery_partner import DeliveryPartner
 from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
 from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
-from app.models.subscription import Subscription, SubscriptionItem
+from app.models.subscription import Subscription, SubscriptionItem, SubscriptionStatus
 from app.models.product import Product
 from app.models.fruit import FruitOrder, FruitOrderStatus, FruitOrderItem, Fruit
 from app.models.address import Address
@@ -73,6 +73,7 @@ async def list_all_orders(
         .outerjoin(DeliveryAssignment, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
         .outerjoin(DeliveryPartner, DeliveryPartner.id == DeliveryAssignment.delivery_partner_id)
         .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
+        .where(Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED]))
         .options(
             selectinload(SubscriptionDelivery.subscription).selectinload(Subscription.items).selectinload(SubscriptionItem.product)
         )

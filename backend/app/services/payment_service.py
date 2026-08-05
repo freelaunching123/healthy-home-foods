@@ -100,12 +100,19 @@ class PaymentService:
         payment.status = PaymentStatus.SUCCESS
         payment.paid_at = datetime.now(timezone.utc)
 
-        # Activate subscription
+        # Activate target subscription and any pending subscriptions for this customer
         sub = await db.get(Subscription, payment.subscription_id)
-        if not sub:
-            raise HTTPException(status_code=404, detail="Subscription not found")
+        if sub:
+            await subscription_engine.activate_subscription(db, sub)
 
-        await subscription_engine.activate_subscription(db, sub)
+        pending_subs_res = await db.execute(
+            select(Subscription).where(
+                Subscription.customer_id == payment.customer_id,
+                Subscription.status == SubscriptionStatus.PENDING_PAYMENT
+            )
+        )
+        for p_sub in pending_subs_res.scalars().all():
+            await subscription_engine.activate_subscription(db, p_sub)
 
         # Generate invoice safely guarding None values
         invoice_number = f"INV-{datetime.now().strftime('%Y%m')}-{str(payment.id)[:8].upper()}"

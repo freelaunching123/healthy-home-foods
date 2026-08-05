@@ -30,6 +30,7 @@ class ApiConstants {
   static const String paymentInitiate = '/payments/initiate';
   static const String paymentVerify = '/payments/verify';
   static const String paymentHistory = '/payments/history';
+  static String paymentInvoice(String id) => '/payments/$id/invoice';
 
   // Deliveries
   static const String deliveriesPending = '/deliveries/pending';

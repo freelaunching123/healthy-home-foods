@@ -11,6 +11,7 @@ class ProductCategoryCreate(BaseModel):
     image_url: Optional[str] = None
     parent_id: Optional[uuid.UUID] = None
     sort_order: int = 0
+    category_type: Optional[str] = "package"
 
 
 class ProductCategoryResponse(BaseModel):
@@ -21,6 +22,7 @@ class ProductCategoryResponse(BaseModel):
     image_url: Optional[str]
     parent_id: Optional[uuid.UUID]
     sort_order: int
+    category_type: str = "package"
     is_active: bool
 
     model_config = {"from_attributes": True}

@@ -31,6 +31,25 @@ async def lifespan(app: FastAPI):
     os.makedirs(os.path.join(settings.UPLOAD_DIR, "proofs"), exist_ok=True)
     os.makedirs(os.path.join(settings.UPLOAD_DIR, "fruits"), exist_ok=True)
 
+    # Ensure new columns exist on startup for SQLite
+    try:
+        from app.db.session import AsyncSessionLocal
+        from sqlalchemy import text
+        async with AsyncSessionLocal() as db:
+            try:
+                await db.execute(text("ALTER TABLE product_categories ADD COLUMN category_type VARCHAR(50) DEFAULT 'package'"))
+                await db.commit()
+            except Exception:
+                await db.rollback()
+            try:
+                await db.execute(text("ALTER TABLE fruits ADD COLUMN category_id CHAR(36)"))
+                await db.execute(text("ALTER TABLE fruits ADD COLUMN category_name VARCHAR(150)"))
+                await db.commit()
+            except Exception:
+                await db.rollback()
+    except Exception as e:
+        logger.warning(f"DB schema column check: {e}")
+
     # Seed default admin user if not exists
     try:
         from app.db.session import AsyncSessionLocal

@@ -143,14 +143,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
       // Upload Image if selected
       if (_selectedImage != null && _selectedImageBytes != null) {
-        final formData = FormData.fromMap({
-          'file': MultipartFile.fromBytes(_selectedImageBytes!, filename: _selectedImage!.name),
-        });
-        await _api.dio.post(
-          '${_api.dio.options.baseUrl}${ApiConstants.products}/$productId/image',
-          data: formData,
-          options: Options(contentType: 'multipart/form-data'),
-        );
+        try {
+          final formData = FormData.fromMap({
+            'file': MultipartFile.fromBytes(_selectedImageBytes!, filename: _selectedImage!.name),
+          });
+          await _api.dio.post(
+            '${_api.dio.options.baseUrl}${ApiConstants.products}/$productId/image',
+            data: formData,
+            options: Options(contentType: 'multipart/form-data'),
+          );
+        } catch (imgError) {
+          debugPrint('Error uploading product image: $imgError');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Image upload failed, but product details were saved.'), backgroundColor: AppTheme.warning),
+            );
+          }
+        }
       }
 
       if (mounted) {

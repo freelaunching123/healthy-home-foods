@@ -16,20 +16,26 @@ router = APIRouter(prefix="/categories", tags=["Categories"])
 @router.get("", response_model=list[ProductCategoryResponse])
 async def list_categories(
     active_only: bool = Query(False),
+    category_type: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(ProductCategory)
     if active_only:
         query = query.where(ProductCategory.is_active == True)
+    if category_type:
+        query = query.where(ProductCategory.category_type == category_type)
     result = await db.execute(query.order_by(ProductCategory.sort_order))
     return result.scalars().all()
 
 @router.get("/active", response_model=list[ProductCategoryResponse])
 async def list_active_categories(
+    category_type: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(ProductCategory).where(ProductCategory.is_active == True).order_by(ProductCategory.sort_order)
-    result = await db.execute(query)
+    query = select(ProductCategory).where(ProductCategory.is_active == True)
+    if category_type:
+        query = query.where(ProductCategory.category_type == category_type)
+    result = await db.execute(query.order_by(ProductCategory.sort_order))
     return result.scalars().all()
 
 

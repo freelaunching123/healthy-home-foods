@@ -224,7 +224,36 @@ class _ActiveDeliveriesScreenState extends State<ActiveDeliveriesScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
           : _deliveries.isEmpty
-              ? const Center(child: Text('No active deliveries right now.'))
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.task_alt_rounded, size: 56, color: AppTheme.primaryGreen),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Today\'s Deliveries Completed!',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'All package deliveries for today have been marked complete. Next delivery will be scheduled for tomorrow.',
+                          style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: _deliveries.length,

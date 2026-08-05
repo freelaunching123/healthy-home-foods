@@ -586,13 +586,24 @@ async def admin_create_fruit(
     _: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin: add a new fruit to the catalogue."""
+    """Admin: add a new grocery item to the catalogue."""
+    from app.models.product import ProductCategory
     try:
         avail = FruitAvailability(payload.availability_status)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid availability_status: {payload.availability_status}")
 
+    cat_name = None
+    if payload.category_id:
+        cat_res = await db.execute(select(ProductCategory).where(ProductCategory.id == payload.category_id))
+        cat = cat_res.scalar_one_or_none()
+        if not cat:
+            raise HTTPException(status_code=400, detail="Specified category does not exist")
+        cat_name = cat.name
+
     fruit = Fruit(
+        category_id=payload.category_id,
+        category_name=cat_name,
         name=payload.name.strip(),
         description=payload.description,
         price_per_kg=payload.price_per_kg,
@@ -611,11 +622,11 @@ async def admin_get_fruit(
     _: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin: get a single fruit's details (including inactive)."""
+    """Admin: get a single grocery item's details (including inactive)."""
     result = await db.execute(select(Fruit).where(Fruit.id == fruit_id))
     fruit = result.scalar_one_or_none()
     if not fruit:
-        raise HTTPException(status_code=404, detail="Fruit not found")
+        raise HTTPException(status_code=404, detail="Grocery item not found")
     return fruit
 
 
@@ -626,13 +637,21 @@ async def admin_update_fruit(
     _: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin: update fruit details."""
+    """Admin: update grocery item details."""
+    from app.models.product import ProductCategory
     result = await db.execute(select(Fruit).where(Fruit.id == fruit_id))
     fruit = result.scalar_one_or_none()
     if not fruit:
-        raise HTTPException(status_code=404, detail="Fruit not found")
+        raise HTTPException(status_code=404, detail="Grocery item not found")
 
     data = payload.model_dump(exclude_none=True)
+    if "category_id" in data and data["category_id"] is not None:
+        cat_res = await db.execute(select(ProductCategory).where(ProductCategory.id == data["category_id"]))
+        cat = cat_res.scalar_one_or_none()
+        if not cat:
+            raise HTTPException(status_code=400, detail="Specified category does not exist")
+        data["category_name"] = cat.name
+
     if "availability_status" in data:
         try:
             data["availability_status"] = FruitAvailability(data["availability_status"])

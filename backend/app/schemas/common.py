@@ -71,7 +71,7 @@ class PaymentVerifyRequest(BaseModel):
 
 class PaymentResponse(BaseModel):
     id: uuid.UUID
-    subscription_id: uuid.UUID
+    subscription_id: Optional[uuid.UUID] = None
     gateway_order_id: Optional[str]
     gateway_payment_id: Optional[str]
     amount: float

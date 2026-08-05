@@ -103,7 +103,7 @@ class _FruitCartScreenState extends State<FruitCartScreen> {
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: Text('My Fruit Cart', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        title: Text('My Grocery Cart', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),

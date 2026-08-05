@@ -19,6 +19,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _api = ApiClient();
   
+  final TextEditingController _searchController = TextEditingController();
+  
   // -- Shared State --
   Timer? _pollingTimer;
   String _searchQuery = '';
@@ -69,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -124,7 +127,94 @@ class _HomeScreenState extends State<HomeScreen> {
     return filtered;
   }
 
-  // ── FRUITS LOGIC ──────────────────────────────────────────────────────────
+  Widget _buildFloatingBottomCartBar() {
+    final isFruit = _selectedTabIndex == 1;
+    final count = isFruit ? _cartCount : _packageCartCount;
+    if (count <= 0) return const SizedBox.shrink();
+
+    final title = isFruit ? 'Grocery Cart' : 'Package Cart';
+    final targetRoute = isFruit ? '/fruits/cart' : '/packages/cart';
+
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () async {
+              await context.push(targetRoute);
+              if (mounted) {
+                if (isFruit) {
+                  _loadCartCount();
+                  _loadFruits(isSilent: true);
+                } else {
+                  _loadPackageCartCount();
+                  _loadPackages(isSilent: true);
+                }
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: const TextStyle(
+                        color: AppTheme.primaryGreen,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'View Cart',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+
 
   Future<void> _loadFruits({bool isSilent = false}) async {
     if (!isSilent) setState(() => _isLoadingFruits = true);
@@ -317,137 +407,110 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(width: 4),
-          if (_selectedTabIndex == 1) // Fruit Cart
-            if (_cartCount > 0)
-              Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.shopping_basket_rounded, color: AppTheme.primaryGreen),
-                    onPressed: () async {
-                      await context.push('/fruits/cart');
-                      if (mounted) {
-                        _loadCartCount();
-                        _loadFruits(isSilent: true);
-                      }
-                    },
-                    tooltip: 'Fruit Cart',
-                  ),
-                  Positioned(
-                    top: 6, right: 6,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: AppTheme.error, shape: BoxShape.circle),
-                      child: Text('$_cartCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              )
-            else
-              const SizedBox.shrink()
-          else // Package Cart
-            if (_packageCartCount > 0)
-              Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.shopping_cart_rounded, color: AppTheme.primaryGreen),
-                    onPressed: () async {
-                      await context.push('/packages/cart');
-                      if (mounted) {
-                        _loadPackageCartCount();
-                        _loadPackages(isSilent: true);
-                      }
-                    },
-                    tooltip: 'Package Cart',
-                  ),
-                  Positioned(
-                    top: 6, right: 6,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: AppTheme.error, shape: BoxShape.circle),
-                      child: Text('$_packageCartCount', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              )
-            else
-              const SizedBox.shrink(),
         ],
       ),
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // Search & Segmented Switch
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Fresh meals, delivered daily', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
-                    const SizedBox(height: 16),
-                    // Segmented Switch
-                    Container(
-                      decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.all(4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() { _selectedTabIndex = 0; _searchQuery = ''; }),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: _selectedTabIndex == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
+        child: Stack(
+          children: [
+            CustomScrollView(
+              slivers: [
+                // Search & Segmented Switch
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Fresh meals, delivered daily', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                        const SizedBox(height: 16),
+                        // Segmented Switch
+                        Container(
+                          decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.all(4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() {
+                                    _selectedTabIndex = 0;
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: _selectedTabIndex == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text('Packages', style: TextStyle(fontWeight: FontWeight.bold, color: _selectedTabIndex == 0 ? AppTheme.primaryGreen : AppTheme.textLight)),
+                                  ),
                                 ),
-                                alignment: Alignment.center,
-                                child: Text('Packages', style: TextStyle(fontWeight: FontWeight.bold, color: _selectedTabIndex == 0 ? AppTheme.primaryGreen : AppTheme.textLight)),
                               ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() { _selectedTabIndex = 1; _searchQuery = ''; }),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: _selectedTabIndex == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setState(() {
+                                    _selectedTabIndex = 1;
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: _selectedTabIndex == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text('Groceries', style: TextStyle(fontWeight: FontWeight.bold, color: _selectedTabIndex == 1 ? AppTheme.primaryGreen : AppTheme.textLight)),
+                                  ),
                                 ),
-                                alignment: Alignment.center,
-                                child: Text('Fruits', style: TextStyle(fontWeight: FontWeight.bold, color: _selectedTabIndex == 1 ? AppTheme.primaryGreen : AppTheme.textLight)),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Search Field
+                        TextField(
+                          controller: _searchController,
+                          onChanged: (v) => setState(() => _searchQuery = v),
+                          decoration: InputDecoration(
+                            hintText: _selectedTabIndex == 0 ? 'Search healthy food packs...' : 'Search fresh fruits...',
+                            prefixIcon: const Icon(Icons.search, size: 20),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.cancel_rounded, size: 20, color: AppTheme.textLight),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    // Search Field
-                    TextField(
-                      key: ValueKey('search_$_selectedTabIndex'), // Force rebuild to clear visually
-                      onChanged: (v) => setState(() => _searchQuery = v),
-                      decoration: InputDecoration(
-                        hintText: _selectedTabIndex == 0 ? 'Search healthy food packs...' : 'Search fresh fruits...',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Colors.grey.shade200)),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+
+                if (_selectedTabIndex == 0) ..._buildPackagesSlivers(),
+                if (_selectedTabIndex == 1) ..._buildFruitsSlivers(),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ],
             ),
 
-            if (_selectedTabIndex == 0) ..._buildPackagesSlivers(),
-            if (_selectedTabIndex == 1) ..._buildFruitsSlivers(),
-
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            // Floating Bottom Cart Bar (Shows ONLY when customer added items)
+            Positioned(
+              left: 0, right: 0, bottom: 0,
+              child: _buildFloatingBottomCartBar(),
+            ),
           ],
         ),
       ),

@@ -175,7 +175,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
           IconButton(
             icon: const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryGreen),
             onPressed: () => context.push('/admin/fruits/orders'),
-            tooltip: 'Fruit Orders',
+            tooltip: 'Grocery Orders',
           ),
         ],
       ),
@@ -185,7 +185,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
           _loadFruits();
         },
         icon: const Icon(Icons.add_rounded),
-        label: Text('Add Fruit', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        label: Text('Add Grocery Item', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
         backgroundColor: AppTheme.primaryGreen,
       ),
       body: Column(
@@ -199,7 +199,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search fruits...',
+                    hintText: 'Search groceries...',
                     prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textLight),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(

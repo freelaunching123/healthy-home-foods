@@ -42,7 +42,7 @@ class _FruitOrderHistoryScreenState extends State<FruitOrderHistoryScreen> {
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: Text('My Fruit Orders', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        title: Text('My Grocery Orders', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
         leading: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => context.pop()),
       ),

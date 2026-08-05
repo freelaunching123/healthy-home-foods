@@ -43,6 +43,10 @@ class Fruit(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     __tablename__ = "fruits"
 
+    category_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("product_categories.id"), nullable=True, index=True
+    )
+    category_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     price_per_kg: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
@@ -60,6 +64,7 @@ class Fruit(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     # Relationships
+    category: Mapped[Optional["ProductCategory"]] = relationship("ProductCategory")
     cart_items: Mapped[List["FruitCart"]] = relationship("FruitCart", back_populates="fruit")
     order_items: Mapped[List["FruitOrderItem"]] = relationship("FruitOrderItem", back_populates="fruit")
 
