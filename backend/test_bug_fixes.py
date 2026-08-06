@@ -2,7 +2,8 @@ import asyncio
 import io
 import uuid
 import httpx
-from datetime import date
+from datetime import date, datetime, timezone
+from app.models.payment import Payment, PaymentStatus
 from sqlalchemy import select, delete
 
 from app.main import app as fastapi_app
@@ -78,7 +79,7 @@ async def test_fixes():
                 id=cust_user_id,
                 role=UserRoleEnum.CUSTOMER,
                 full_name="Test Customer",
-                phone="8888888888"
+                phone=f"88{uuid.uuid4().int % 100000000:08d}"
             )
             session.add(cust_user)
             await session.flush()
@@ -108,6 +109,17 @@ async def test_fixes():
             )
             session.add_all([paid_sub, unpaid_sub])
 
+            # Successful payment record for paid_sub
+            paid_pmt = Payment(
+                id=uuid.uuid4(),
+                subscription_id=paid_sub.id,
+                customer_id=cust_id,
+                amount=500.0,
+                status=PaymentStatus.SUCCESS,
+                paid_at=datetime.now(timezone.utc)
+            )
+            session.add(paid_pmt)
+
             # Add 1 Paid Fruit Order (SUCCESS) & 1 Unpaid Fruit Order (PENDING)
             paid_fruit = FruitOrder(
                 id=uuid.uuid4(),
@@ -115,6 +127,7 @@ async def test_fixes():
                 order_number=f"FO-PAID-{uuid.uuid4().hex[:6]}",
                 total_amount=200.0,
                 payment_status=FruitPaymentStatus.SUCCESS,
+                paid_at=datetime.now(timezone.utc),
                 order_status=FruitOrderStatus.PENDING
             )
             unpaid_fruit = FruitOrder(

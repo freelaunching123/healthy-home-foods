@@ -140,23 +140,21 @@ class PaymentService:
         )
         db.add(invoice)
 
-        # In-app notifications
-        await NotificationService.create_in_app_notification(
+        # Notifications log + Push
+        await NotificationService.send_notification_to_user(
             db=db,
             user_id=user.id,
             title="Payment Successful",
             body=f"Your payment of ₹{payment.amount} was successful.",
-            category="payment",
-            action_type="payment",
+            notification_type="payment",
             reference_id=str(payment.id)
         )
-        await NotificationService.create_in_app_notification(
+        await NotificationService.send_notification_to_user(
             db=db,
             user_id=user.id,
             title="Subscription Activated",
             body="Your package subscription has been activated! Deliveries will begin as scheduled.",
-            category="subscription",
-            action_type="subscription",
+            notification_type="subscription",
             reference_id=str(sub.id)
         )
 

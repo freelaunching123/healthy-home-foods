@@ -224,13 +224,12 @@ async def update_delivery_status(
             delivery.status = DeliveryStatus.OUT_FOR_DELIVERY
         if user_id:
             try:
-                await NotificationService.create_in_app_notification(
+                await NotificationService.send_notification_to_user(
                     db=db,
                     user_id=user_id,
                     title="Out for Delivery",
                     body="Your meal is out for delivery! You can track it live.",
-                    category="delivery",
-                    action_type="delivery",
+                    notification_type="delivery",
                     reference_id=str(delivery.id) if delivery else str(assignment.id)
                 )
             except Exception as e:
@@ -242,13 +241,12 @@ async def update_delivery_status(
         assignment.delivered_at = now
         if user_id:
             try:
-                await NotificationService.create_in_app_notification(
+                await NotificationService.send_notification_to_user(
                     db=db,
                     user_id=user_id,
                     title="Delivery Completed",
                     body="Your meal has been delivered. Enjoy your food!",
-                    category="delivery",
-                    action_type="delivery",
+                    notification_type="delivery",
                     reference_id=str(delivery.id) if delivery else str(assignment.id)
                 )
             except Exception as e:
@@ -261,13 +259,12 @@ async def update_delivery_status(
             await subscription_engine.handle_missed_delivery(db, delivery)
         if user_id:
             try:
-                await NotificationService.create_in_app_notification(
+                await NotificationService.send_notification_to_user(
                     db=db,
                     user_id=user_id,
                     title="Delivery Failed",
                     body=f"We couldn't deliver your meal today. Reason: {payload.failure_reason}",
-                    category="delivery",
-                    action_type="delivery",
+                    notification_type="delivery",
                     reference_id=str(delivery.id) if delivery else str(assignment.id)
                 )
             except Exception as e:

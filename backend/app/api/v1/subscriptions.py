@@ -593,18 +593,6 @@ async def pause_subscription(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-    # Send Notification
-    customer_profile = await db.get(Customer, sub.customer_id)
-    await NotificationService.create_in_app_notification(
-        db=db,
-        user_id=customer_profile.user_id,
-        title="Subscription Paused",
-        body=f"Your subscription has been paused. Reason: {payload.reason or 'Admin paused'}",
-        category="subscription",
-        action_type="subscription",
-        reference_id=str(sub.id)
-    )
-    
     await db.commit()
     return MessageResponse(message="Subscription paused successfully")
 
@@ -633,18 +621,6 @@ async def resume_subscription(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
         
-    # Send Notification
-    customer_profile = await db.get(Customer, sub.customer_id)
-    await NotificationService.create_in_app_notification(
-        db=db,
-        user_id=customer_profile.user_id,
-        title="Subscription Resumed",
-        body="Your subscription has been resumed and deliveries will continue.",
-        category="subscription",
-        action_type="subscription",
-        reference_id=str(sub.id)
-    )
-    
     await db.commit()
     return MessageResponse(message="Subscription resumed successfully")
 
@@ -676,15 +652,15 @@ async def cancel_subscription(
 
     # Send Notification
     customer_profile = await db.get(Customer, sub.customer_id)
-    await NotificationService.create_in_app_notification(
-        db=db,
-        user_id=customer_profile.user_id,
-        title="Subscription Cancelled",
-        body=f"Your subscription has been cancelled. Reason: {payload.reason}",
-        category="subscription",
-        action_type="subscription",
-        reference_id=str(sub.id)
-    )
+    if customer_profile:
+        await NotificationService.send_notification_to_user(
+            db=db,
+            user_id=customer_profile.user_id,
+            title="Subscription Cancelled",
+            body=f"Your subscription has been cancelled. Reason: {payload.reason or 'User cancelled'}",
+            notification_type="subscription",
+            reference_id=str(sub.id)
+        )
 
     await db.commit()
     return MessageResponse(message="Subscription cancelled successfully")

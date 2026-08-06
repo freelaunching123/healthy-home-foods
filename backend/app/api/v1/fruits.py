@@ -953,10 +953,10 @@ async def admin_assign_fruit_order(
         cust_res = await db.execute(select(Customer).where(Customer.id == order.customer_id))
         cust = cust_res.scalar_one_or_none()
         if cust:
-            await NotificationService.create_in_app_notification(
+            await NotificationService.send_notification_to_user(
                 db=db, user_id=cust.user_id, title="Delivery Assigned",
                 body=f"Your fruit order {order.order_number} has been assigned to a delivery partner.",
-                category="delivery", action_type="fruit_order", reference_id=str(order.id)
+                notification_type="delivery", reference_id=str(order.id)
             )
     except Exception as e:
         import logging

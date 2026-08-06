@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -50,7 +49,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen>
     super.dispose();
   }
 
-  String? get _currentStatus => _statusFilters[_tabController.index]['value'] as String?;
+  String? get _currentStatus => _statusFilters[_tabController.index]['value'];
 
   Future<void> _loadAll() async {
     await Future.wait([_loadPayments(), _loadSummary()]);

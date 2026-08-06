@@ -246,6 +246,14 @@ class FcmService {
           }
           break;
 
+        case 'fruit_order':
+          if (referenceId != null && referenceId.isNotEmpty) {
+            appRouter.go('/fruits/orders/$referenceId');
+          } else {
+            appRouter.go('/fruits/orders');
+          }
+          break;
+
         case 'morning_reminder':
           _authService.getUserRole().then((role) {
             if (role == 'delivery_partner') {

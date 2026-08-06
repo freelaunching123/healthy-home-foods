@@ -33,7 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _selectedCategoryId;
   bool _isLoadingPackages = true;
   
-  List<dynamic> get _featuredProducts => _products.where((p) => p['is_featured'] == true || p['is_popular'] == true).toList();
   List<dynamic> get _todaySpecials => _products.where((p) => p['is_today_special'] == true).toList();
 
   // -- Fruits State --
@@ -45,8 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // -- Package Cart State --
   int _packageCartCount = 0;
   final Map<String, int> _packageQuantities = {};
-  double _packageCartTotal = 0;
-  double _fruitCartTotal = 0;
   
   @override
   void initState() {

@@ -160,10 +160,9 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
       final formData = FormData.fromMap({
         'file': MultipartFile.fromBytes(_pickedImageBytes!, filename: _pickedImage!.name),
       });
-      await _api.dio.post(
-        '${_api.dio.options.baseUrl}${ApiConstants.adminFruits}/$fruitId/image',
+      await _api.post(
+        '${ApiConstants.adminFruits}/$fruitId/image',
         data: formData,
-        options: Options(contentType: 'multipart/form-data'),
       );
     } catch (e) {
       if (mounted) {

@@ -922,6 +922,20 @@ async def assign_subscription_partner(
         db.add(del_history)
 
     await db.commit()
+
+    # Send notification to delivery partner
+    try:
+        await NotificationService.send_notification_to_user(
+            db=db,
+            user_id=partner.user_id,
+            title="Subscription Deliveries Assigned",
+            body="You have been assigned to deliver a meal subscription.",
+            notification_type="delivery",
+            reference_id=str(subscription.id)
+        )
+    except Exception as e:
+        logger.error(f"Failed to notify partner of subscription assignment: {e}")
+
     return MessageResponse(message=f"Subscription assigned to {partner_user.full_name}")
 
 

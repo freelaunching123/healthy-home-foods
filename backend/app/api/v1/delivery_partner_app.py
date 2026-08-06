@@ -463,10 +463,10 @@ async def update_delivery_status(
             
         if user_id:
             try:
-                await NotificationService.create_in_app_notification(
+                await NotificationService.send_notification_to_user(
                     db=db, user_id=user_id, title="Out for Delivery",
                     body="Your order is out for delivery! You can track it live.",
-                    category="delivery", action_type="delivery", reference_id=str(assignment.id)
+                    notification_type="delivery", reference_id=str(assignment.id)
                 )
             except Exception:
                 pass
@@ -480,10 +480,10 @@ async def update_delivery_status(
             
         if user_id:
             try:
-                await NotificationService.create_in_app_notification(
+                await NotificationService.send_notification_to_user(
                     db=db, user_id=user_id, title="Delivery Completed",
                     body="Your order has been delivered. Enjoy!",
-                    category="delivery", action_type="delivery", reference_id=str(assignment.id)
+                    notification_type="delivery", reference_id=str(assignment.id)
                 )
             except Exception:
                 pass
@@ -498,10 +498,10 @@ async def update_delivery_status(
             
         if user_id:
             try:
-                await NotificationService.create_in_app_notification(
+                await NotificationService.send_notification_to_user(
                     db=db, user_id=user_id, title="Delivery Failed",
                     body=f"We couldn't deliver your order today. Reason: {payload.failure_reason}",
-                    category="delivery", action_type="delivery", reference_id=str(assignment.id)
+                    notification_type="delivery", reference_id=str(assignment.id)
                 )
             except Exception:
                 pass

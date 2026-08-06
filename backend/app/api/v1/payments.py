@@ -240,34 +240,55 @@ async def download_invoice(
 ):
     """Generate and return the invoice PDF for a payment transaction."""
     try:
-        # Retrieve customer profile
-        customer = await _get_customer(db, current_user.id)
-
-        # Fetch payment with relationships
+        from app.models.user import UserRoleEnum
         from sqlalchemy.orm import selectinload
         from app.models.fruit import FruitOrder, FruitOrderItem
-        result = await db.execute(
-            select(Payment)
-            .where(Payment.id == payment_id, Payment.customer_id == customer.id)
-            .options(
-                selectinload(Payment.invoice),
-                selectinload(Payment.subscription).selectinload(Subscription.product),
-                selectinload(Payment.subscription).selectinload(Subscription.plan),
-                selectinload(Payment.subscription).selectinload(Subscription.items).selectinload(SubscriptionItem.product),
-            )
-        )
-        payment = result.scalar_one_or_none()
-        fruit_order = None
 
-        if not payment:
-            f_res = await db.execute(
-                select(FruitOrder)
-                .where(FruitOrder.id == payment_id, FruitOrder.customer_id == customer.id)
-                .options(selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit))
+        if current_user.role in [UserRoleEnum.SUPER_ADMIN, UserRoleEnum.ADMIN]:
+            result = await db.execute(
+                select(Payment)
+                .where(Payment.id == payment_id)
+                .options(
+                    selectinload(Payment.invoice),
+                    selectinload(Payment.subscription).selectinload(Subscription.product),
+                    selectinload(Payment.subscription).selectinload(Subscription.plan),
+                    selectinload(Payment.subscription).selectinload(Subscription.items).selectinload(SubscriptionItem.product),
+                )
             )
-            fruit_order = f_res.scalar_one_or_none()
-            if not fruit_order:
-                raise HTTPException(status_code=404, detail="Payment transaction not found")
+            payment = result.scalar_one_or_none()
+            fruit_order = None
+            if not payment:
+                f_res = await db.execute(
+                    select(FruitOrder)
+                    .where(FruitOrder.id == payment_id)
+                    .options(selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit))
+                )
+                fruit_order = f_res.scalar_one_or_none()
+                if not fruit_order:
+                    raise HTTPException(status_code=404, detail="Payment transaction not found")
+        else:
+            customer = await _get_customer(db, current_user.id)
+            result = await db.execute(
+                select(Payment)
+                .where(Payment.id == payment_id, Payment.customer_id == customer.id)
+                .options(
+                    selectinload(Payment.invoice),
+                    selectinload(Payment.subscription).selectinload(Subscription.product),
+                    selectinload(Payment.subscription).selectinload(Subscription.plan),
+                    selectinload(Payment.subscription).selectinload(Subscription.items).selectinload(SubscriptionItem.product),
+                )
+            )
+            payment = result.scalar_one_or_none()
+            fruit_order = None
+            if not payment:
+                f_res = await db.execute(
+                    select(FruitOrder)
+                    .where(FruitOrder.id == payment_id, FruitOrder.customer_id == customer.id)
+                    .options(selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit))
+                )
+                fruit_order = f_res.scalar_one_or_none()
+                if not fruit_order:
+                    raise HTTPException(status_code=404, detail="Payment transaction not found")
 
         from datetime import datetime
         import io

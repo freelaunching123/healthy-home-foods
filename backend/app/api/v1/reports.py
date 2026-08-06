@@ -347,8 +347,25 @@ async def get_admin_overview(
     todays_frt_rev = await db.scalar(select(func.sum(FruitOrder.total_amount)).where(and_(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS, func.date(FruitOrder.paid_at) == today)))
     todays_revenue = float(todays_pkg_rev or 0) + float(todays_frt_rev or 0)
     
-    orders_pkg = await db.scalar(select(func.count(Subscription.id)).where(and_(func.date(Subscription.created_at) == today, Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED]))))
-    orders_frt = await db.scalar(select(func.count(FruitOrder.id)).where(and_(func.date(FruitOrder.created_at) == today, FruitOrder.payment_status == FruitPaymentStatus.SUCCESS)))
+    orders_pkg = await db.scalar(
+        select(func.count(Subscription.id.distinct()))
+        .join(Payment, Payment.subscription_id == Subscription.id)
+        .where(
+            and_(
+                Payment.status == PaymentStatus.SUCCESS,
+                func.date(Payment.paid_at) == today
+            )
+        )
+    )
+    orders_frt = await db.scalar(
+        select(func.count(FruitOrder.id))
+        .where(
+            and_(
+                func.date(FruitOrder.paid_at) == today,
+                FruitOrder.payment_status == FruitPaymentStatus.SUCCESS
+            )
+        )
+    )
     orders_today = (orders_pkg or 0) + (orders_frt or 0)
     
     active_subscribers = await db.scalar(select(func.count(Subscription.id)).where(Subscription.status == SubscriptionStatus.ACTIVE))
