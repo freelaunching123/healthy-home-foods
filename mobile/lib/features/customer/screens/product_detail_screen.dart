@@ -25,6 +25,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // Reviews state
   List<dynamic> _reviews = [];
   int _totalReviews = 0;
+  double _averageRating = 0.0;
 
   // Cart state
   int _cartCount = 0;
