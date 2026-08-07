@@ -1,3 +1,4 @@
+import bcrypt
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
 from jose import JWTError, jwt
@@ -10,11 +11,25 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # ── Password hashing ──────────────────────────────────────────────────────────
 
 def hash_password(plain_password: str) -> str:
-    return pwd_context.hash(plain_password)
+    """Hash a password using bcrypt directly to avoid passlib Python 3.13 compatibility issues."""
+    pwd_bytes = plain_password.encode('utf-8')[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verify a plain password against a hashed password."""
+    if not hashed_password:
+        return False
+    try:
+        pwd_bytes = plain_password.encode('utf-8')[:72]
+        hash_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(pwd_bytes, hash_bytes)
+    except Exception:
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            return False
 
 
 # ── JWT token creation ────────────────────────────────────────────────────────

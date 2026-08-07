@@ -39,10 +39,12 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _fruits = [];
   bool _isLoadingFruits = true;
   int _cartCount = 0;
+  double _fruitCartTotal = 0.0;
   final Map<String, double> _quantities = {};
   
   // -- Package Cart State --
   int _packageCartCount = 0;
+  double _packageCartTotal = 0.0;
   final Map<String, int> _packageQuantities = {};
   
   @override

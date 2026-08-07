@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Healthy Home Foods"
     APP_ENV: str = "development"
     DEBUG: bool = True
-    SECRET_KEY: str
+    SECRET_KEY: str = "dev-secret-key-123456789-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]
 
     # Database
-    DATABASE_URL: str
-    SYNC_DATABASE_URL: str
+    DATABASE_URL: str = "sqlite+aiosqlite:///healthy_home.db"
+    SYNC_DATABASE_URL: str = "sqlite:///healthy_home.db"
 
     # Redis / Celery
     REDIS_URL: str = "redis://localhost:6379/0"

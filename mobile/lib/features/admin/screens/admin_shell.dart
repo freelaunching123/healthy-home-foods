@@ -52,7 +52,7 @@ class AdminShell extends StatelessWidget {
                 destinations: const [
                   NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: Text('Dashboard')),
                   NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: Text('Products')),
-                  NavigationRailDestination(icon: Icon(Icons.local_grocery_store_outlined), selectedIcon: Icon(Icons.local_grocery_store), label: Text('Fruits')),
+                  NavigationRailDestination(icon: Icon(Icons.local_grocery_store_outlined), selectedIcon: Icon(Icons.local_grocery_store), label: Text('Groceries')),
                   NavigationRailDestination(icon: Icon(Icons.local_shipping_outlined), selectedIcon: Icon(Icons.local_shipping), label: Text('Deliveries')),
                   NavigationRailDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: Text('Reports')),
                 ],
@@ -69,7 +69,7 @@ class AdminShell extends StatelessWidget {
                 destinations: const [
                   NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard, color: AppTheme.primaryGreen), label: 'Dashboard'),
                   NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2, color: AppTheme.primaryGreen), label: 'Products'),
-                  NavigationDestination(icon: Icon(Icons.local_grocery_store_outlined), selectedIcon: Icon(Icons.local_grocery_store, color: AppTheme.primaryGreen), label: 'Fruits'),
+                  NavigationDestination(icon: Icon(Icons.local_grocery_store_outlined), selectedIcon: Icon(Icons.local_grocery_store, color: AppTheme.primaryGreen), label: 'Groceries'),
                   NavigationDestination(icon: Icon(Icons.local_shipping_outlined), selectedIcon: Icon(Icons.local_shipping, color: AppTheme.primaryGreen), label: 'Deliveries'),
                   NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart, color: AppTheme.primaryGreen), label: 'Reports'),
                 ],

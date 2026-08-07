@@ -4,12 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
+import uuid
+try:
+    import shortuuid
+except ImportError:
+    shortuuid = None
+
 from app.db.session import get_db
 from app.core.security import create_access_token, create_refresh_token, decode_token, verify_password, hash_password, validate_password_strength
 from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.models.user import User
-from app.models.customer import Customer
 from app.models.customer import Customer
 from app.schemas.auth import (
     AdminLoginRequest, TokenResponse, RefreshTokenRequest,
@@ -56,7 +61,10 @@ async def register_customer(
 
     # Role is already set to CUSTOMER by default in the model
 
-    customer_code = f"C{shortuuid.ShortUUID().random(length=8).upper()}"
+    if shortuuid:
+        customer_code = f"C{shortuuid.ShortUUID().random(length=8).upper()}"
+    else:
+        customer_code = f"C{uuid.uuid4().hex[:8].upper()}"
     db.add(Customer(user_id=user.id, customer_code=customer_code))
     await db.commit()
     

@@ -161,21 +161,11 @@ class AdminDrawer extends StatelessWidget {
                   _buildDrawerItem(
                     context: context,
                     icon: Icons.category_outlined,
-                    title: 'Package Categories',
-                    isSelected: currentRoute == '/admin/categories',
+                    title: 'Category Management',
+                    isSelected: currentRoute == '/admin/categories' || currentRoute == '/admin/grocery-categories',
                     onTap: () {
                       context.pop();
                       if (currentRoute != '/admin/categories') context.push('/admin/categories');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.local_grocery_store_outlined,
-                    title: 'Grocery Categories',
-                    isSelected: currentRoute == '/admin/grocery-categories',
-                    onTap: () {
-                      context.pop();
-                      if (currentRoute != '/admin/grocery-categories') context.push('/admin/grocery-categories');
                     },
                   ),
                   _buildDrawerItem(

@@ -289,18 +289,19 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
 
                     // Form fields
                     _formCard(children: [
-                      _label('Grocery Category'),
+                      _label('Grocery Category *'),
                       DropdownButtonFormField<String>(
                         value: _groceryCategories.any((c) => c['id'] == _selectedCategoryId)
                             ? _selectedCategoryId
                             : null,
-                        decoration: _inputDecoration('Select Category (Optional)'),
+                        decoration: _inputDecoration('Select Category'),
                         items: _groceryCategories.map((c) {
                           return DropdownMenuItem<String>(
                             value: c['id'] as String,
                             child: Text(c['name'] as String? ?? 'Unnamed Category'),
                           );
                         }).toList(),
+                        validator: (val) => val == null || val.isEmpty ? 'Grocery category is required' : null,
                         onChanged: (val) => setState(() => _selectedCategoryId = val),
                       ),
                       const SizedBox(height: 16),

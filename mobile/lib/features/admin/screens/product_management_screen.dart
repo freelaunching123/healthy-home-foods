@@ -38,7 +38,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
 
   Future<void> _loadCategories() async {
     try {
-      final res = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true});
+      final res = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true, 'category_type': 'package'});
       if (mounted) setState(() => _categories = res.data ?? []);
     } catch (e) {
       debugPrint('Error loading categories: $e');

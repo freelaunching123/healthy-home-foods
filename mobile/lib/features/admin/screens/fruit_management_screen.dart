@@ -158,7 +158,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         title: const Text(
-          'Admin Dashboard',
+          'Groceries',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -294,9 +294,9 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       const Icon(Icons.local_grocery_store_outlined, size: 72, color: AppTheme.accentLight),
       const SizedBox(height: 16),
-      Text('No fruits added yet', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600)),
+      Text('No groceries added yet', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600)),
       const SizedBox(height: 8),
-      Text('Tap + to add your first fruit', style: GoogleFonts.inter(color: AppTheme.textSecondary)),
+      Text('Tap + to add your first grocery item', style: GoogleFonts.inter(color: AppTheme.textSecondary)),
     ]),
   );
 }
