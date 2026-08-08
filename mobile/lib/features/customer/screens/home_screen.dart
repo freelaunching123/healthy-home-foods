@@ -271,7 +271,15 @@ class _HomeScreenState extends State<HomeScreen> {
         'quantity': qty,
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to cart'), backgroundColor: AppTheme.primaryGreen, duration: Duration(seconds: 2)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Added to cart'),
+            backgroundColor: AppTheme.primaryGreen,
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(bottom: 90, left: 16, right: 16),
+          ),
+        );
       }
       _loadPackageCartCount();
     } catch (e) {
@@ -337,7 +345,15 @@ class _HomeScreenState extends State<HomeScreen> {
         'quantity_kg': qty,
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added to cart'), backgroundColor: AppTheme.primaryGreen, duration: Duration(seconds: 2)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Added to cart'),
+            backgroundColor: AppTheme.primaryGreen,
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(bottom: 90, left: 16, right: 16),
+          ),
+        );
       }
       _loadCartCount();
     } catch (e) {
