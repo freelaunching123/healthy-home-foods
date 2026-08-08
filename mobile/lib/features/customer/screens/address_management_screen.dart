@@ -1186,27 +1186,7 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
                         ),
                         const SizedBox(height: 16),
 
-                        // Info cards
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildInfoCard(
-                                icon: Icons.straighten_rounded,
-                                label: 'Distance',
-                                value: _getDistanceString(),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildInfoCard(
-                                icon: Icons.access_time_filled_rounded,
-                                label: 'Est. Delivery Time',
-                                value: _getTravelTimeString(),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
+
 
                         // Confirm Button
                         ElevatedButton(

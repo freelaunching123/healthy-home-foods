@@ -40,6 +40,7 @@ fpdf2==2.8.1
 # File handling
 pillow==10.3.0
 python-magic==0.4.27
+reportlab==4.2.0
 
 # WebSockets
 websockets==12.0
