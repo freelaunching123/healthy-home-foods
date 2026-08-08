@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -176,34 +176,29 @@ class DeliveryDetailsSheet extends StatelessWidget {
         ? LatLng(partner['current_lat'], partner['current_lng']) 
         : null;
 
-    return FlutterMap(
-      options: MapOptions(
-        initialCenter: customerPos,
-        initialZoom: 15.0,
+    final markers = <Marker>{
+      Marker(
+        markerId: const MarkerId('customer'),
+        position: customerPos,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
       ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.healthyhomefoods',
-        ),
-        MarkerLayer(
-          markers: [
-            Marker(
-              point: customerPos,
-              width: 40,
-              height: 40,
-              child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-            ),
-            if (partnerPos != null)
-              Marker(
-                point: partnerPos,
-                width: 40,
-                height: 40,
-                child: const Icon(Icons.local_shipping, color: Colors.blue, size: 40),
-              ),
-          ],
-        ),
-      ],
+    };
+    if (partnerPos != null) {
+      markers.add(Marker(
+        markerId: const MarkerId('partner'),
+        position: partnerPos,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+      ));
+    }
+
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(
+        target: customerPos,
+        zoom: 15.0,
+      ),
+      markers: markers,
+      zoomControlsEnabled: true,
+      myLocationButtonEnabled: false,
     );
   }
 }

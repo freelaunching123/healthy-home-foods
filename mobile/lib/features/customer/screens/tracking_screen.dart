@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -17,15 +17,14 @@ class TrackingScreen extends StatefulWidget {
 
 class _TrackingScreenState extends State<TrackingScreen> {
   final _api = ApiClient();
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
   
   Map<String, dynamic>? _trackingData;
   LatLng? _driverLocation;
   LatLng? _customerLocation;
-  List<Marker> _markers = [];
+  Set<Marker> _markers = {};
   bool _isLoading = true;
-  Timer? _pollingTimer;
-
+  
   @override
   void initState() {
     super.initState();
@@ -34,12 +33,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _loadTrackingData();
     
     // Poll for updates every 10 seconds since WebSocket is not fully setup in this mock
-    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) => _loadTrackingData(isRefresh: true));
   }
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
     super.dispose();
   }
 
@@ -67,27 +64,21 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   void _updateMarkers() {
-    final markers = <Marker>[];
+    final markers = <Marker>{};
     
     if (_customerLocation != null) {
       markers.add(Marker(
-        point: _customerLocation!,
-        child: const Icon(
-          Icons.location_on,
-          color: Colors.green,
-          size: 40,
-        ),
+        markerId: const MarkerId('customer'),
+        position: _customerLocation!,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
       ));
     }
     
     if (_driverLocation != null) {
       markers.add(Marker(
-        point: _driverLocation!,
-        child: const Icon(
-          Icons.directions_car_rounded,
-          color: Colors.orange,
-          size: 40,
-        ),
+        markerId: const MarkerId('driver'),
+        position: _driverLocation!,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
       ));
     }
     
@@ -99,7 +90,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   Future<void> _animateToDriver() async {
     if (_driverLocation == null) return;
     try {
-      _mapController.move(_driverLocation!, 15.0);
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_driverLocation!, 15.0));
     } catch (_) {}
   }
 
@@ -118,21 +109,15 @@ class _TrackingScreenState extends State<TrackingScreen> {
           : Column(
               children: [
                 Expanded(
-                  child: FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: _driverLocation ?? _customerLocation ?? const LatLng(13.0827, 80.2707),
-                      initialZoom: 14.0,
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _driverLocation ?? _customerLocation ?? const LatLng(13.0827, 80.2707),
+                      zoom: 14.0,
                     ),
-                    children: [
-                      TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.healthyhomefoods.app',
-                      ),
-                      MarkerLayer(
-                        markers: _markers,
-                      ),
-                    ],
+                    onMapCreated: (controller) => _mapController = controller,
+                    markers: _markers,
+                    zoomControlsEnabled: false,
+                    myLocationButtonEnabled: false,
                   ),
                 ),
                 _buildTrackingInfoPanel(),

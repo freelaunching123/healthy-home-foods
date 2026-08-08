@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:go_router/go_router.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
 import 'package:geolocator/geolocator.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
@@ -686,7 +686,7 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
   LatLng _selectedLatLng = const LatLng(9.919630, 78.094379); // Default to shop coordinates if null
   LatLng? _currentLatLng;
   double? _currentAccuracy;
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
   
   bool _isLocating = false;
   bool _isConfirming = false;
@@ -695,8 +695,7 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
   
   // Real-time location stream and map animation controllers
   StreamSubscription<Position>? _positionStreamSubscription;
-  AnimationController? _mapAnimationController;
-  
+    
   // Detection of map movement (idle detection)
   Timer? _mapIdleTimer;
   bool _isMapMoving = false;
@@ -715,55 +714,16 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
 
   @override
   void dispose() {
-    _mapAnimationController?.dispose();
-    _positionStreamSubscription?.cancel();
+        _positionStreamSubscription?.cancel();
     _mapIdleTimer?.cancel();
-    _mapController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
   void _animatedMapMove(LatLng destLocation, double destZoom) {
-    // Stop any existing animation
-    _mapAnimationController?.stop();
-    _mapAnimationController?.dispose();
-
-    // Create a new controller
-    final controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(destLocation, destZoom),
     );
-    _mapAnimationController = controller;
-
-    // Interpolate latitude, longitude, and zoom
-    final latTween = Tween<double>(begin: _selectedLatLng.latitude, end: destLocation.latitude);
-    final lngTween = Tween<double>(begin: _selectedLatLng.longitude, end: destLocation.longitude);
-    final zoomTween = Tween<double>(begin: _currentZoom, end: destZoom);
-
-    final animation = CurvedAnimation(parent: controller, curve: Curves.fastOutSlowIn);
-
-    controller.addListener(() {
-      if (mounted) {
-        final currentLat = latTween.evaluate(animation);
-        final currentLng = lngTween.evaluate(animation);
-        final currentZoomVal = zoomTween.evaluate(animation);
-        
-        _mapController.move(
-          LatLng(currentLat, currentLng),
-          currentZoomVal,
-        );
-      }
-    });
-
-    controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed || status == AnimationStatus.dismissed) {
-        controller.dispose();
-        if (_mapAnimationController == controller) {
-          _mapAnimationController = null;
-        }
-      }
-    });
-
-    controller.forward();
   }
 
   Future<void> _startListeningToLocation() async {
@@ -954,23 +914,22 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
     return '${travelMinutes.toStringAsFixed(0)} mins';
   }
 
-  void _onPositionChanged(MapCamera position, bool hasGesture) {
+  void _onCameraMove(CameraPosition position) {
     setState(() {
-      _selectedLatLng = position.center;
+      _selectedLatLng = position.target;
       _currentZoom = position.zoom;
       if (!_isMapMoving) {
         _isMapMoving = true;
       }
     });
+  }
 
-    _mapIdleTimer?.cancel();
-    _mapIdleTimer = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        setState(() {
-          _isMapMoving = false;
-        });
-      }
-    });
+  void _onCameraIdle() {
+    if (mounted) {
+      setState(() {
+        _isMapMoving = false;
+      });
+    }
   }
 
   Widget _buildCoordinateColumn({required String label, required String value}) {
@@ -1083,72 +1042,22 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
       ),
       body: Stack(
         children: [
-          // Leaflet Map using OSM Tiles
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _selectedLatLng,
-              initialZoom: _currentZoom,
-              onPositionChanged: _onPositionChanged,
+          // Google Map
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _selectedLatLng,
+              zoom: _currentZoom,
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.healthyhomefoods.app',
-              ),
-              if (_currentLatLng != null && _currentAccuracy != null)
-                CircleLayer(
-                  circles: [
-                    CircleMarker(
-                      point: _currentLatLng!,
-                      radius: _currentAccuracy!,
-                      useRadiusInMeter: true,
-                      color: Colors.blue.withValues(alpha: 0.15),
-                      borderColor: Colors.blue.withValues(alpha: 0.5),
-                      borderStrokeWidth: 1.5,
-                    ),
-                  ],
-                ),
-              if (_currentLatLng != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _currentLatLng!,
-                      width: 24,
-                      height: 24,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withValues(alpha: 0.2),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade600,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2.5),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.blue.withValues(alpha: 0.3),
-                                  blurRadius: 6,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-            ],
+            onMapCreated: (GoogleMapController controller) {
+              _mapController = controller;
+            },
+            onCameraMove: _onCameraMove,
+            onCameraIdle: _onCameraIdle,
+            myLocationEnabled: _currentLatLng != null,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            compassEnabled: false,
           ),
 
           // Static Center Pin overlay
@@ -1168,14 +1077,7 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _AnimatedFloatingButton(
-                  icon: Icons.explore_outlined,
-                  onPressed: () {
-                    _mapController.rotate(0.0);
-                  },
-                  tooltip: 'Reset Rotation',
-                ),
-                const SizedBox(height: 12),
+
                 _AnimatedFloatingButton(
                   icon: Icons.add_rounded,
                   onPressed: () {
