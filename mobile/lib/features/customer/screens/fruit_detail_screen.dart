@@ -73,7 +73,7 @@ class _FruitDetailScreenState extends State<FruitDetailScreen> {
       }
       
     } catch (e) {
-      _error = 'Failed to load fruit details';
+      _error = 'Failed to load grocery details';
     } finally {
       if (mounted) {
         setState(() {
@@ -265,7 +265,7 @@ class _FruitDetailScreenState extends State<FruitDetailScreen> {
                   Text('Description', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
                   const SizedBox(height: 8),
                   Text(
-                    _fruit!['description'] ?? 'No description available for this fruit.',
+                    _fruit!['description'] ?? 'No description available for this grocery.',
                     style: GoogleFonts.inter(fontSize: 14, color: AppTheme.textSecondary, height: 1.5),
                   ),
                   

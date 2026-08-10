@@ -353,7 +353,7 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
                   items: const [
                     DropdownMenuItem(value: 'all', child: Text('All')),
                     DropdownMenuItem(value: 'subscription', child: Text('Packages')),
-                    DropdownMenuItem(value: 'fruit', child: Text('Fruits')),
+                    DropdownMenuItem(value: 'fruit', child: Text('Groceries')),
                   ],
                   onChanged: (val) {
                     setModalState(() => _selectedOrderType = val!);

@@ -115,7 +115,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(color: AppTheme.primaryGreen.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                                      child: Text(isFruit ? 'FRUIT' : 'PACKAGE', style: GoogleFonts.inter(fontSize: 10, color: AppTheme.primaryGreen, fontWeight: FontWeight.bold)),
+                                      child: Text(isFruit ? 'GROCERY' : 'PACKAGE', style: GoogleFonts.inter(fontSize: 10, color: AppTheme.primaryGreen, fontWeight: FontWeight.bold)),
                                     ),
                                     const SizedBox(height: 6),
                                     Text(item['name'] ?? '', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),

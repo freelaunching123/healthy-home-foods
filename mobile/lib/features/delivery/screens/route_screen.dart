@@ -166,7 +166,7 @@ class _RouteScreenState extends State<RouteScreen> {
             itemCount: stops.length,
             itemBuilder: (context, index) {
               final stop = stops[index];
-              final orderType = stop['order_type'] == 'fruit' ? 'Fruit Order' : 'Subscription';
+              final orderType = stop['order_type'] == 'fruit' ? 'Grocery Order' : 'Subscription';
               final lat = stop['latitude'];
               final lng = stop['longitude'];
               

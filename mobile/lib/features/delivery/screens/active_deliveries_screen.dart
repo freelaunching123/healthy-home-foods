@@ -266,7 +266,7 @@ class _ActiveDeliveriesScreenState extends State<ActiveDeliveriesScreen> {
   }
 
   Widget _buildDeliveryCard(dynamic delivery) {
-    final orderType = delivery['order_type'] == 'fruit' ? 'Fruit Order' : 'Subscription';
+    final orderType = delivery['order_type'] == 'fruit' ? 'Grocery Order' : 'Subscription';
     final lat = delivery['latitude'];
     final lng = delivery['longitude'];
     

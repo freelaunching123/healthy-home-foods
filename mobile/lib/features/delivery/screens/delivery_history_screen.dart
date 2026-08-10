@@ -297,7 +297,7 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
     final isDelivered = status == 'delivered';
     final isFailed = status == 'failed';
     final dateStr = item['delivery_date']?.toString() ?? '';
-    final orderType = item['order_type'] == 'fruit' ? 'Fruit Order' : 'Subscription';
+    final orderType = item['order_type'] == 'fruit' ? 'Grocery Order' : 'Subscription';
     
     DateTime? dt;
     try {

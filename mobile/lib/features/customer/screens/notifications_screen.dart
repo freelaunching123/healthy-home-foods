@@ -191,19 +191,20 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Notifications'),
             if (unread > 0) ...[
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppTheme.error,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '$unread',
-                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -211,12 +212,23 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         ),
         actions: [
           if (unread > 0)
-            TextButton.icon(
+            TextButton(
               onPressed: _markAllRead,
-              icon: const Icon(Icons.done_all, size: 18, color: AppTheme.primaryGreen),
-              label: const Text(
-                'Read All',
-                style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.w600, fontSize: 13),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.done_all, size: 20, color: AppTheme.primaryGreen),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Read All',
+                    style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                ],
               ),
             ),
           if (_notifications.isNotEmpty)

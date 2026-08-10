@@ -416,7 +416,7 @@ class _AdminOrderCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Fruit Order Details', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18)),
+                  Text('Grocery Order Details', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18)),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
                 ],
               ),

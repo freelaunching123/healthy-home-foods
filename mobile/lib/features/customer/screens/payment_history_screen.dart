@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:open_file/open_file.dart';
 import 'package:dio/dio.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
@@ -98,13 +98,14 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen>
       await file.writeAsBytes(bytes);
 
       if (mounted) {
-        await SharePlus.instance.share(
-          ShareParams(
-            files: [XFile(filePath, mimeType: 'application/pdf')],
-            subject: 'Payment Invoice #${paymentId.substring(0, 8).toUpperCase()}',
-            text: 'Here is your payment invoice from Healthy Home Foods.',
-          ),
-        );
+        final result = await OpenFile.open(filePath);
+        if (result.type != ResultType.done) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not open file: ${result.message}'), backgroundColor: AppTheme.error),
+            );
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error downloading invoice: $e');

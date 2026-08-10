@@ -83,7 +83,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Fruit?'),
+        title: const Text('Delete Grocery?'),
         content: Text('Are you sure you want to completely delete "${fruit['name']}"? This action cannot be undone.'),
         actions: [
           TextButton(onPressed: () => ctx.pop(false), child: const Text('Cancel')),
@@ -99,7 +99,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
       await _api.delete('${ApiConstants.adminFruits}/${fruit['id']}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Fruit permanently deleted'), backgroundColor: AppTheme.primaryGreen),
+          const SnackBar(content: Text('Grocery permanently deleted'), backgroundColor: AppTheme.primaryGreen),
         );
       }
       _loadFruits();

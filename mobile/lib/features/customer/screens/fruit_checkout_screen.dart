@@ -206,7 +206,7 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
           'key': keyId,
           'amount': payData['amount'] ?? ((_total * 100).toInt()),
           'name': 'Healthy Home Foods',
-          'description': 'Fruit Box Order Payment',
+          'description': 'Grocery Order Payment',
           'order_id': gatewayOrderId,
           'retry': {'enabled': true, 'max_count': 1},
           'send_sms_hash': true,
@@ -333,7 +333,7 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
               Text('Order Placed!', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 22)),
               const SizedBox(height: 8),
               Text(
-                'Your fresh fruits are on their way. 🍎',
+                'Your groceries are on their way. 🍎',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 14),
               ),

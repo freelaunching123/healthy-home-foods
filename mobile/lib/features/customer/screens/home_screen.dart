@@ -491,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           controller: _searchController,
                           onChanged: (v) => setState(() => _searchQuery = v),
                           decoration: InputDecoration(
-                            hintText: _selectedTabIndex == 0 ? 'Search healthy food packs...' : 'Search fresh fruits...',
+                            hintText: _selectedTabIndex == 0 ? 'Search healthy food packs...' : 'Search groceries...',
                             prefixIcon: const Icon(Icons.search, size: 20),
                             suffixIcon: _searchQuery.isNotEmpty
                                 ? IconButton(
@@ -651,7 +651,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Icon(Icons.local_grocery_store_outlined, size: 72, color: AppTheme.accentLight),
                   SizedBox(height: 16),
-                  Text('No fruits found', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                  Text('No groceries found', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
                 ],
               ),
             ),

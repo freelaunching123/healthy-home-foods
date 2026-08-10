@@ -139,7 +139,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isEdit ? 'Fruit updated successfully!' : 'Fruit added successfully!'),
+            content: Text(_isEdit ? 'Grocery updated successfully!' : 'Grocery added successfully!'),
             backgroundColor: AppTheme.success,
           ),
         );
@@ -149,7 +149,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
       setState(() {
         _saving = false;
         _uploadingImage = false;
-        _error = 'Failed to save fruit. Please check your inputs and try again.';
+        _error = 'Failed to save grocery. Please check your inputs and try again.';
       });
     }
   }
@@ -167,7 +167,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Image upload failed, but fruit was saved.'), backgroundColor: AppTheme.warning),
+          const SnackBar(content: Text('Image upload failed, but grocery was saved.'), backgroundColor: AppTheme.warning),
         );
       }
     }

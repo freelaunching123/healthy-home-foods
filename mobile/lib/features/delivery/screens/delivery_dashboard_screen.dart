@@ -317,7 +317,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
       itemCount: _activeDeliveries.length > 3 ? 3 : _activeDeliveries.length, // Show up to 3
       itemBuilder: (context, index) {
         final delivery = _activeDeliveries[index];
-        final orderType = delivery['order_type'] == 'fruit' ? 'Fruit Order' : 'Subscription';
+        final orderType = delivery['order_type'] == 'fruit' ? 'Grocery Order' : 'Subscription';
         final statusVal = delivery['status'] as String? ?? '';
         final isOutForDelivery = statusVal == 'out_for_delivery';
         

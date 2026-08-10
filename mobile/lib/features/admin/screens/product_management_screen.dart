@@ -19,6 +19,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   String? _availabilityFilter;
+  bool? _filterActive;
   String? _selectedCategoryId;
   List<dynamic> _categories = [];
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -61,7 +62,11 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
         if (_availabilityFilter != null) 'availability': _availabilityFilter,
         if (_selectedCategoryId != null) 'category_id': _selectedCategoryId,
       });
-      setState(() => _products = res.data['items'] ?? []);
+      List<dynamic> items = res.data['items'] ?? [];
+      if (_filterActive != null) {
+        items = items.where((p) => p['is_active'] == _filterActive).toList();
+      }
+      setState(() => _products = items);
     } catch (e) {
       debugPrint('Error loading products: $e');
     } finally {
@@ -163,15 +168,23 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                     });
                   },
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildFilterChip('Availability', ['available', 'out_of_stock', 'temporarily_unavailable'], _availabilityFilter, (v) {
-                        setState(() => _availabilityFilter = v);
-                        _loadProducts();
-                      }),
+                      _FilterChip(label: 'All', selected: _filterActive == null && _availabilityFilter == null,
+                        onTap: () { setState(() { _filterActive = null; _availabilityFilter = null; }); _loadProducts(); }),
+                      _FilterChip(label: 'Active', selected: _filterActive == true,
+                        onTap: () { setState(() { _filterActive = true; _availabilityFilter = null; }); _loadProducts(); }),
+                      _FilterChip(label: 'Inactive', selected: _filterActive == false,
+                        onTap: () { setState(() { _filterActive = false; _availabilityFilter = null; }); _loadProducts(); }),
+                      _FilterChip(label: 'Available', selected: _availabilityFilter == 'available',
+                        onTap: () { setState(() { _availabilityFilter = 'available'; _filterActive = null; }); _loadProducts(); }),
+                      _FilterChip(label: 'Out of Stock', selected: _availabilityFilter == 'out_of_stock',
+                        onTap: () { setState(() { _availabilityFilter = 'out_of_stock'; _filterActive = null; }); _loadProducts(); }),
+                      _FilterChip(label: 'Unavailable', selected: _availabilityFilter == 'temporarily_unavailable',
+                        onTap: () { setState(() { _availabilityFilter = 'temporarily_unavailable'; _filterActive = null; }); _loadProducts(); }),
                     ],
                   ),
                 ),
@@ -181,25 +194,22 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _CategoryTab(
+                      _FilterChip(
                         label: 'All Categories',
-                        isSelected: _selectedCategoryId == null,
+                        selected: _selectedCategoryId == null,
                         onTap: () {
                           setState(() => _selectedCategoryId = null);
                           _loadProducts();
                         },
                       ),
-                      ..._categories.map((cat) => Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: _CategoryTab(
+                      ..._categories.map((cat) => _FilterChip(
                               label: cat['name'],
-                              isSelected: _selectedCategoryId == cat['id'],
+                              selected: _selectedCategoryId == cat['id'],
                               onTap: () {
                                 setState(() => _selectedCategoryId = cat['id']);
                                 _loadProducts();
                               },
-                            ),
-                          )),
+                            )),
                     ],
                   ),
                 ),
@@ -237,52 +247,33 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, List<String> options, String? currentValue, ValueChanged<String?> onChanged) {
-    return PopupMenuButton<String?>(
-      onSelected: onChanged,
-      itemBuilder: (context) => [
-        PopupMenuItem(value: null, child: Text('All $label')),
-        ...options.map((opt) => PopupMenuItem(value: opt, child: Text(opt.replaceAll('_', ' ').toUpperCase()))),
-      ],
-      child: Chip(
-        label: Text(currentValue != null ? currentValue.replaceAll('_', ' ').toUpperCase() : label),
-        backgroundColor: currentValue != null ? AppTheme.primaryGreen.withValues(alpha: 0.1) : Colors.grey.shade100,
-        labelStyle: TextStyle(color: currentValue != null ? AppTheme.primaryGreen : AppTheme.textSecondary),
-        deleteIcon: currentValue != null ? const Icon(Icons.close, size: 16) : null,
-        onDeleted: currentValue != null ? () => onChanged(null) : null,
-      ),
-    );
-  }
 }
 
-class _CategoryTab extends StatelessWidget {
+class _FilterChip extends StatelessWidget {
   final String label;
-  final bool isSelected;
+  final bool selected;
   final VoidCallback onTap;
 
-  const _CategoryTab({required this.label, required this.isSelected, required this.onTap});
+  const _FilterChip({required this.label, required this.selected, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryGreen : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : AppTheme.textSecondary,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: selected ? AppTheme.primaryGreen : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(20),
       ),
-    );
-  }
+      child: Text(label, style: TextStyle(
+        fontSize: 12,
+        fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+        color: selected ? Colors.white : AppTheme.textSecondary,
+      )),
+    ),
+  );
 }
 
 class _ProductAdminCard extends StatelessWidget {

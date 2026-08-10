@@ -277,7 +277,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             icon: Icons.local_grocery_store_rounded,
             iconColor: const Color(0xFF10B981),
             iconBg: const Color(0xFFE8F5E9),
-            title: 'Top Fruit',
+            title: 'Top Grocery',
             name: topFruit != null ? (topFruit['name'] as String?) ?? '—' : null,
             subtitle: topFruit != null
                 ? '${topFruit['count']} Orders'

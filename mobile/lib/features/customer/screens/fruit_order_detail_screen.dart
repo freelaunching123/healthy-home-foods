@@ -354,7 +354,7 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
                     children: [
                       Text('Rate Your Order', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
                       const SizedBox(height: 6),
-                      Text('How was your fruit order delivery?', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary)),
+                      Text('How was your grocery order delivery?', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary)),
                       const SizedBox(height: 12),
                       Row(
                         children: List.generate(5, (starIndex) {

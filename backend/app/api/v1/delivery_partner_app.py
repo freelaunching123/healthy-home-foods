@@ -218,7 +218,10 @@ async def get_history(
         
     query = select(DeliveryAssignment).where(
         DeliveryAssignment.delivery_partner_id == partner.id,
-        DeliveryAssignment.assigned_at >= start_date,
+        or_(
+            DeliveryAssignment.delivered_at >= start_date,
+            DeliveryAssignment.failed_at >= start_date
+        ),
         DeliveryAssignment.status.in_([AssignmentStatus.DELIVERED, AssignmentStatus.FAILED])
     ).order_by(DeliveryAssignment.assigned_at.desc())
     
