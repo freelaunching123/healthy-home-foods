@@ -1,6 +1,6 @@
 import hmac, hashlib
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
@@ -401,6 +401,22 @@ async def list_admin_package_orders(
         if sub.payments:
             sorted_payments = sorted(sub.payments, key=lambda p: p.created_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
             latest_payment = sorted_payments[0]
+        elif sub.created_at:
+            time_window_start = sub.created_at - timedelta(seconds=5)
+            time_window_end = sub.created_at + timedelta(seconds=5)
+            from app.models.payment import Payment
+            related_payment_res = await db.execute(
+                select(Payment)
+                .join(Subscription, Payment.subscription_id == Subscription.id)
+                .where(
+                    Subscription.customer_id == sub.customer_id,
+                    Subscription.created_at >= time_window_start,
+                    Subscription.created_at <= time_window_end
+                )
+                .order_by(Payment.created_at.desc())
+                .limit(1)
+            )
+            latest_payment = related_payment_res.scalar_one_or_none()
             
         c_user = sub.customer.user if sub.customer else None
         

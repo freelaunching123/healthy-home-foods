@@ -42,10 +42,23 @@ async def get_dashboard_stats(
     partner = await get_my_partner_profile(db, current_user.id)
     today = date.today()
     
-    # Base query for today's assignments
-    query = select(DeliveryAssignment).where(
-        DeliveryAssignment.delivery_partner_id == partner.id,
-        func.date(DeliveryAssignment.assigned_at) == today
+    # Base query for today's assignments based on scheduled/delivery date
+    query = (
+        select(DeliveryAssignment)
+        .outerjoin(SubscriptionDelivery, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
+        .outerjoin(FruitOrder, DeliveryAssignment.fruit_order_id == FruitOrder.id)
+        .where(
+            DeliveryAssignment.delivery_partner_id == partner.id,
+            or_(
+                SubscriptionDelivery.scheduled_date == today,
+                FruitOrder.delivery_date == today,
+                and_(
+                    DeliveryAssignment.subscription_delivery_id.is_(None),
+                    DeliveryAssignment.fruit_order_id.is_(None),
+                    func.date(DeliveryAssignment.assigned_at) == today
+                )
+            )
+        )
     )
     result = await db.execute(query)
     assignments = result.scalars().all()

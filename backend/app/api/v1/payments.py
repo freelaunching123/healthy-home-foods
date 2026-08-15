@@ -1,6 +1,6 @@
 import hmac, hashlib
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -121,34 +121,61 @@ async def payment_history(
     enriched = []
     for pmt in payments:
         sub = pmt.subscription
-        product_name = None
-        plan_name = sub.plan.name if sub and sub.plan else None
-        if sub:
-            if sub.product and sub.product.name:
-                product_name = sub.product.name
-            elif sub.items:
-                p_names = [it.product.name for it in sub.items if it.product]
-                if len(p_names) == 1:
-                    product_name = p_names[0]
-                elif len(p_names) > 1:
-                    product_name = f"{p_names[0]} + {len(p_names)-1} other(s)"
+        
+        # Group subscriptions bought at the exact same time
+        if sub and sub.created_at:
+            time_window_start = sub.created_at - timedelta(seconds=5)
+            time_window_end = sub.created_at + timedelta(seconds=5)
+            
+            related_subs_res = await db.execute(
+                select(Subscription).where(
+                    Subscription.customer_id == pmt.customer_id,
+                    Subscription.created_at >= time_window_start,
+                    Subscription.created_at <= time_window_end
+                ).options(
+                    selectinload(Subscription.plan),
+                    selectinload(Subscription.product),
+                    selectinload(Subscription.items).selectinload(SubscriptionItem.product)
+                )
+            )
+            related_subs = related_subs_res.scalars().all()
+        else:
+            related_subs = [sub] if sub else []
 
-        subscription_name = None
-        if product_name and plan_name:
-            subscription_name = f"{product_name} ({plan_name})"
-        elif product_name:
-            subscription_name = product_name
+        product_names = []
+        gst_amount = 0.0
+        delivery_charge = 0.0
+        
+        for r_sub in related_subs:
+            if r_sub.product and r_sub.product.name:
+                product_names.append(r_sub.product.name)
+            elif r_sub.items:
+                for it in r_sub.items:
+                    if it.product:
+                        product_names.append(it.product.name)
+            elif r_sub.plan:
+                product_names.append(r_sub.plan.name)
+            
+            gst_amount += float(r_sub.tax_amount or 0.0)
+            delivery_charge += float(r_sub.delivery_charge or 0.0)
 
-        gst_amount = float(sub.tax_amount) if sub and sub.tax_amount is not None else 0.0
-        delivery_charge = float(sub.delivery_charge) if sub and sub.delivery_charge is not None else 0.0
+        # Deduplicate and join names
+        unique_names = []
+        for name in product_names:
+            if name not in unique_names:
+                unique_names.append(name)
+                
+        subscription_name = " + ".join(unique_names) if unique_names else "Package Subscription"
+
         total_amount = float(pmt.amount)
+        base_amount = max(0.0, total_amount - gst_amount - delivery_charge)
 
         enriched.append(PaymentResponse(
             id=pmt.id,
             subscription_id=pmt.subscription_id,
             gateway_order_id=pmt.gateway_order_id,
             gateway_payment_id=pmt.gateway_payment_id,
-            amount=float(pmt.amount),
+            amount=base_amount,
             currency=pmt.currency,
             status=pmt.status.value if hasattr(pmt.status, "value") else str(pmt.status),
             payment_method=pmt.payment_method.value if pmt.payment_method and hasattr(pmt.payment_method, "value") else pmt.payment_method,
@@ -180,7 +207,7 @@ async def payment_history(
                 payment_method="online",
                 paid_at=fo.paid_at,
                 created_at=fo.created_at,
-                subscription_name=f"Fresh Fruit Order #{fo.order_number}",
+                subscription_name=f"Grocery Order #{fo.order_number}",
                 gst_amount=0.0,
                 delivery_charge=0.0,
                 total_amount=float(fo.total_amount),
@@ -200,6 +227,8 @@ async def payment_summary(
     from sqlalchemy import func as sqlfunc
     customer = await _get_customer(db, current_user.id)
 
+    from app.models.fruit import FruitOrder, FruitPaymentStatus
+
     total_result = await db.execute(
         select(
             sqlfunc.count(Payment.id).label("total"),
@@ -211,6 +240,27 @@ async def payment_summary(
         )
     )
     row = total_result.one()
+
+    # Fruit order total
+    fruit_total_result = await db.execute(
+        select(
+            sqlfunc.count(FruitOrder.id).label("total"),
+            sqlfunc.coalesce(sqlfunc.sum(FruitOrder.total_amount), 0).label("total_amount"),
+            sqlfunc.max(FruitOrder.paid_at).label("last_paid"),
+        ).where(
+            FruitOrder.customer_id == customer.id,
+            FruitOrder.payment_status == FruitPaymentStatus.SUCCESS,
+        )
+    )
+    f_row = fruit_total_result.one()
+    
+    total_txns = (row.total or 0) + (f_row.total or 0)
+    total_spent = float(row.total_amount or 0) + float(f_row.total_amount or 0)
+    
+    if row.last_paid and f_row.last_paid:
+        last_paid = max(row.last_paid, f_row.last_paid)
+    else:
+        last_paid = row.last_paid or f_row.last_paid
 
     # Active subscription cost
     active_sub_result = await db.execute(
@@ -225,9 +275,9 @@ async def payment_summary(
     active_cost = active_sub_result.scalar_one_or_none()
 
     return PaymentSummaryResponse(
-        total_transactions=row.total or 0,
-        total_amount_spent=float(row.total_amount or 0),
-        last_payment_date=row.last_paid,
+        total_transactions=total_txns,
+        total_amount_spent=total_spent,
+        last_payment_date=last_paid,
         active_subscription_cost=float(active_cost) if active_cost else None,
     )
 
