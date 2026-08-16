@@ -694,8 +694,6 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
   double _currentZoom = 15.0;
   
   // Real-time location stream and map animation controllers
-  StreamSubscription<Position>? _positionStreamSubscription;
-    
   // Detection of map movement (idle detection)
   Timer? _mapIdleTimer;
   bool _isMapMoving = false;
@@ -714,7 +712,6 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
 
   @override
   void dispose() {
-        _positionStreamSubscription?.cancel();
     _mapIdleTimer?.cancel();
     _mapController?.dispose();
     super.dispose();
@@ -724,37 +721,6 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
     _mapController?.animateCamera(
       CameraUpdate.newLatLngZoom(destLocation, destZoom),
     );
-  }
-
-  Future<void> _startListeningToLocation() async {
-    // Cancel existing subscription first
-    await _positionStreamSubscription?.cancel();
-    
-    // Check permission and start stream if allowed
-    final permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (serviceEnabled) {
-        _positionStreamSubscription = Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.medium, // Medium accuracy is faster on Web
-            distanceFilter: 5, // update on 5m movement
-          ),
-        ).listen(
-          (Position position) {
-            if (mounted) {
-              setState(() {
-                _currentLatLng = LatLng(position.latitude, position.longitude);
-                _currentAccuracy = position.accuracy;
-              });
-            }
-          },
-          onError: (e) {
-            debugPrint('Live location stream error: $e');
-          },
-        );
-      }
-    }
   }
 
   Future<void> _checkPermissionAndLoadLocation() async {
@@ -830,8 +796,6 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
         }
       }
 
-      // Start live updates stream
-      _startListeningToLocation();
 
     } catch (e) {
       debugPrint('Error getting location: $e');

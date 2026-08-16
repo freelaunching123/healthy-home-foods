@@ -1,7 +1,5 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
@@ -17,27 +15,14 @@ class TrackingScreen extends StatefulWidget {
 
 class _TrackingScreenState extends State<TrackingScreen> {
   final _api = ApiClient();
-  GoogleMapController? _mapController;
   
   Map<String, dynamic>? _trackingData;
-  LatLng? _driverLocation;
-  LatLng? _customerLocation;
-  Set<Marker> _markers = {};
   bool _isLoading = true;
   
   @override
   void initState() {
     super.initState();
-    // Default location (e.g. city center)
-    _customerLocation = const LatLng(13.0827, 80.2707); // Chennai mock
     _loadTrackingData();
-    
-    // Poll for updates every 10 seconds since WebSocket is not fully setup in this mock
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   Future<void> _loadTrackingData({bool isRefresh = false}) async {
@@ -46,14 +31,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
     try {
       final res = await _api.get('${ApiConstants.gpsTrack}/${widget.deliveryId}');
       if (res.data != null) {
-        final data = res.data;
         setState(() {
-          _trackingData = data;
-          if (data['latitude'] != null && data['longitude'] != null) {
-            _driverLocation = LatLng(data['latitude'], data['longitude']);
-            _updateMarkers();
-            _animateToDriver();
-          }
+          _trackingData = res.data;
         });
       }
     } catch (e) {
@@ -63,42 +42,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
   }
 
-  void _updateMarkers() {
-    final markers = <Marker>{};
-    
-    if (_customerLocation != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('customer'),
-        position: _customerLocation!,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-      ));
-    }
-    
-    if (_driverLocation != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('driver'),
-        position: _driverLocation!,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-      ));
-    }
-    
-    setState(() {
-      _markers = markers;
-    });
-  }
-
-  Future<void> _animateToDriver() async {
-    if (_driverLocation == null) return;
-    try {
-      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(_driverLocation!, 15.0));
-    } catch (_) {}
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: const Text('Live Tracking'),
+        title: const Text('Delivery Status'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => context.pop(),
@@ -106,22 +55,15 @@ class _TrackingScreenState extends State<TrackingScreen> {
       ),
       body: _isLoading 
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
-          : Column(
-              children: [
-                Expanded(
-                  child: GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: _driverLocation ?? _customerLocation ?? const LatLng(13.0827, 80.2707),
-                      zoom: 14.0,
-                    ),
-                    onMapCreated: (controller) => _mapController = controller,
-                    markers: _markers,
-                    zoomControlsEnabled: false,
-                    myLocationButtonEnabled: false,
-                  ),
+          : RefreshIndicator(
+              onRefresh: () => _loadTrackingData(isRefresh: true),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: _buildTrackingInfoPanel(),
                 ),
-                _buildTrackingInfoPanel(),
-              ],
+              ),
             ),
     );
   }

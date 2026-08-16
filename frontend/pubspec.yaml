@@ -50,7 +50,6 @@ dependencies:
   firebase_messaging: ^16.3.0
   flutter_local_notifications: ^22.0.0
   geolocator: ^14.0.2
-  geocoding: ^4.0.0
   google_maps_flutter: ^2.10.0
   url_launcher: ^6.3.2
   share_plus: ^13.1.0
