@@ -83,68 +83,66 @@ class _DeliveryPartnerProfileScreenState
             )
           : data == null
               ? _ErrorView(onRetry: _load)
-              : CustomScrollView(
-                  slivers: [
-                    // Profile header sliver
-                    _ProfileHeader(data: data),
+              : NestedScrollView(
+                  headerSliverBuilder: (context, innerBoxIsScrolled) {
+                    return [
+                      // Profile header sliver
+                      _ProfileHeader(data: data),
 
-                    // Info cards
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 16),
-                            _InfoSection(data: data),
-                            const SizedBox(height: 16),
-                            _StatsSection(data: data),
-                            const SizedBox(height: 16),
-                          ],
+                      // Info cards
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 16),
+                              _InfoSection(data: data),
+                              const SizedBox(height: 16),
+                              _StatsSection(data: data),
+                              const SizedBox(height: 16),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
 
-                    // Tabs header
-                    SliverPersistentHeader(
-                      pinned: true,
-                      delegate: _TabBarDelegate(
-                        TabBar(
-                          controller: _tabController,
-                          labelColor: AppTheme.primaryGreen,
-                          unselectedLabelColor: AppTheme.textSecondary,
-                          indicatorColor: AppTheme.primaryGreen,
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          tabs: const [
-                            Tab(text: 'Overview'),
-                            Tab(text: 'Completed'),
-                            Tab(text: 'Pending'),
-                          ],
+                      // Tabs header
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _TabBarDelegate(
+                          TabBar(
+                            controller: _tabController,
+                            labelColor: AppTheme.primaryGreen,
+                            unselectedLabelColor: AppTheme.textSecondary,
+                            indicatorColor: AppTheme.primaryGreen,
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            tabs: const [
+                              Tab(text: 'Overview'),
+                              Tab(text: 'Completed'),
+                              Tab(text: 'Pending'),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-
-                    // Tab content
-                    SliverFillRemaining(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _OverviewTab(data: data),
-                          _DeliveryListTab(
-                            deliveries: _deliveries.where((d) => d['status'] == 'delivered' || d['status'] == 'failed' || d['status'] == 'missed').toList(),
-                            isLoading: _isDeliveriesLoading,
-                            label: 'completed',
-                            color: AppTheme.success,
-                          ),
-                          _DeliveryListTab(
-                            deliveries: _deliveries.where((d) => d['status'] != 'delivered' && d['status'] != 'failed' && d['status'] != 'missed').toList(),
-                            isLoading: _isDeliveriesLoading,
-                            label: 'pending',
-                            color: AppTheme.warning,
-                          ),
-                        ],
+                    ];
+                  },
+                  body: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _OverviewTab(data: data),
+                      _DeliveryListTab(
+                        deliveries: _deliveries.where((d) => d['status'] == 'delivered' || d['status'] == 'failed' || d['status'] == 'missed').toList(),
+                        isLoading: _isDeliveriesLoading,
+                        label: 'completed',
+                        color: AppTheme.success,
                       ),
-                    ),
-                  ],
+                      _DeliveryListTab(
+                        deliveries: _deliveries.where((d) => d['status'] != 'delivered' && d['status'] != 'failed' && d['status'] != 'missed').toList(),
+                        isLoading: _isDeliveriesLoading,
+                        label: 'pending',
+                        color: AppTheme.warning,
+                      ),
+                    ],
+                  ),
                 ),
     );
   }

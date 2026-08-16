@@ -42,7 +42,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
 
   Future<void> _loadCategories() async {
     try {
-      final res = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true, 'category_type': 'fruit'});
+      final res = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true, 'category_type': 'grocery'});
       if (mounted) setState(() => _categories = List<Map<String, dynamic>>.from(res.data ?? []));
     } catch (e) {
       debugPrint('Error loading categories: $e');
@@ -234,49 +234,53 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
                     Future.delayed(const Duration(milliseconds: 400), () { if (_searchQuery == v) _loadFruits(); });
                   },
                 ),
-                const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _FilterChip(label: 'All', selected: _filterActive == null && _filterAvailability == null,
-                        onTap: () { setState(() { _filterActive = null; _filterAvailability = null; }); _loadFruits(); }),
-                      _FilterChip(label: 'Active', selected: _filterActive == true,
-                        onTap: () { setState(() { _filterActive = true; _filterAvailability = null; }); _loadFruits(); }),
-                      _FilterChip(label: 'Inactive', selected: _filterActive == false,
-                        onTap: () { setState(() { _filterActive = false; _filterAvailability = null; }); _loadFruits(); }),
-                      _FilterChip(label: 'In Stock', selected: _filterAvailability == 'in_stock',
-                        onTap: () { setState(() { _filterAvailability = 'in_stock'; _filterActive = null; }); _loadFruits(); }),
-                      _FilterChip(label: 'Out of Stock', selected: _filterAvailability == 'out_of_stock',
-                        onTap: () { setState(() { _filterAvailability = 'out_of_stock'; _filterActive = null; }); _loadFruits(); }),
-                    ],
+                if (_fruits.isNotEmpty || _searchQuery.isNotEmpty || _filterAvailability != null || _filterActive != null || _selectedCategoryId != null) ...[
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _FilterChip(label: 'All', selected: _filterActive == null && _filterAvailability == null,
+                          onTap: () { setState(() { _filterActive = null; _filterAvailability = null; }); _loadFruits(); }),
+                        _FilterChip(label: 'Active', selected: _filterActive == true,
+                          onTap: () { setState(() { _filterActive = true; _filterAvailability = null; }); _loadFruits(); }),
+                        _FilterChip(label: 'Inactive', selected: _filterActive == false,
+                          onTap: () { setState(() { _filterActive = false; _filterAvailability = null; }); _loadFruits(); }),
+                        _FilterChip(label: 'In Stock', selected: _filterAvailability == 'in_stock',
+                          onTap: () { setState(() { _filterAvailability = 'in_stock'; _filterActive = null; }); _loadFruits(); }),
+                        _FilterChip(label: 'Out of Stock', selected: _filterAvailability == 'out_of_stock',
+                          onTap: () { setState(() { _filterAvailability = 'out_of_stock'; _filterActive = null; }); _loadFruits(); }),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                // Category Tabs
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _FilterChip(
-                        label: 'All Categories',
-                        selected: _selectedCategoryId == null,
-                        onTap: () {
-                          setState(() => _selectedCategoryId = null);
-                          _loadFruits();
-                        },
+                  if (_categories.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    // Category Tabs
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _FilterChip(
+                            label: 'All Categories',
+                            selected: _selectedCategoryId == null,
+                            onTap: () {
+                              setState(() => _selectedCategoryId = null);
+                              _loadFruits();
+                            },
+                          ),
+                          ..._categories.map((cat) => _FilterChip(
+                                  label: cat['name'],
+                                  selected: _selectedCategoryId == cat['id'],
+                                  onTap: () {
+                                    setState(() => _selectedCategoryId = cat['id']);
+                                    _loadFruits();
+                                  },
+                                )),
+                        ],
                       ),
-                      ..._categories.map((cat) => _FilterChip(
-                              label: cat['name'],
-                              selected: _selectedCategoryId == cat['id'],
-                              onTap: () {
-                                setState(() => _selectedCategoryId = cat['id']);
-                                _loadFruits();
-                              },
-                            )),
-                    ],
-                  ),
-                ),
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
@@ -335,11 +339,11 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
 
   Widget _buildEmpty() => Center(
     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      const Icon(Icons.shopping_bag_outlined, size: 72, color: AppTheme.accentLight),
+      const Icon(Icons.shopping_basket_outlined, size: 72, color: AppTheme.accentLight),
       const SizedBox(height: 16),
-      Text('No groceries added yet', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600)),
+      Text('No groceries found', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
       const SizedBox(height: 8),
-      Text('Tap + to add your first grocery item', style: GoogleFonts.inter(color: AppTheme.textSecondary)),
+      Text('Tap + to add your first grocery', style: GoogleFonts.inter(color: AppTheme.textSecondary)),
     ]),
   );
 }

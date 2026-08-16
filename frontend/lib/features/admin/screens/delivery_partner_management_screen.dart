@@ -206,83 +206,84 @@ class _DeliveryPartnerManagementScreenState
       ),
       body: Column(
         children: [
-          // Search + Filter bar
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: Column(
-              children: [
-                // Search field
-                TextField(
-                  controller: _searchController,
-                  onChanged: (_) => _applyFilter(),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or mobile...',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              _applyFilter();
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade200),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade200),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: AppTheme.primaryGreen,
-                        width: 2,
+          // Filter bar
+          if (_partners.isNotEmpty || _searchController.text.isNotEmpty || _activeFilter != null)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                children: [
+                  // Search field
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (_) => _applyFilter(),
+                    decoration: InputDecoration(
+                      hintText: 'Search by name or mobile...',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                _applyFilter();
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
                       ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: AppTheme.primaryGreen,
+                          width: 2,
+                        ),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
                     ),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
                   ),
-                ),
-                const SizedBox(height: 12),
-                // Filter chips
-                Row(
-                  children: [
-                    const Text(
-                      'Filter: ',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: AppTheme.textSecondary,
+                  const SizedBox(height: 12),
+                  // Filter chips
+                  Row(
+                    children: [
+                      const Text(
+                        'Filter: ',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'All',
-                      selected: _activeFilter == null,
-                      onTap: () {
-                        setState(() => _activeFilter = null);
-                        _applyFilter();
-                      },
-                      color: AppTheme.primaryGreen,
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Active',
-                      selected: _activeFilter == true,
-                      onTap: () {
-                        setState(() => _activeFilter = true);
-                        _applyFilter();
-                      },
-                      color: AppTheme.success,
-                    ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'All',
+                        selected: _activeFilter == null,
+                        onTap: () {
+                          setState(() => _activeFilter = null);
+                          _applyFilter();
+                        },
+                        color: AppTheme.primaryGreen,
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Active',
+                        selected: _activeFilter == true,
+                        onTap: () {
+                          setState(() => _activeFilter = true);
+                          _applyFilter();
+                        },
+                        color: AppTheme.success,
+                      ),
                     const SizedBox(width: 8),
                     _FilterChip(
                       label: 'Inactive',

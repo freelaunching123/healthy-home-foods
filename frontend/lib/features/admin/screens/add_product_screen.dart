@@ -99,6 +99,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
+  Future<void> _deleteImage() async {
+    if (widget.productId == null) return;
+    try {
+      await _api.delete('${ApiConstants.products}/${widget.productId}/image');
+      setState(() { _existingImageUrl = null; _selectedImage = null; _selectedImageBytes = null; });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image removed'), backgroundColor: AppTheme.success),
+      );
+    } catch (_) {}
+  }
+
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate() || _selectedCategory == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required fields and select a category.')));
@@ -121,7 +132,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
         'category_id': _selectedCategory,
         'status': _status,
         'availability': _availability,
-        'display_order': int.tryParse(_displayOrderCtrl.text) ?? 0,
         'is_featured': _isFeatured,
         'is_popular': _isPopular,
         'is_today_special': _isTodaySpecial,
@@ -243,27 +253,61 @@ class _AddProductScreenState extends State<AddProductScreen> {
             children: [
               // Image Upload
               Center(
-                child: GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    width: 140, height: 140,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
-                      image: _selectedImageBytes != null
-                          ? DecorationImage(image: MemoryImage(_selectedImageBytes!), fit: BoxFit.cover)
-                          : _existingImageUrl != null
-                              ? DecorationImage(image: NetworkImage('${_api.mediaBaseUrl}$_existingImageUrl'), fit: BoxFit.cover)
-                              : null,
+                child: Column(
+                  children: [
+                    GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        width: 140, height: 140,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
+                          image: _selectedImageBytes != null
+                              ? DecorationImage(image: MemoryImage(_selectedImageBytes!), fit: BoxFit.cover)
+                              : _existingImageUrl != null
+                                  ? DecorationImage(image: NetworkImage('${_api.mediaBaseUrl}$_existingImageUrl'), fit: BoxFit.cover)
+                                  : null,
+                        ),
+                        child: _selectedImageBytes == null && _existingImageUrl == null
+                            ? const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [Icon(Icons.add_a_photo, color: AppTheme.primaryGreen, size: 32), SizedBox(height: 8), Text('Add Photo')],
+                              )
+                            : null,
+                      ),
                     ),
-                    child: _selectedImageBytes == null && _existingImageUrl == null
-                        ? const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [Icon(Icons.add_a_photo, color: AppTheme.primaryGreen, size: 32), SizedBox(height: 8), Text('Add Photo')],
-                          )
-                        : null,
-                  ),
+                    if (_existingImageUrl != null || _selectedImage != null) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: _pickImage,
+                            icon: const Icon(Icons.photo_library_rounded, size: 16),
+                            label: const Text('Replace', style: TextStyle(fontSize: 13)),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 36),
+                              side: const BorderSide(color: AppTheme.primaryGreen),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              if (_selectedImage != null) setState(() { _selectedImage = null; _selectedImageBytes = null; });
+                              else _deleteImage();
+                            },
+                            icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppTheme.error),
+                            label: const Text('Remove', style: TextStyle(color: AppTheme.error, fontSize: 13)),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 36),
+                              side: const BorderSide(color: AppTheme.error),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
@@ -316,24 +360,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _availability,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Availability', border: OutlineInputBorder()),
-                      items: const [
-                        DropdownMenuItem(value: 'available', child: Text('Available', overflow: TextOverflow.ellipsis)),
-                        DropdownMenuItem(value: 'out_of_stock', child: Text('Out Of Stock', overflow: TextOverflow.ellipsis)),
-                        DropdownMenuItem(value: 'temporarily_unavailable', child: Text('Temp Unavailable', overflow: TextOverflow.ellipsis)),
-                      ],
-                      onChanged: (v) => setState(() => _availability = v!),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildTextField('Display Order (Sort)', _displayOrderCtrl, isNumeric: true)),
+              DropdownButtonFormField<String>(
+                value: _availability,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Availability', border: OutlineInputBorder()),
+                items: const [
+                  DropdownMenuItem(value: 'available', child: Text('Available', overflow: TextOverflow.ellipsis)),
+                  DropdownMenuItem(value: 'out_of_stock', child: Text('Out Of Stock', overflow: TextOverflow.ellipsis)),
+                  DropdownMenuItem(value: 'temporarily_unavailable', child: Text('Temp Unavailable', overflow: TextOverflow.ellipsis)),
                 ],
+                onChanged: (v) => setState(() => _availability = v!),
               ),
               const SizedBox(height: 24),
 

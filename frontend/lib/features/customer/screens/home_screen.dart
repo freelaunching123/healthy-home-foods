@@ -391,7 +391,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        title: Text('🥗 Healthy Home Foods', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+        title: const Text(
+          'Healthy Home Foods',
+          style: TextStyle(
+            color: AppTheme.primaryGreen,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -559,24 +566,26 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-      SliverToBoxAdapter(
-        child: SizedBox(
-          height: 44,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              _CategoryChip(label: 'All', isSelected: _selectedCategoryId == null, onTap: () => setState(() => _selectedCategoryId = null)),
-              ..._categories.map((cat) => _CategoryChip(
-                label: cat['name'] ?? '',
-                isSelected: _selectedCategoryId == cat['id'],
-                onTap: () => setState(() => _selectedCategoryId = cat['id']),
-              )),
-            ],
+      if (_products.isNotEmpty) ...[
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: 44,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _CategoryChip(label: 'All', isSelected: _selectedCategoryId == null, onTap: () => setState(() => _selectedCategoryId = null)),
+                ..._categories.map((cat) => _CategoryChip(
+                  label: cat['name'] ?? '',
+                  isSelected: _selectedCategoryId == cat['id'],
+                  onTap: () => setState(() => _selectedCategoryId = cat['id']),
+                )),
+              ],
+            ),
           ),
         ),
-      ),
-      const SliverToBoxAdapter(child: SizedBox(height: 16)),
+        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+      ],
       if (_isLoadingPackages)
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -592,9 +601,9 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: EdgeInsets.all(40.0),
               child: Column(
                 children: [
-                  Icon(Icons.restaurant_menu, size: 48, color: AppTheme.textLight),
-                  SizedBox(height: 12),
-                  Text('No packages found', style: TextStyle(color: AppTheme.textSecondary)),
+                  Icon(Icons.restaurant_menu, size: 72, color: AppTheme.accentLight),
+                  SizedBox(height: 16),
+                  Text('No packages found', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
                 ],
               ),
             ),

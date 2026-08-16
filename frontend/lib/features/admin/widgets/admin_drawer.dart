@@ -91,7 +91,7 @@ class AdminDrawer extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Admin User',
+                    'Healthy Home Foods',
                     style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                   ),
                   Text(

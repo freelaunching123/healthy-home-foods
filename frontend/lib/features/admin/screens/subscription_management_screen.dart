@@ -368,99 +368,100 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
       ),
       body: Column(
         children: [
-          // Filter bar
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _searchController,
-                  onSubmitted: (_) => _onSearchChanged(),
-                  decoration: InputDecoration(
-                    hintText: 'Search by customer, phone, or product...',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              _onSearchChanged();
-                            },
-                          )
-                        : IconButton(
-                            icon: const Icon(Icons.search_rounded, size: 18),
-                            onPressed: _onSearchChanged,
-                          ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          // Search and Filters
+          if (_subscriptions.isNotEmpty || _searchController.text.isNotEmpty || _statusFilter != 'all')
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _searchController,
+                    onSubmitted: (_) => _onSearchChanged(),
+                    decoration: InputDecoration(
+                      hintText: 'Search by customer, phone, or product...',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                _onSearchChanged();
+                              },
+                            )
+                          : IconButton(
+                              icon: const Icon(Icons.search_rounded, size: 18),
+                              onPressed: _onSearchChanged,
+                            ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      const Text('Status: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'All',
-                        selected: _statusFilter == 'all',
-                        onTap: () {
-                          setState(() => _statusFilter = 'all');
-                          _loadSubscriptions(refresh: true);
-                        },
-                      ),
-                      const SizedBox(width: 6),
-                      _FilterChip(
-                        label: 'Active',
-                        selected: _statusFilter == 'active',
-                        onTap: () {
-                          setState(() => _statusFilter = 'active');
-                          _loadSubscriptions(refresh: true);
-                        },
-                      ),
-                      const SizedBox(width: 6),
-                      _FilterChip(
-                        label: 'Paused',
-                        selected: _statusFilter == 'paused',
-                        onTap: () {
-                          setState(() => _statusFilter = 'paused');
-                          _loadSubscriptions(refresh: true);
-                        },
-                      ),
-                      const SizedBox(width: 6),
-                      _FilterChip(
-                        label: 'Pending Payment',
-                        selected: _statusFilter == 'pending_payment',
-                        onTap: () {
-                          setState(() => _statusFilter = 'pending_payment');
-                          _loadSubscriptions(refresh: true);
-                        },
-                      ),
-                      const SizedBox(width: 6),
-                      _FilterChip(
-                        label: 'Completed',
-                        selected: _statusFilter == 'completed',
-                        onTap: () {
-                          setState(() => _statusFilter = 'completed');
-                          _loadSubscriptions(refresh: true);
-                        },
-                      ),
-                      const SizedBox(width: 6),
-                      _FilterChip(
-                        label: 'Cancelled',
-                        selected: _statusFilter == 'cancelled',
-                        onTap: () {
-                          setState(() => _statusFilter = 'cancelled');
-                          _loadSubscriptions(refresh: true);
-                        },
-                      ),
-                    ],
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        const Text('Status: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'All',
+                          selected: _statusFilter == 'all',
+                          onTap: () {
+                            setState(() => _statusFilter = 'all');
+                            _loadSubscriptions(refresh: true);
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _FilterChip(
+                          label: 'Active',
+                          selected: _statusFilter == 'active',
+                          onTap: () {
+                            setState(() => _statusFilter = 'active');
+                            _loadSubscriptions(refresh: true);
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _FilterChip(
+                          label: 'Paused',
+                          selected: _statusFilter == 'paused',
+                          onTap: () {
+                            setState(() => _statusFilter = 'paused');
+                            _loadSubscriptions(refresh: true);
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _FilterChip(
+                          label: 'Pending Payment',
+                          selected: _statusFilter == 'pending_payment',
+                          onTap: () {
+                            setState(() => _statusFilter = 'pending_payment');
+                            _loadSubscriptions(refresh: true);
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _FilterChip(
+                          label: 'Completed',
+                          selected: _statusFilter == 'completed',
+                          onTap: () {
+                            setState(() => _statusFilter = 'completed');
+                            _loadSubscriptions(refresh: true);
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _FilterChip(
+                          label: 'Cancelled',
+                          selected: _statusFilter == 'cancelled',
+                          onTap: () {
+                            setState(() => _statusFilter = 'cancelled');
+                            _loadSubscriptions(refresh: true);
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
           // Subscriptions List
           Expanded(

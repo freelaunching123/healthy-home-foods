@@ -114,69 +114,70 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
       body: Column(
         children: [
           // Search + Filters
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search by order number...',
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textLight),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.search_rounded, color: AppTheme.primaryGreen),
-                      onPressed: _loadOrders,
+          if (_orders.isNotEmpty || _searchController.text.isNotEmpty || _filterOrderStatus != null)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search by order number...',
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textLight),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.search_rounded, color: AppTheme.primaryGreen),
+                        onPressed: _loadOrders,
+                      ),
+                      filled: true, fillColor: AppTheme.scaffoldBg,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     ),
-                    filled: true, fillColor: AppTheme.scaffoldBg,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    onSubmitted: (_) => _loadOrders(),
                   ),
-                  onSubmitted: (_) => _loadOrders(),
-                ),
-                const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _FilterChip(label: 'All Orders', selected: _filterOrderStatus == null,
+                          onTap: () { setState(() => _filterOrderStatus = null); _loadOrders(); }),
+                        ..._orderStatuses.map((s) => _FilterChip(
+                          label: _statusLabel(s), selected: _filterOrderStatus == s,
+                          onTap: () { setState(() => _filterOrderStatus = s); _loadOrders(); },
+                          color: _statusColor(s),
+                        )),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
                     children: [
-                      _FilterChip(label: 'All Orders', selected: _filterOrderStatus == null,
-                        onTap: () { setState(() => _filterOrderStatus = null); _loadOrders(); }),
-                      ..._orderStatuses.map((s) => _FilterChip(
-                        label: _statusLabel(s), selected: _filterOrderStatus == s,
-                        onTap: () { setState(() => _filterOrderStatus = s); _loadOrders(); },
-                        color: _statusColor(s),
+                      Text('Payment: ', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary)),
+                      ...[null, 'pending', 'success', 'failed'].map((s) => GestureDetector(
+                        onTap: () { setState(() => _filterPaymentStatus = s); _loadOrders(); },
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _filterPaymentStatus == s ? AppTheme.primaryGreen : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            s == null ? 'All' : s[0].toUpperCase() + s.substring(1),
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: _filterPaymentStatus == s ? Colors.white : AppTheme.textSecondary,
+                              fontWeight: _filterPaymentStatus == s ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                        ),
                       )),
                     ],
                   ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Text('Payment: ', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary)),
-                    ...[null, 'pending', 'success', 'failed'].map((s) => GestureDetector(
-                      onTap: () { setState(() => _filterPaymentStatus = s); _loadOrders(); },
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _filterPaymentStatus == s ? AppTheme.primaryGreen : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          s == null ? 'All' : s[0].toUpperCase() + s.substring(1),
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: _filterPaymentStatus == s ? Colors.white : AppTheme.textSecondary,
-                            fontWeight: _filterPaymentStatus == s ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    )),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
           // Orders list
           Expanded(

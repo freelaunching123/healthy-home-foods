@@ -151,81 +151,82 @@ class _CustomerManagementScreenState extends State<CustomerManagementScreen> {
       body: Column(
         children: [
           // Filter bar
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _searchController,
-                  onChanged: (_) => _applyFilter(),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name or phone...',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              _applyFilter();
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade200),
+          if (_customers.isNotEmpty || _searchController.text.isNotEmpty || _statusFilter != 'all')
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (_) => _applyFilter(),
+                    decoration: InputDecoration(
+                      hintText: 'Search by name or phone...',
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                _applyFilter();
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: Colors.grey.shade200),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Text('Status: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textSecondary)),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'All',
-                      selected: _statusFilter == 'all',
-                      onTap: () {
-                        setState(() => _statusFilter = 'all');
-                        _applyFilter();
-                      },
-                    ),
-                    const SizedBox(width: 6),
-                    _FilterChip(
-                      label: 'Active',
-                      selected: _statusFilter == 'active',
-                      onTap: () {
-                        setState(() => _statusFilter = 'active');
-                        _applyFilter();
-                      },
-                    ),
-                    const SizedBox(width: 6),
-                    _FilterChip(
-                      label: 'Inactive',
-                      selected: _statusFilter == 'inactive',
-                      onTap: () {
-                        setState(() => _statusFilter = 'inactive');
-                        _applyFilter();
-                      },
-                    ),
-                    const Spacer(),
-                    Text('${_filtered.length} found', style: const TextStyle(fontSize: 12, color: AppTheme.textLight)),
-                  ],
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text('Status: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.textSecondary)),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'All',
+                        selected: _statusFilter == 'all',
+                        onTap: () {
+                          setState(() => _statusFilter = 'all');
+                          _applyFilter();
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                      _FilterChip(
+                        label: 'Active',
+                        selected: _statusFilter == 'active',
+                        onTap: () {
+                          setState(() => _statusFilter = 'active');
+                          _applyFilter();
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                      _FilterChip(
+                        label: 'Inactive',
+                        selected: _statusFilter == 'inactive',
+                        onTap: () {
+                          setState(() => _statusFilter = 'inactive');
+                          _applyFilter();
+                        },
+                      ),
+                      const Spacer(),
+                      Text('${_filtered.length} found', style: const TextStyle(fontSize: 12, color: AppTheme.textLight)),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
 
           // Customers List
           Expanded(

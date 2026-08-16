@@ -11,7 +11,7 @@ from app.schemas.common import AdminSettingsUpdate, AdminSettingsResponse
 router = APIRouter(prefix="/admin/settings", tags=["Admin Settings"])
 
 
-@router.get("/", response_model=AdminSettingsResponse)
+@router.get("", response_model=AdminSettingsResponse)
 async def get_settings(
     _: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
@@ -23,7 +23,7 @@ async def get_settings(
     return settings
 
 
-@router.put("/", response_model=AdminSettingsResponse)
+@router.put("", response_model=AdminSettingsResponse)
 async def update_settings(
     payload: AdminSettingsUpdate,
     _: User = Depends(require_super_admin),

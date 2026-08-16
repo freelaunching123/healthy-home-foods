@@ -170,51 +170,55 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                     });
                   },
                 ),
-                const SizedBox(height: 8),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _FilterChip(label: 'All', selected: _filterActive == null && _availabilityFilter == null,
-                        onTap: () { setState(() { _filterActive = null; _availabilityFilter = null; }); _loadProducts(); }),
-                      _FilterChip(label: 'Active', selected: _filterActive == true,
-                        onTap: () { setState(() { _filterActive = true; _availabilityFilter = null; }); _loadProducts(); }),
-                      _FilterChip(label: 'Inactive', selected: _filterActive == false,
-                        onTap: () { setState(() { _filterActive = false; _availabilityFilter = null; }); _loadProducts(); }),
-                      _FilterChip(label: 'Available', selected: _availabilityFilter == 'available',
-                        onTap: () { setState(() { _availabilityFilter = 'available'; _filterActive = null; }); _loadProducts(); }),
-                      _FilterChip(label: 'Out of Stock', selected: _availabilityFilter == 'out_of_stock',
-                        onTap: () { setState(() { _availabilityFilter = 'out_of_stock'; _filterActive = null; }); _loadProducts(); }),
-                      _FilterChip(label: 'Unavailable', selected: _availabilityFilter == 'temporarily_unavailable',
-                        onTap: () { setState(() { _availabilityFilter = 'temporarily_unavailable'; _filterActive = null; }); _loadProducts(); }),
-                    ],
+                if (_products.isNotEmpty || _searchQuery.isNotEmpty || _availabilityFilter != null || _filterActive != null || _selectedCategoryId != null) ...[
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _FilterChip(label: 'All', selected: _filterActive == null && _availabilityFilter == null,
+                          onTap: () { setState(() { _filterActive = null; _availabilityFilter = null; }); _loadProducts(); }),
+                        _FilterChip(label: 'Active', selected: _filterActive == true,
+                          onTap: () { setState(() { _filterActive = true; _availabilityFilter = null; }); _loadProducts(); }),
+                        _FilterChip(label: 'Inactive', selected: _filterActive == false,
+                          onTap: () { setState(() { _filterActive = false; _availabilityFilter = null; }); _loadProducts(); }),
+                        _FilterChip(label: 'Available', selected: _availabilityFilter == 'available',
+                          onTap: () { setState(() { _availabilityFilter = 'available'; _filterActive = null; }); _loadProducts(); }),
+                        _FilterChip(label: 'Out of Stock', selected: _availabilityFilter == 'out_of_stock',
+                          onTap: () { setState(() { _availabilityFilter = 'out_of_stock'; _filterActive = null; }); _loadProducts(); }),
+                        _FilterChip(label: 'Unavailable', selected: _availabilityFilter == 'temporarily_unavailable',
+                          onTap: () { setState(() { _availabilityFilter = 'temporarily_unavailable'; _filterActive = null; }); _loadProducts(); }),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                // Category Tabs
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _FilterChip(
-                        label: 'All Categories',
-                        selected: _selectedCategoryId == null,
-                        onTap: () {
-                          setState(() => _selectedCategoryId = null);
-                          _loadProducts();
-                        },
+                  if (_categories.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    // Category Tabs
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _FilterChip(
+                            label: 'All Categories',
+                            selected: _selectedCategoryId == null,
+                            onTap: () {
+                              setState(() => _selectedCategoryId = null);
+                              _loadProducts();
+                            },
+                          ),
+                          ..._categories.map((cat) => _FilterChip(
+                                  label: cat['name'],
+                                  selected: _selectedCategoryId == cat['id'],
+                                  onTap: () {
+                                    setState(() => _selectedCategoryId = cat['id']);
+                                    _loadProducts();
+                                  },
+                                )),
+                        ],
                       ),
-                      ..._categories.map((cat) => _FilterChip(
-                              label: cat['name'],
-                              selected: _selectedCategoryId == cat['id'],
-                              onTap: () {
-                                setState(() => _selectedCategoryId = cat['id']);
-                                _loadProducts();
-                              },
-                            )),
-                    ],
-                  ),
-                ),
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
@@ -227,7 +231,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
                             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                               const Icon(Icons.receipt_long_outlined, size: 72, color: AppTheme.accentLight),
                               const SizedBox(height: 16),
-                              Text('No products found', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600)),
+                              Text('No packages found', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
                               const SizedBox(height: 8),
                               Text('Tap + to add your first product', style: GoogleFonts.inter(color: AppTheme.textSecondary)),
                             ]),

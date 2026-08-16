@@ -10,15 +10,15 @@ import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
 
-class AddEditFruitScreen extends StatefulWidget {
+class AddEditGroceryScreen extends StatefulWidget {
   final String? fruitId;
-  const AddEditFruitScreen({super.key, this.fruitId});
+  const AddEditGroceryScreen({super.key, this.fruitId});
 
   @override
-  State<AddEditFruitScreen> createState() => _AddEditFruitScreenState();
+  State<AddEditGroceryScreen> createState() => _AddEditGroceryScreenState();
 }
 
-class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
+class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
   final _api = ApiClient();
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
@@ -194,14 +194,7 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
         title: Text(_isEdit ? 'Edit Grocery Item' : 'Add Grocery Item', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
         leading: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => context.pop()),
-        actions: [
-          TextButton(
-            onPressed: (_saving || _uploadingImage || _loading) ? null : _save,
-            child: _saving || _uploadingImage
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryGreen))
-                : Text('Save', style: GoogleFonts.inter(color: AppTheme.primaryGreen, fontWeight: FontWeight.w700, fontSize: 16)),
-          ),
-        ],
+        actions: const [],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
@@ -241,21 +234,20 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              OutlinedButton.icon(
-                                onPressed: _pickImage,
-                                icon: const Icon(Icons.photo_library_rounded, size: 16),
-                                label: Text(_existingImageUrl != null || _pickedImage != null ? 'Replace' : 'Upload Image',
-                                    style: GoogleFonts.inter(fontSize: 13)),
-                                style: OutlinedButton.styleFrom(
-                                  minimumSize: const Size(0, 36),
-                                  side: const BorderSide(color: AppTheme.primaryGreen),
+                          if (_existingImageUrl != null || _pickedImage != null) ...[
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: _pickImage,
+                                  icon: const Icon(Icons.photo_library_rounded, size: 16),
+                                  label: Text('Replace', style: GoogleFonts.inter(fontSize: 13)),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size(0, 36),
+                                    side: const BorderSide(color: AppTheme.primaryGreen),
+                                  ),
                                 ),
-                              ),
-                              if (_existingImageUrl != null || _pickedImage != null) ...[
                                 const SizedBox(width: 8),
                                 OutlinedButton.icon(
                                   onPressed: () {
@@ -270,8 +262,8 @@ class _AddEditFruitScreenState extends State<AddEditFruitScreen> {
                                   ),
                                 ),
                               ],
-                            ],
-                          ),
+                            ),
+                          ],
                           if (_uploadingImage)
                             Padding(
                               padding: const EdgeInsets.only(top: 8),

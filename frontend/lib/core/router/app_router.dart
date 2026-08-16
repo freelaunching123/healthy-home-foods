@@ -25,11 +25,11 @@ import '../../features/customer/screens/address_management_screen.dart';
 import '../../features/customer/screens/wishlist_screen.dart';
 import '../../features/customer/screens/reviews_screen.dart';
 // Fruit screens (Customer)
-import '../../features/customer/screens/fruit_detail_screen.dart';
-import '../../features/customer/screens/fruit_cart_screen.dart';
-import '../../features/customer/screens/fruit_checkout_screen.dart';
-import '../../features/customer/screens/fruit_order_history_screen.dart';
-import '../../features/customer/screens/fruit_order_detail_screen.dart';
+import '../../features/customer/screens/grocery_detail_screen.dart';
+import '../../features/customer/screens/grocery_cart_screen.dart';
+import '../../features/customer/screens/grocery_checkout_screen.dart';
+import '../../features/customer/screens/grocery_order_history_screen.dart';
+import '../../features/customer/screens/grocery_order_detail_screen.dart';
 import '../../features/customer/screens/package_cart_screen.dart';
 import '../../features/customer/screens/package_checkout_screen.dart';
 
@@ -52,9 +52,9 @@ import '../../features/admin/screens/admin_change_password_screen.dart';
 import '../../features/admin/screens/delivery_settings_screen.dart';
 import '../../features/admin/screens/package_orders_screen.dart';
 // Fruit screens (Admin)
-import '../../features/admin/screens/fruit_management_screen.dart';
-import '../../features/admin/screens/add_edit_fruit_screen.dart';
-import '../../features/admin/screens/fruit_orders_screen.dart';
+import '../../features/admin/screens/grocery_management_screen.dart';
+import '../../features/admin/screens/add_edit_grocery_screen.dart';
+import '../../features/admin/screens/grocery_orders_screen.dart';
 
 // Delivery boy screens
 import '../../features/delivery/screens/delivery_shell.dart';
@@ -223,10 +223,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/admin/delivery-settings', builder: (_, __) => const DeliverySettingsScreen()),
 
     // ── Fruit admin routes ─────────────────────────────────────────────────────
-    GoRoute(path: '/admin/fruits/add', builder: (_, __) => const AddEditFruitScreen()),
+    GoRoute(path: '/admin/fruits/add', builder: (_, __) => const AddEditGroceryScreen()),
     GoRoute(
       path: '/admin/fruits/edit/:id',
-      builder: (_, state) => AddEditFruitScreen(fruitId: state.pathParameters['id']),
+      builder: (_, state) => AddEditGroceryScreen(fruitId: state.pathParameters['id']),
     ),
     GoRoute(path: '/admin/fruits/orders', builder: (_, __) => const FruitOrdersScreen()),
     
