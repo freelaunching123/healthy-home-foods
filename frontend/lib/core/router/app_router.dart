@@ -162,6 +162,7 @@ final GoRouter appRouter = GoRouter(
     ),
 
     // ── Fruit customer routes ──────────────────────────────────────────────────
+    GoRoute(path: '/fruits', redirect: (_, __) => '/home'),
     GoRoute(path: '/fruits/cart', builder: (_, __) => const FruitCartScreen()),
     GoRoute(path: '/fruits/checkout', builder: (_, __) => const FruitCheckoutScreen()),
     GoRoute(path: '/fruits/orders', builder: (_, __) => const FruitOrderHistoryScreen()),
@@ -175,6 +176,7 @@ final GoRouter appRouter = GoRouter(
     ),
     
     // ── Package customer routes ────────────────────────────────────────────────
+    GoRoute(path: '/packages', redirect: (_, __) => '/home'),
     GoRoute(path: '/packages/cart', builder: (_, __) => const PackageCartScreen()),
     GoRoute(path: '/packages/checkout', builder: (_, __) => const PackageCheckoutScreen()),
 

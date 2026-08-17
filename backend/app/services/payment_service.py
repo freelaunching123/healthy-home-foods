@@ -157,6 +157,15 @@ class PaymentService:
             notification_type="subscription",
             reference_id=str(sub.id)
         )
+        
+        await NotificationService.send_notification_to_role(
+            db=db,
+            role="admin",
+            title="New Package Order",
+            body=f"A new package subscription has been purchased by {user.full_name}.",
+            notification_type="order",
+            reference_id=str(sub.id)
+        )
 
         await db.commit()
         return payment
@@ -228,6 +237,29 @@ class PaymentService:
             await db.delete(item)
 
         await db.commit()
+
+        # Send notifications
+        from app.services.notification_service import NotificationService
+        
+        # User notification
+        await NotificationService.send_notification_to_user(
+            db=db,
+            user_id=user.id,
+            title="Order Placed Successfully",
+            body="Your grocery order has been placed successfully and is being prepared.",
+            notification_type="fruit_order",
+            reference_id=str(order.id)
+        )
+        
+        # Admin notification
+        await NotificationService.send_notification_to_role(
+            db=db,
+            role="admin",
+            title="New Grocery Order",
+            body=f"A new grocery order (#{order.order_number}) has been placed by {user.full_name}.",
+            notification_type="fruit_order",
+            reference_id=str(order.id)
+        )
         return order
 
     # Alias for backwards compatibility

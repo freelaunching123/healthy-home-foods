@@ -69,8 +69,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   Widget _buildTrackingInfoPanel() {
-    final estMinutes = _trackingData?['estimated_minutes'] ?? '--';
-    final driverName = _trackingData?['delivery_partner_name'] ?? 'Delivery Agent';
+    final driverName = _trackingData?['delivery_partner_name'] ?? 'Delivery Boy';
     
     return Container(
       padding: const EdgeInsets.all(24),
@@ -99,29 +98,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
           const SizedBox(height: 20),
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.timer, color: AppTheme.primaryGreen),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Estimated Arrival', style: TextStyle(color: AppTheme.textSecondary)),
-                    Text('$estMinutes mins', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 32),
-          Row(
-            children: [
               const CircleAvatar(
                 backgroundColor: AppTheme.accentLight,
                 child: Icon(Icons.person, color: Colors.white),
@@ -132,7 +108,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(driverName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                    const Text('Delivery Partner', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                    const Text('Delivery Boy', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
                   ],
                 ),
               ),

@@ -416,7 +416,7 @@ async def download_invoice(
             if fruit_order.items:
                 for it in fruit_order.items:
                     fname = it.fruit.name if (it.fruit and it.fruit.name) else "Fresh Fruit"
-                    u_price = float(it.unit_price_per_kg or 0.0)
+                    u_price = float(it.price_per_kg or 0.0)
                     qty_kg = float(it.quantity_kg or 0.0)
                     sub_tot = float(it.subtotal or (u_price * qty_kg))
                     item_rows.append([

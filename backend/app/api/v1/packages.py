@@ -232,6 +232,8 @@ async def checkout(
     customer = await _get_customer(db, current_user.id)
     
     address_id_str = payload.get("address_id")
+    preferred_delivery_time = payload.get("preferred_delivery_time")
+    
     if not address_id_str:
         raise HTTPException(status_code=400, detail="address_id is required")
     try:
@@ -320,6 +322,7 @@ async def checkout(
             total_deliveries=package_days,
             plan_id=plan_id,
             address_id=address.id,
+            preferred_delivery_time=preferred_delivery_time,
             delivery_charge=item_del_charge,
             tax_amount=item_tax_amt
         )

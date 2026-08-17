@@ -228,7 +228,7 @@ async def update_delivery_status(
                     db=db,
                     user_id=user_id,
                     title="Out for Delivery",
-                    body="Your meal is out for delivery! You can track it live.",
+                    body="Your meal is out for delivery!",
                     notification_type="delivery",
                     reference_id=str(delivery.id) if delivery else str(assignment.id)
                 )

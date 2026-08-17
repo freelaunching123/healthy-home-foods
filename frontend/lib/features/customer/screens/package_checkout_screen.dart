@@ -25,6 +25,7 @@ class _PackageCheckoutScreenState extends State<PackageCheckoutScreen> {
   double? _deliveryDistance;
   bool _calculatingDelivery = false;
   String? _deliveryError;
+  String _selectedSession = 'Morning';
 
   bool _loadingCart = true;
   bool _loadingAddresses = true;
@@ -151,6 +152,7 @@ class _PackageCheckoutScreenState extends State<PackageCheckoutScreen> {
       // Create the order which also creates mock payment record
       final orderRes = await _api.post(ApiConstants.packageOrdersCheckout, data: {
         'address_id': _selectedAddress!['id'],
+        'preferred_delivery_time': _selectedSession,
       });
       final orderData = orderRes.data;
       
@@ -372,6 +374,39 @@ class _PackageCheckoutScreenState extends State<PackageCheckoutScreen> {
                           },
                         ),
 
+                  const SizedBox(height: 24),
+                  
+                  // Delivery Session
+                  _SectionHeader(icon: Icons.access_time_rounded, title: 'Delivery Session'),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: ['Morning', 'Afternoon', 'Evening'].map((session) {
+                      final isSelected = _selectedSession == session;
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedSession = session),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppTheme.primaryGreen : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              session,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : AppTheme.textPrimary,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                   const SizedBox(height: 24),
 
                   // Order Summary

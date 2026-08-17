@@ -892,6 +892,35 @@ class _ProductCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (product['is_featured'] == true)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.amber.shade700, borderRadius: BorderRadius.circular(4)),
+                            child: const Text('FEATURED', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.white)),
+                          ),
+                        if (product['is_popular'] == true)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(4)),
+                            child: const Text('POPULAR', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.white)),
+                          ),
+                        if (product['is_today_special'] == true)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.purple.shade600, borderRadius: BorderRadius.circular(4)),
+                            child: const Text('SPECIAL', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w800, color: Colors.white)),
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
               

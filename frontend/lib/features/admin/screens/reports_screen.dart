@@ -360,21 +360,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 child: PieChart(
                   PieChartData(
                     sectionsSpace: 2,
-                    centerSpaceRadius: 30,
+                    centerSpaceRadius: 20,
                     sections: [
                       PieChartSectionData(
                         color: const Color(0xFFF59E0B),
                         value: fruitPct,
-                        title: '${fruitPct.toStringAsFixed(0)}%',
-                        radius: 20,
-                        titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                        title: fruitPct > 0 ? '${fruitPct.toStringAsFixed(0)}%' : '',
+                        radius: 30,
+                        titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                       PieChartSectionData(
                         color: const Color(0xFF8B5CF6),
                         value: pkgPct,
-                        title: '${pkgPct.toStringAsFixed(0)}%',
-                        radius: 20,
-                        titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                        title: pkgPct > 0 ? '${pkgPct.toStringAsFixed(0)}%' : '',
+                        radius: 30,
+                        titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ],
                   ),
