@@ -151,7 +151,7 @@ class _CustomerManagementScreenState extends State<CustomerManagementScreen> {
       body: Column(
         children: [
           // Filter bar
-          if (_customers.isNotEmpty || _searchController.text.isNotEmpty || _statusFilter != 'all')
+          if (_users.isNotEmpty || _searchController.text.isNotEmpty || _statusFilter != 'all')
             Container(
               color: Colors.white,
               padding: const EdgeInsets.all(16),
