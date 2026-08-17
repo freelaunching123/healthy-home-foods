@@ -22,7 +22,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<dynamic> _plans = [];
   String? _selectedAddressId;
   String? _selectedPlanId;
-  DateTime _startDate = DateTime.now().add(const Duration(days: 1));
+  String _selectedSession = 'Morning';
   bool _isLoading = true;
   bool _isProcessing = false;
   double _deliveryCharge = 0;
@@ -116,23 +116,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double get _subtotal => _selectedPrice;
   double get _total => _subtotal + _deliveryCharge;
 
-  Future<void> _selectStartDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _startDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
-      selectableDayPredicate: (day) => day.weekday != DateTime.sunday,
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: Theme.of(context).colorScheme.copyWith(primary: AppTheme.primaryGreen),
-        ),
-        child: child!,
-      ),
-    );
-    if (date != null) setState(() => _startDate = date);
-  }
-
   Future<void> _createSubscription() async {
     if (_selectedPlanId == null || _selectedAddressId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -164,7 +147,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'product_id': widget.productId,
         'plan_id': _selectedPlanId,
         'address_id': _selectedAddressId,
-        'preferred_delivery_time': null,
+        'preferred_delivery_time': _selectedSession,
         'auto_renew': false,
         'notes': null,
       });
@@ -360,26 +343,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Start date
-            const Text('Start Date', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            // Delivery Session
+            const Text('Delivery Session', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _selectStartDate,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.grey.shade200)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_today_rounded, color: AppTheme.primaryGreen, size: 20),
-                    const SizedBox(width: 12),
-                    Text('${_startDate.day}/${_startDate.month}/${_startDate.year}',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                    const Spacer(),
-                    const Icon(Icons.chevron_right_rounded, color: AppTheme.textLight),
-                  ],
-                ),
-              ),
+            Row(
+              children: ['Morning', 'Afternoon', 'Evening'].map((session) {
+                final isSelected = _selectedSession == session;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedSession = session),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppTheme.primaryGreen : Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        session,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : AppTheme.textPrimary,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
             const SizedBox(height: 20),
 

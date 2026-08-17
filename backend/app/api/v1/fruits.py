@@ -138,6 +138,7 @@ def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None
 async def list_fruits(
     search: Optional[str] = Query(None),
     availability: Optional[str] = Query(None),
+    category_id: Optional[UUID] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """List all active fruits visible to customers."""
@@ -154,6 +155,9 @@ async def list_fruits(
         query = query.where(
             or_(Fruit.name.ilike(f"%{search}%"), Fruit.description.ilike(f"%{search}%"))
         )
+
+    if category_id:
+        query = query.where(Fruit.category_id == category_id)
 
     result = await db.execute(query.order_by(Fruit.name))
     return result.scalars().all()
@@ -365,6 +369,7 @@ async def checkout(
     settings_result = await db.execute(select(AdminSettings).where(AdminSettings.id == 1))
     settings_obj = settings_result.scalar_one_or_none()
     distance = 0.0
+    delivery_charge = 0.0
     if settings_obj:
         if address.latitude and address.longitude:
             shop_lat = float(settings_obj.business_lat) if settings_obj.business_lat is not None else 9.919630
@@ -379,6 +384,9 @@ async def checkout(
                 status_code=400,
                 detail=f"There is no service beyond {max_dist}km. Please select an address within the range."
             )
+        
+        from app.services.delivery_engine import calculate_charge_for_distance
+        delivery_charge = calculate_charge_for_distance(distance, settings_obj)
 
     # Load cart
     cart_result = await db.execute(
@@ -414,7 +422,7 @@ async def checkout(
         customer_id=customer.id,
         address_id=address.id,
         order_number=_generate_order_number(),
-        total_amount=round(total, 2),
+        total_amount=round(total + delivery_charge, 2),
         payment_status=FruitPaymentStatus.PENDING,
         order_status=FruitOrderStatus.PENDING,
         notes=payload.notes,

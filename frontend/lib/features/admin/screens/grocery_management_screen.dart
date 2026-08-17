@@ -213,6 +213,7 @@ class _FruitManagementScreenState extends State<FruitManagementScreen> {
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
                   controller: _searchController,

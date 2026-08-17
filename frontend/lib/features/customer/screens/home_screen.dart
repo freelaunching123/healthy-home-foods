@@ -36,6 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> get _todaySpecials => _products.where((p) => p['is_today_special'] == true).toList();
 
   // -- Fruits State --
+  List<dynamic> _groceryCategories = [];
+  String? _selectedGroceryCategoryId;
   List<Map<String, dynamic>> _fruits = [];
   bool _isLoadingFruits = true;
   int _cartCount = 0;
@@ -218,10 +220,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadFruits({bool isSilent = false}) async {
     if (!isSilent) setState(() => _isLoadingFruits = true);
     try {
+      final catRes = await _api.get(ApiConstants.categories, queryParameters: {'active_only': true, 'category_type': 'grocery'});
       final res = await _api.get(ApiConstants.fruits);
       if (mounted) {
         setState(() {
+          _groceryCategories = catRes.data is List ? catRes.data : [];
           _fruits = List<Map<String, dynamic>>.from(res.data as List);
+          
+          if (_selectedGroceryCategoryId != null) {
+            if (!_groceryCategories.any((c) => c['id'] == _selectedGroceryCategoryId)) {
+              _selectedGroceryCategoryId = null;
+            }
+          }
         });
       }
     } catch (e) {
@@ -232,8 +242,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<Map<String, dynamic>> get _filteredFruits {
-    if (_searchQuery.isEmpty) return _fruits;
-    return _fruits.where((f) => (f['name'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    var filtered = _fruits;
+    if (_selectedGroceryCategoryId != null) {
+      filtered = filtered.where((f) => f['category_id'] == _selectedGroceryCategoryId).toList();
+    }
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((f) => (f['name'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    }
+    return filtered;
   }
 
   // ── PACKAGE CART LOGIC ──────────────────────────────────────────────────────
@@ -643,6 +659,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Widget> _buildFruitsSlivers() {
     return [
+      if (_fruits.isNotEmpty) ...[
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: 44,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _CategoryChip(label: 'All', isSelected: _selectedGroceryCategoryId == null, onTap: () => setState(() => _selectedGroceryCategoryId = null)),
+                ..._groceryCategories.map((cat) => _CategoryChip(
+                  label: cat['name'] ?? '',
+                  isSelected: _selectedGroceryCategoryId == cat['id'],
+                  onTap: () => setState(() => _selectedGroceryCategoryId = cat['id']),
+                )),
+              ],
+            ),
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+      ],
       if (_isLoadingFruits)
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 20),

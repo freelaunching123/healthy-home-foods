@@ -29,7 +29,7 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
 
   List<Map<String, dynamic>> _slots = [];
   String? _selectedDate;
-  String? _selectedTimeSlot;
+  String _selectedTimeSlot = 'Morning';
 
   bool _loadingCart = true;
   bool _loadingAddresses = true;
@@ -204,7 +204,7 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
       if (keyId != null && keyId.isNotEmpty && keyId != 'mock_key') {
         final options = {
           'key': keyId,
-          'amount': payData['amount'] ?? ((_total * 100).toInt()),
+          'amount': payData['amount'] ?? (((_total + _deliveryCharge) * 100).toInt()),
           'name': 'Healthy Home Foods',
           'description': 'Grocery Order Payment',
           'order_id': gatewayOrderId,
@@ -411,7 +411,7 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
                   onTap: () {
                     setState(() {
                       _selectedDate = dateStr;
-                      _selectedTimeSlot = null; // Reset slot when date changes
+                      _selectedTimeSlot = 'Morning'; // Reset slot when date changes
                     });
                   },
                   child: AnimatedContainer(
@@ -437,65 +437,36 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          Text('Select Time Slot', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary)),
+          Text('Select Delivery Session', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textPrimary)),
           const SizedBox(height: 10),
-          if (timeSlots.isEmpty)
-            const Text('No slots available for this date.', style: TextStyle(color: AppTheme.textLight, fontSize: 13))
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: timeSlots.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (ctx, i) {
-                final slot = timeSlots[i];
-                final slotName = slot['time_slot'] as String;
-                final available = slot['is_available'] as bool? ?? true;
-                final isSelected = slotName == _selectedTimeSlot;
-
-                return GestureDetector(
-                  onTap: available
-                      ? () => setState(() => _selectedTimeSlot = slotName)
-                      : null,
-                  child: Opacity(
-                    opacity: available ? 1.0 : 0.4,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppTheme.primaryGreen.withValues(alpha: 0.06) : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade200,
-                          width: isSelected ? 2 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
-                            color: isSelected ? AppTheme.primaryGreen : AppTheme.textLight,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            slotName,
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected ? AppTheme.primaryGreen : AppTheme.textPrimary,
-                            ),
-                          ),
-                          const Spacer(),
-                          if (!available)
-                            Text('UNAVAILABLE', style: GoogleFonts.inter(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)),
-                        ],
+          Row(
+            children: ['Morning', 'Afternoon', 'Evening'].map((session) {
+              final isSelected = _selectedTimeSlot == session;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedTimeSlot = session),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppTheme.primaryGreen : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade300),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      session,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : AppTheme.textPrimary,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        fontSize: 13,
                       ),
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );
