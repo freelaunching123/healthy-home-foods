@@ -285,9 +285,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.info_outline),
                   title: const Text('About Us'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('About Us coming soon')));
-                  },
+                  onTap: () => context.push('/about-us'),
                 ),
                 const SizedBox(height: 24),
               ],
@@ -302,7 +300,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
       value: value,
       onChanged: onChanged,
-      activeColor: AppTheme.primaryGreen,
+      activeThumbColor: AppTheme.primaryGreen,
     );
   }
 }

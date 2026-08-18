@@ -24,6 +24,7 @@ import '../../features/customer/screens/delivery_history_screen.dart';
 import '../../features/customer/screens/address_management_screen.dart';
 import '../../features/customer/screens/wishlist_screen.dart';
 import '../../features/customer/screens/reviews_screen.dart';
+import '../../features/customer/screens/about_us_screen.dart';
 // Fruit screens (Customer)
 import '../../features/customer/screens/grocery_detail_screen.dart';
 import '../../features/customer/screens/grocery_cart_screen.dart';
@@ -102,26 +103,26 @@ final GoRouter appRouter = GoRouter(
   },
   routes: [
     // Auth routes
-    GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
-    GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-    GoRoute(path: '/forgot-password', builder: (_, __) => const ForgotPasswordScreen()),
-    GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+    GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
+    GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+    GoRoute(path: '/forgot-password', builder: (_, _) => const ForgotPasswordScreen()),
+    GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
 
     // Customer shell with bottom nav (5 tabs: Home, Plans, Payments, Profile)
     StatefulShellRoute.indexedStack(
-      builder: (_, __, navigationShell) => CustomerShell(navigationShell: navigationShell),
+      builder: (context, state, navigationShell) => CustomerShell(navigationShell: navigationShell),
       branches: [
         StatefulShellBranch(routes: [
-          GoRoute(path: '/home', builder: (_, __) => const HomeScreen()),
+          GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/subscriptions', builder: (_, __) => const SubscriptionsScreen()),
+          GoRoute(path: '/subscriptions', builder: (_, _) => const SubscriptionsScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/payments', builder: (_, __) => const PaymentHistoryScreen()),
+          GoRoute(path: '/payments', builder: (_, _) => const PaymentHistoryScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+          GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
         ]),
       ],
     ),
@@ -146,13 +147,14 @@ final GoRouter appRouter = GoRouter(
       path: '/tracking/:deliveryId',
       builder: (_, state) => TrackingScreen(deliveryId: state.pathParameters['deliveryId']!),
     ),
-    GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
-    GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
-    GoRoute(path: '/profile/edit', builder: (_, __) => const EditProfileScreen()),
-    GoRoute(path: '/profile/subscription', builder: (_, __) => const MySubscriptionDetailScreen()),
-    GoRoute(path: '/profile/delivery-history', builder: (_, __) => const CustomerDeliveryHistoryScreen()),
-    GoRoute(path: '/profile/addresses', builder: (_, __) => const AddressManagementScreen()),
-    GoRoute(path: '/wishlist', builder: (_, __) => const WishlistScreen()),
+    GoRoute(path: '/notifications', builder: (_, _) => const NotificationsScreen()),
+    GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
+    GoRoute(path: '/about-us', builder: (_, _) => const AboutUsScreen()),
+    GoRoute(path: '/profile/edit', builder: (_, _) => const EditProfileScreen()),
+    GoRoute(path: '/profile/subscription', builder: (_, _) => const MySubscriptionDetailScreen()),
+    GoRoute(path: '/profile/delivery-history', builder: (_, _) => const CustomerDeliveryHistoryScreen()),
+    GoRoute(path: '/profile/addresses', builder: (_, _) => const AddressManagementScreen()),
+    GoRoute(path: '/wishlist', builder: (_, _) => const WishlistScreen()),
     GoRoute(
       path: '/reviews/:type/:id',
       builder: (_, state) => ReviewsScreen(
@@ -162,10 +164,10 @@ final GoRouter appRouter = GoRouter(
     ),
 
     // ── Fruit customer routes ──────────────────────────────────────────────────
-    GoRoute(path: '/fruits', redirect: (_, __) => '/home'),
-    GoRoute(path: '/fruits/cart', builder: (_, __) => const FruitCartScreen()),
-    GoRoute(path: '/fruits/checkout', builder: (_, __) => const FruitCheckoutScreen()),
-    GoRoute(path: '/fruits/orders', builder: (_, __) => const FruitOrderHistoryScreen()),
+    GoRoute(path: '/fruits', redirect: (_, _) => '/home'),
+    GoRoute(path: '/fruits/cart', builder: (_, _) => const FruitCartScreen()),
+    GoRoute(path: '/fruits/checkout', builder: (_, _) => const FruitCheckoutScreen()),
+    GoRoute(path: '/fruits/orders', builder: (_, _) => const FruitOrderHistoryScreen()),
     GoRoute(
       path: '/fruits/orders/:id',
       builder: (_, state) => FruitOrderDetailScreen(orderId: state.pathParameters['id']!),
@@ -176,43 +178,43 @@ final GoRouter appRouter = GoRouter(
     ),
     
     // ── Package customer routes ────────────────────────────────────────────────
-    GoRoute(path: '/packages', redirect: (_, __) => '/home'),
-    GoRoute(path: '/packages/cart', builder: (_, __) => const PackageCartScreen()),
-    GoRoute(path: '/packages/checkout', builder: (_, __) => const PackageCheckoutScreen()),
+    GoRoute(path: '/packages', redirect: (_, _) => '/home'),
+    GoRoute(path: '/packages/cart', builder: (_, _) => const PackageCartScreen()),
+    GoRoute(path: '/packages/checkout', builder: (_, _) => const PackageCheckoutScreen()),
 
     // Admin shell (5 tabs: Dashboard, Products, Fruits, Deliveries, Reports)
     StatefulShellRoute.indexedStack(
-      builder: (_, __, navigationShell) => AdminShell(navigationShell: navigationShell),
+      builder: (context, state, navigationShell) => AdminShell(navigationShell: navigationShell),
       branches: [
         StatefulShellBranch(routes: [
-          GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardScreen()),
+          GoRoute(path: '/admin', builder: (_, _) => const AdminDashboardScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/admin/products', builder: (_, __) => const ProductManagementScreen()),
+          GoRoute(path: '/admin/products', builder: (_, _) => const ProductManagementScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/admin/fruits', builder: (_, __) => const FruitManagementScreen()),
+          GoRoute(path: '/admin/fruits', builder: (_, _) => const FruitManagementScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/admin/deliveries', builder: (_, __) => const DeliveryManagementScreen()),
+          GoRoute(path: '/admin/deliveries', builder: (_, _) => const DeliveryManagementScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/admin/reports', builder: (_, __) => const ReportsScreen()),
+          GoRoute(path: '/admin/reports', builder: (_, _) => const ReportsScreen()),
         ]),
       ],
     ),
-    GoRoute(path: '/admin/products/add', builder: (_, __) => const AddProductScreen()),
+    GoRoute(path: '/admin/products/add', builder: (_, _) => const AddProductScreen()),
     GoRoute(
       path: '/admin/products/edit/:id',
       builder: (_, state) => AddProductScreen(productId: state.pathParameters['id']),
     ),
-    GoRoute(path: '/admin/categories', builder: (_, __) => const CategoryManagementScreen(categoryType: 'package')),
-    GoRoute(path: '/admin/grocery-categories', builder: (_, __) => const CategoryManagementScreen(categoryType: 'grocery')),
-    GoRoute(path: '/admin/products/analytics', builder: (_, __) => const ProductAnalyticsScreen()),
-    GoRoute(path: '/admin/customers', builder: (_, __) => const CustomerManagementScreen()),
-    GoRoute(path: '/admin/subscriptions', builder: (_, __) => const SubscriptionManagementScreen()),
-    GoRoute(path: '/admin/delivery-partners', builder: (_, __) => const DeliveryPartnerManagementScreen()),
-    GoRoute(path: '/admin/delivery-partners/create', builder: (_, __) => const CreateDeliveryPartnerScreen()),
+    GoRoute(path: '/admin/categories', builder: (_, _) => const CategoryManagementScreen(categoryType: 'package')),
+    GoRoute(path: '/admin/grocery-categories', builder: (_, _) => const CategoryManagementScreen(categoryType: 'grocery')),
+    GoRoute(path: '/admin/products/analytics', builder: (_, _) => const ProductAnalyticsScreen()),
+    GoRoute(path: '/admin/customers', builder: (_, _) => const CustomerManagementScreen()),
+    GoRoute(path: '/admin/subscriptions', builder: (_, _) => const SubscriptionManagementScreen()),
+    GoRoute(path: '/admin/delivery-partners', builder: (_, _) => const DeliveryPartnerManagementScreen()),
+    GoRoute(path: '/admin/delivery-partners/create', builder: (_, _) => const CreateDeliveryPartnerScreen()),
     GoRoute(
       path: '/admin/delivery-partners/:id',
       builder: (_, state) => DeliveryPartnerProfileScreen(
@@ -220,42 +222,42 @@ final GoRouter appRouter = GoRouter(
         initialData: state.extra as Map<String, dynamic>?,
       ),
     ),
-    GoRoute(path: '/admin/settings', builder: (_, __) => const AdminSettingsScreen()),
-    GoRoute(path: '/admin/change-password', builder: (_, __) => const AdminChangePasswordScreen()),
-    GoRoute(path: '/admin/delivery-settings', builder: (_, __) => const DeliverySettingsScreen()),
+    GoRoute(path: '/admin/settings', builder: (_, _) => const AdminSettingsScreen()),
+    GoRoute(path: '/admin/change-password', builder: (_, _) => const AdminChangePasswordScreen()),
+    GoRoute(path: '/admin/delivery-settings', builder: (_, _) => const DeliverySettingsScreen()),
 
     // ── Fruit admin routes ─────────────────────────────────────────────────────
-    GoRoute(path: '/admin/fruits/add', builder: (_, __) => const AddEditGroceryScreen()),
+    GoRoute(path: '/admin/fruits/add', builder: (_, _) => const AddEditGroceryScreen()),
     GoRoute(
       path: '/admin/fruits/edit/:id',
       builder: (_, state) => AddEditGroceryScreen(fruitId: state.pathParameters['id']),
     ),
-    GoRoute(path: '/admin/fruits/orders', builder: (_, __) => const FruitOrdersScreen()),
+    GoRoute(path: '/admin/fruits/orders', builder: (_, _) => const FruitOrdersScreen()),
     
     // ── Package admin routes ───────────────────────────────────────────────────
-    GoRoute(path: '/admin/packages/orders', builder: (_, __) => const PackageOrdersScreen()),
+    GoRoute(path: '/admin/packages/orders', builder: (_, _) => const PackageOrdersScreen()),
 
     // Delivery boy shell
     StatefulShellRoute.indexedStack(
-      builder: (_, __, navigationShell) => DeliveryShell(navigationShell: navigationShell),
+      builder: (context, state, navigationShell) => DeliveryShell(navigationShell: navigationShell),
       branches: [
         StatefulShellBranch(routes: [
-          GoRoute(path: '/delivery', builder: (_, __) => const DeliveryDashboardScreen()),
+          GoRoute(path: '/delivery', builder: (_, _) => const DeliveryDashboardScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/delivery/route', builder: (_, __) => const RouteScreen()),
+          GoRoute(path: '/delivery/route', builder: (_, _) => const RouteScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/delivery/history', builder: (_, __) => const DeliveryHistoryScreen()),
+          GoRoute(path: '/delivery/history', builder: (_, _) => const DeliveryHistoryScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/delivery/profile', builder: (_, __) => const DeliveryProfileScreen()),
+          GoRoute(path: '/delivery/profile', builder: (_, _) => const DeliveryProfileScreen()),
         ]),
       ],
     ),
     GoRoute(
       path: '/delivery/active',
-      builder: (_, __) => const ActiveDeliveriesScreen(),
+      builder: (_, _) => const ActiveDeliveriesScreen(),
     ),
     GoRoute(
       path: '/delivery/order/:id',

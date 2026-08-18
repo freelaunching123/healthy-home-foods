@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "160472789112",
-    "project_id": "healthy-home-foods-3d7f0",
-    "storage_bucket": "healthy-home-foods-3d7f0.firebasestorage.app"
+    "project_number": "855849751067",
+    "project_id": "healthy-home-foods-52cc7",
+    "storage_bucket": "healthy-home-foods-52cc7.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:160472789112:android:b54077155c509b21917d8d",
+        "mobilesdk_app_id": "1:855849751067:android:1193058c5dd5aa0ba71ebe",
         "android_client_info": {
           "package_name": "com.healthyhomefoods.mobile"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBH12TcS3KegWhgx1MiqjY-4ylM482sLYs"
+          "current_key": "AIzaSyBbz29ntCTGqV5fMagKQB8B00MFvtxvJTQ"
         }
       ],
       "services": {

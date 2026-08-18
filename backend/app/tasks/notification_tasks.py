@@ -39,7 +39,8 @@ def send_morning_delivery_notifications():
                     user_id=str(user.id),
                     title="Delivery Arriving Today",
                     body=f"Your healthy meal delivery is scheduled for today. Track it in the app!",
-                    data={"delivery_id": str(delivery.id), "type": "delivery_update"}
+                    data={"delivery_id": str(delivery.id), "type": "delivery_update"},
+                    db=db,
                 )
     asyncio.run(_run())
 
@@ -66,7 +67,8 @@ def send_expiry_reminders():
                     user_id=str(user.id),
                     title="Subscription Expiring Soon",
                     body=f"Your healthy meal subscription expires in 2 days. Renew now to avoid interruption!",
-                    data={"subscription_id": str(sub.id), "type": "subscription_expiry"}
+                    data={"subscription_id": str(sub.id), "type": "subscription_expiry"},
+                    db=db,
                 )
                 await NotificationService.send_sms(
                     phone_number=user.phone,

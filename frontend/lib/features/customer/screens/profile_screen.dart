@@ -52,9 +52,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final router = GoRouter.of(context);
               Navigator.pop(context);
               await _authService.logout();
-              if (mounted) context.go('/login');
+              router.go('/login');
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             child: const Text('Logout'),
@@ -157,6 +158,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       await context.push('/profile/addresses');
                       _loadProfile();
                     },
+                  ),
+                  _ProfileMenuItem(
+                    icon: Icons.info_outline,
+                    title: 'About Us',
+                    onTap: () => context.push('/about-us'),
                   ),
                   
                   const SizedBox(height: 32),

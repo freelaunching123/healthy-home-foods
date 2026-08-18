@@ -28,16 +28,21 @@ try:
 
         if not firebase_initialized:
             cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "./firebase-credentials.json")
+            if not os.path.exists(cred_path):
+                alt_path = os.path.join(os.path.dirname(__file__), "..", "..", "firebase-credentials.json")
+                if os.path.exists(alt_path):
+                    cred_path = alt_path
+
             if os.path.exists(cred_path):
                 try:
                     cred = credentials.Certificate(cred_path)
                     firebase_admin.initialize_app(cred)
                     firebase_initialized = True
-                    logger.info("Firebase Admin SDK initialized successfully.")
+                    logger.info(f"Firebase Admin SDK initialized successfully from file: {cred_path}")
                 except Exception as e:
                     logger.error(f"Error initializing Firebase Admin SDK from file: {e}")
             else:
-                logger.warning(f"Firebase credentials not found. Push notifications will run in Mock mode.")
+                logger.warning(f"Firebase credentials not found at {cred_path}. Push notifications will run in Mock mode.")
 except ImportError:
     logger.info("firebase_admin package not installed, push notifications disabled.")
 
@@ -49,18 +54,43 @@ class NotificationService:
     """
 
     @staticmethod
-    async def send_push_notification(user_id: str, title: str, body: str, data: dict = None):
-        """Mock FCM Push Notification"""
-        # In real implementation:
-        # 1. Fetch user's FCM token from DB (add fcm_token field to User model if not exists)
-        # 2. Send request to Firebase Admin SDK or FCM HTTP v1 API
+    async def send_push_notification(user_id: str, title: str, body: str, data: dict = None, db=None):
+        """FCM Push Notification with real token lookup and notification history recording."""
         logger.info(f"========== PUSH NOTIFICATION (FCM) ==========")
         logger.info(f"To User ID: {user_id}")
         logger.info(f"Title: {title}")
         logger.info(f"Body: {body}")
         logger.info(f"Data: {data}")
         logger.info(f"=============================================")
-        return True
+
+        try:
+            if db is not None:
+                return await NotificationService.send_notification_to_user(
+                    db=db,
+                    user_id=user_id,
+                    title=title,
+                    body=body,
+                    notification_type=(data or {}).get("type", "system"),
+                    reference_id=(data or {}).get("assignment_id") or (data or {}).get("delivery_id") or (data or {}).get("subscription_id"),
+                    data=data
+                )
+            else:
+                from app.db.session import AsyncSessionLocal
+                async with AsyncSessionLocal() as session:
+                    res = await NotificationService.send_notification_to_user(
+                        db=session,
+                        user_id=user_id,
+                        title=title,
+                        body=body,
+                        notification_type=(data or {}).get("type", "system"),
+                        reference_id=(data or {}).get("assignment_id") or (data or {}).get("delivery_id") or (data or {}).get("subscription_id"),
+                        data=data
+                    )
+                    await session.commit()
+                    return res
+        except Exception as e:
+            logger.error(f"Error in send_push_notification for user {user_id}: {e}")
+            return False
 
     @staticmethod
     async def send_sms(phone_number: str, message: str):

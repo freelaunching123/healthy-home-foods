@@ -153,7 +153,8 @@ async def auto_assign_delivery(
         user_id=str(best_match.user_id),
         title="New Delivery Assigned!",
         body=f"You have a new delivery assigned. Distance: {dist:.2f}km.",
-        data={"assignment_id": str(assignment.id), "type": "new_assignment"}
+        data={"assignment_id": str(assignment.id), "type": "new_assignment"},
+        db=db,
     )
     
     return assignment
