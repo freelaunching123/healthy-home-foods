@@ -99,11 +99,29 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
     }
   }
 
+  String _activeDatePreset = 'Today';
+  DateTimeRange? _customDateRange;
+
   Future<void> _loadDeliveries() async {
     try {
-      final Map<String, dynamic> qParams = {
-        'selected_date': DateFormat('yyyy-MM-dd').format(_selectedDate),
-      };
+      final Map<String, dynamic> qParams = {};
+      final now = DateTime.now();
+      
+      if (_activeDatePreset == 'Today') {
+        qParams['selected_date'] = DateFormat('yyyy-MM-dd').format(now);
+      } else if (_activeDatePreset == 'Yesterday') {
+        qParams['selected_date'] = DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 1)));
+      } else if (_activeDatePreset == 'Last 7 Days') {
+        qParams['start_date'] = DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 7)));
+        qParams['end_date'] = DateFormat('yyyy-MM-dd').format(now);
+      } else if (_activeDatePreset == 'This Month') {
+        qParams['start_date'] = DateFormat('yyyy-MM-dd').format(DateTime(now.year, now.month, 1));
+        qParams['end_date'] = DateFormat('yyyy-MM-dd').format(now);
+      } else if (_activeDatePreset == 'Custom' && _customDateRange != null) {
+        qParams['start_date'] = DateFormat('yyyy-MM-dd').format(_customDateRange!.start);
+        qParams['end_date'] = DateFormat('yyyy-MM-dd').format(_customDateRange!.end);
+      }
+
       if (_selectedStatus != 'all') qParams['status'] = _selectedStatus;
       if (_selectedPartnerId != 'all') qParams['delivery_partner_id'] = _selectedPartnerId;
       if (_searchQuery.isNotEmpty) qParams['search'] = _searchQuery;
@@ -559,9 +577,65 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
               ),
             ),
 
+            // Date Presets Bar
+            SizedBox(
+              height: 38,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  'Today', 'Yesterday', 'Last 7 Days', 'This Month', 'All Time', 'Custom'
+                ].map((preset) {
+                  final isSelected = _activeDatePreset == preset;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      selected: isSelected,
+                      label: Text(
+                        preset == 'Custom' && _customDateRange != null
+                            ? '${DateFormat('MMM d').format(_customDateRange!.start)} - ${DateFormat('MMM d').format(_customDateRange!.end)}'
+                            : preset,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? Colors.white : AppTheme.textPrimary,
+                        ),
+                      ),
+                      selectedColor: AppTheme.primaryGreen,
+                      backgroundColor: Colors.white,
+                      checkmarkColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      onSelected: (selected) async {
+                        if (preset == 'Custom') {
+                          final picked = await showDateRangePicker(
+                            context: context,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                            initialDateRange: _customDateRange,
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              _customDateRange = picked;
+                              _activeDatePreset = 'Custom';
+                              _isLoading = true;
+                            });
+                            _loadDeliveries();
+                          }
+                        } else {
+                          setState(() {
+                            _activeDatePreset = preset;
+                            _isLoading = true;
+                          });
+                          _loadDeliveries();
+                        }
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
 
-
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
             // Deliveries List
             Expanded(

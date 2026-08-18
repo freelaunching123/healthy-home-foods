@@ -50,6 +50,7 @@ class Fruit(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     price_per_kg: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    unit: Mapped[str] = mapped_column(String(20), default="kg", nullable=False)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     availability_status: Mapped[FruitAvailability] = mapped_column(
         SAEnum(FruitAvailability, name="fruit_availability_enum", values_callable=lambda x: [e.value for e in x]),

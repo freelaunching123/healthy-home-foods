@@ -130,8 +130,13 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
       setState(() {
         _slots = list;
         if (_slots.isNotEmpty) {
-          // Find first available slot or set selected date to the first date in list
-          final uniqueDates = _slots.map((s) => s['date'] as String).toSet().toList();
+          // Filter delivery dates to start from next day (tomorrow)
+          final tomorrowStr = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
+          final uniqueDates = _slots
+              .map((s) => s['date'] as String)
+              .where((d) => d.compareTo(tomorrowStr) >= 0)
+              .toSet()
+              .toList();
           uniqueDates.sort();
           if (uniqueDates.isNotEmpty) {
             _selectedDate = uniqueDates[0];
@@ -167,7 +172,7 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
       );
       return;
     }
-    if (_selectedDate == null || _selectedTimeSlot == null) {
+    if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a delivery date and time slot'), backgroundColor: AppTheme.warning),
       );
@@ -379,10 +384,13 @@ class _FruitCheckoutScreenState extends State<FruitCheckoutScreen> {
       );
     }
 
-    final uniqueDates = _slots.map((s) => s['date'] as String).toSet().toList();
+    final tomorrowStr = DateFormat('yyyy-MM-dd').format(DateTime.now().add(const Duration(days: 1)));
+    final uniqueDates = _slots
+        .map((s) => s['date'] as String)
+        .where((d) => d.compareTo(tomorrowStr) >= 0)
+        .toSet()
+        .toList();
     uniqueDates.sort();
-
-    final timeSlots = _slots.where((s) => s['date'] == _selectedDate).toList();
 
     return Container(
       padding: const EdgeInsets.all(16),

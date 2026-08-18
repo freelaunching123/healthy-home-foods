@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/services/api_client.dart';
-import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
 
 class CustomerShell extends StatefulWidget {
@@ -18,9 +16,15 @@ class _CustomerShellState extends State<CustomerShell> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        if (context.canPop()) {
+        final location = GoRouterState.of(context).matchedLocation;
+        final isRootTab = location == '/home' ||
+            location == '/subscriptions' ||
+            location == '/payments' ||
+            location == '/profile';
+
+        if (!isRootTab && context.canPop()) {
           context.pop();
           return;
         }
@@ -143,76 +147,4 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _NavItemBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final int badgeCount;
-  final bool isSelected;
-  final VoidCallback onTap;
 
-  const _NavItemBadge({
-    required this.icon,
-    required this.label,
-    required this.badgeCount,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryGreen.withValues(alpha: 0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(icon, size: 24, color: isSelected ? AppTheme.primaryGreen : AppTheme.textLight),
-                if (badgeCount > 0)
-                  Positioned(
-                    top: -6,
-                    right: -8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: AppTheme.error,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 14),
-                      child: Text(
-                        badgeCount > 99 ? '99+' : '$badgeCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? AppTheme.primaryGreen : AppTheme.textLight,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

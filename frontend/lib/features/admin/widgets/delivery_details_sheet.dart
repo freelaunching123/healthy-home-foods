@@ -149,10 +149,11 @@ class DeliveryDetailsSheet extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(event['status'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      if (event['description'] != null)
-                        Text(event['description'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                      Text(timestamp, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                      Text(event['status'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      if (event['description'] != null && event['description'].toString().isNotEmpty)
+                        Text(event['description'], style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                      if (timestamp.isNotEmpty)
+                        Text('Time: $timestamp', style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w500)),
                     ],
                   ),
                 ),

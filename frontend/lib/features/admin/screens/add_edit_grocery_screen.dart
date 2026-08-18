@@ -26,6 +26,7 @@ class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
   final _priceCtrl = TextEditingController();
 
   String _availability = 'in_stock';
+  String _unit = 'kg';
   bool _isActive = true;
   String? _selectedCategoryId;
   List<dynamic> _groceryCategories = [];
@@ -82,6 +83,7 @@ class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
       setState(() {
         _selectedCategoryId = data['category_id'] as String?;
         _availability = data['availability_status'] as String? ?? 'in_stock';
+        _unit = data['unit'] as String? ?? 'kg';
         _isActive = data['is_active'] as bool? ?? true;
         _existingImageUrl = data['image_url'] as String?;
         _savedFruitId = widget.fruitId;
@@ -115,6 +117,7 @@ class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
         'name': _nameCtrl.text.trim(),
         'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         'price_per_kg': double.parse(_priceCtrl.text.trim()),
+        'unit': _unit,
         'availability_status': _availability,
         'is_active': _isActive,
       };
@@ -311,7 +314,7 @@ class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
                         decoration: _inputDecoration('Brief description (optional)'),
                       ),
                       const SizedBox(height: 16),
-                      _label('Price per KG / Unit (₹) *'),
+                      _label('Price per Unit (₹) *'),
                       TextFormField(
                         controller: _priceCtrl,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -322,6 +325,18 @@ class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
                           if (d == null || d <= 0) return 'Enter a valid price greater than 0';
                           return null;
                         },
+                      ),
+                      const SizedBox(height: 16),
+                      _label('Unit of Measurement *'),
+                      DropdownButtonFormField<String>(
+                        value: _unit,
+                        decoration: _inputDecoration('Select Unit'),
+                        items: const [
+                          DropdownMenuItem(value: 'kg', child: Text('Kilogram (kg)')),
+                          DropdownMenuItem(value: 'ml', child: Text('Milliliter (ml)')),
+                          DropdownMenuItem(value: 'ltr', child: Text('Liter (ltr)')),
+                        ],
+                        onChanged: (val) => setState(() => _unit = val ?? 'kg'),
                       ),
                     ]),
 

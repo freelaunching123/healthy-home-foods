@@ -134,9 +134,17 @@ async def get_active_deliveries(
             if not u:
                 continue
             
+            slot_code = "1"
+            if sub.preferred_delivery_time:
+                st = sub.preferred_delivery_time.lower()
+                if "afternoon" in st: slot_code = "2"
+                elif "evening" in st: slot_code = "3"
+            sub_seq = str(sd.id.int)[-5:]
+            d_date = sd.created_at.strftime('%Y%m%d') if sd.created_at else today.strftime('%Y%m%d')
+            
             response_list.append(ActiveDeliveryResponse(
                 id=a.id,
-                order_id=str(sd.id)[-8:].upper(),
+                order_id=f"SUB-{d_date}-{slot_code}-{sub_seq}",
                 order_type="subscription",
                 customer_name=u.full_name,
                 customer_phone=u.phone,
@@ -157,6 +165,10 @@ async def get_active_deliveries(
             if not fo:
                 continue
             if fo.order_status in [FruitOrderStatus.DELIVERED, FruitOrderStatus.CANCELLED]:
+                continue
+            # CRITICAL RULE: A grocery order scheduled for a future calendar date
+            # MUST NOT be shown as an active delivery on today's list.
+            if fo.delivery_date and fo.delivery_date > today:
                 continue
             cust_res = await db.execute(select(Customer).where(Customer.id == fo.customer_id))
             cust = cust_res.scalar_one_or_none()
@@ -185,7 +197,7 @@ async def get_active_deliveries(
                 items_summary="Fresh Fruits Order",
                 total_amount=float(fo.total_amount),
                 delivery_instructions=fo.notes,
-                scheduled_time="9 AM - 6 PM"
+                scheduled_time=fo.delivery_slot or "Morning"
             ))
             
     return response_list
@@ -410,7 +422,7 @@ async def get_assignment_details(
             items_summary=items_summary or "Fresh Fruits Order",
             total_amount=float(fo.total_amount),
             delivery_instructions=fo.notes,
-            scheduled_time="9 AM - 6 PM"
+            scheduled_time=fo.delivery_slot or "Morning"
         )
 
 from app.schemas.common import UpdateDeliveryStatusRequest

@@ -243,7 +243,7 @@ class _RouteScreenState extends State<RouteScreen> {
                           const Icon(Icons.access_time, size: 16, color: Colors.grey),
                           const SizedBox(width: 8),
                           Text(
-                            'Delivery Time: ${stop['scheduled_time'] ?? 'Standard (9 AM - 6 PM)'}',
+                            'Delivery Time: ${stop['scheduled_time'] ?? 'Morning'}',
                             style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                           ),
                         ],

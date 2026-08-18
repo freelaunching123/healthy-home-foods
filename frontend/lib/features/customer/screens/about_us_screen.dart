@@ -3,15 +3,22 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 
-class AboutUsScreen extends StatelessWidget {
+class AboutUsScreen extends StatefulWidget {
   const AboutUsScreen({super.key});
 
+  @override
+  State<AboutUsScreen> createState() => _AboutUsScreenState();
+}
+
+class _AboutUsScreenState extends State<AboutUsScreen> {
   static const String facebookUrl = 'https://www.facebook.com/share/1PcuRhGy6M/';
   static const String instagramUrl =
       'https://www.instagram.com/healthy_home_foods_india?igsh=MXBzbGxkamNjMmR4cQ==';
   static const String phoneNumber = '+91 75981 66088';
   static const String emailAddress = 'healthyhomesmdu@gmail.com';
   static const String locationAddress = 'Madurai, Tamil Nadu, India';
+
+  bool _isTimingExpanded = false;
 
   Future<void> _openUrl(BuildContext context, String urlString) async {
     final Uri uri = Uri.parse(urlString);
@@ -37,18 +44,18 @@ class AboutUsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Dark slate theme matching reference image
+      backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppTheme.textPrimary),
           onPressed: () => context.pop(),
         ),
         title: const Text(
           'About Us',
           style: TextStyle(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
@@ -60,100 +67,166 @@ class AboutUsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Header Card / Logo banner
+            // Top Banner Card with Official Logo Image
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white10),
+                border: Border.all(color: Colors.grey.shade200),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 children: [
-                  Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryGreen.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppTheme.primaryGreen, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.restaurant_menu_rounded,
-                      color: AppTheme.primaryGreen,
-                      size: 38,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Healthy Home Foods',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Eat Healthy, Stay Healthy',
-                    style: TextStyle(
-                      color: Color(0xFF4ADE80),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                  Image.asset(
+                    'assets/logo.png',
+                    height: 110,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Column(
+                      children: const [
+                        Icon(Icons.storefront_rounded, size: 60, color: AppTheme.primaryGreen),
+                        SizedBox(height: 8),
+                        Text(
+                          'Healthy Home Foods',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
-            // Content List Container matching reference image exactly
+            // Sunday Holiday Banner
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.event_busy_outlined, color: AppTheme.primaryGreen, size: 20),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Every Sunday is Holiday',
+                      style: TextStyle(
+                        color: AppTheme.primaryGreen,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Content List Card
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                border: Border.all(color: Colors.grey.shade200),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 children: [
                   // 1. Phone
                   _buildListTile(
                     icon: Icons.phone_outlined,
-                    iconColor: Colors.white70,
+                    iconColor: AppTheme.primaryGreen,
                     title: phoneNumber,
-                    titleColor: Colors.white,
+                    titleColor: AppTheme.textPrimary,
                     onTap: () => _openUrl(context, 'tel:+917598166088'),
                   ),
                   _buildDivider(),
 
-                  // 2. Shop Time (Open now changed to Shop Time as requested)
-                  _buildListTile(
-                    icon: Icons.access_time_outlined,
-                    iconColor: Colors.white70,
-                    title: 'Shop Time',
-                    titleColor: const Color(0xFF4ADE80), // Green
-                    trailingWidget: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text(
-                          '6:00 am –\n8:00 pm',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            height: 1.2,
+                  // 2. Expandable Shop Time
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _isTimingExpanded = !_isTimingExpanded;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              const SizedBox(
+                                width: 32,
+                                child: Icon(Icons.access_time_outlined, color: AppTheme.primaryGreen, size: 24),
+                              ),
+                              const SizedBox(width: 14),
+                              const Expanded(
+                                child: Text(
+                                  'Shop Time',
+                                  style: TextStyle(
+                                    color: AppTheme.textPrimary,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              const Text(
+                                '6:00 am – 8:00 pm',
+                                style: TextStyle(
+                                  color: AppTheme.primaryGreen,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                _isTimingExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                color: AppTheme.textSecondary,
+                                size: 22,
+                              ),
+                            ],
                           ),
-                        ),
-                        SizedBox(width: 8),
-                        Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 20),
-                      ],
+                          if (_isTimingExpanded) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppTheme.scaffoldBg,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Column(
+                                children: [
+                                  _buildDayRow('Monday', '6:00 am - 8:00 pm'),
+                                  _buildDayRow('Tuesday', '6:00 am - 8:00 pm'),
+                                  _buildDayRow('Wednesday', '6:00 am - 8:00 pm'),
+                                  _buildDayRow('Thursday', '6:00 am - 8:00 pm'),
+                                  _buildDayRow('Friday', '6:00 am - 8:00 pm'),
+                                  _buildDayRow('Saturday', '6:00 am - 8:00 pm'),
+                                  _buildDayRow('Sunday', 'Holiday', isHoliday: true),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                   _buildDivider(),
@@ -161,27 +234,18 @@ class AboutUsScreen extends StatelessWidget {
                   // 3. Restaurant Category
                   _buildListTile(
                     icon: Icons.category_outlined,
-                    iconColor: Colors.white70,
+                    iconColor: AppTheme.primaryGreen,
                     title: 'Restaurant',
-                    titleColor: Colors.white,
+                    titleColor: AppTheme.textPrimary,
                   ),
                   _buildDivider(),
 
-                  // 4. Tagline
-                  _buildListTile(
-                    icon: Icons.storefront_outlined,
-                    iconColor: Colors.white70,
-                    title: 'EAT HEALTHY STAY HEALTHY',
-                    titleColor: Colors.white,
-                  ),
-                  _buildDivider(),
-
-                  // 5. Location
+                  // 4. Location
                   _buildListTile(
                     icon: Icons.location_on_outlined,
-                    iconColor: Colors.white70,
+                    iconColor: AppTheme.primaryGreen,
                     title: locationAddress,
-                    titleColor: const Color(0xFF60A5FA), // Accent Blue
+                    titleColor: AppTheme.textPrimary,
                     onTap: () => _openUrl(
                       context,
                       'https://www.google.com/maps/search/?api=1&query=Madurai,+Tamil+Nadu,+India',
@@ -189,19 +253,17 @@ class AboutUsScreen extends StatelessWidget {
                   ),
                   _buildDivider(),
 
-                  // 6. Email
+                  // 5. Email
                   _buildListTile(
                     icon: Icons.mail_outline,
-                    iconColor: Colors.white70,
+                    iconColor: AppTheme.primaryGreen,
                     title: emailAddress,
-                    titleColor: const Color(0xFF60A5FA), // Accent Blue
+                    titleColor: AppTheme.textPrimary,
                     onTap: () => _openUrl(context, 'mailto:$emailAddress'),
                   ),
                   _buildDivider(),
 
-                  // Note: Item 7 (Red marked scribble in user screenshot) is excluded per instruction!
-
-                  // 8. Facebook Link
+                  // 6. Facebook Link
                   _buildListTile(
                     customIcon: Container(
                       width: 28,
@@ -223,13 +285,12 @@ class AboutUsScreen extends StatelessWidget {
                       ),
                     ),
                     title: 'healthyhome-madurai',
-                    titleColor: const Color(0xFF4ADE80), // Green text
-                    subtitle: 'Facebook • 7,872 Likes',
+                    titleColor: AppTheme.primaryGreen,
                     onTap: () => _openUrl(context, facebookUrl),
                   ),
                   _buildDivider(),
 
-                  // 9. Instagram Link
+                  // 7. Instagram Link
                   _buildListTile(
                     customIcon: Container(
                       width: 28,
@@ -253,8 +314,7 @@ class AboutUsScreen extends StatelessWidget {
                       ),
                     ),
                     title: '@healthy_home_foods_india',
-                    titleColor: const Color(0xFF4ADE80), // Green text
-                    subtitle: 'Instagram • 16,459 Followers',
+                    titleColor: AppTheme.primaryGreen,
                     onTap: () => _openUrl(context, instagramUrl),
                   ),
                 ],
@@ -268,10 +328,37 @@ class AboutUsScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildDayRow(String day, String timing, {bool isHoliday = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            day,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          Text(
+            timing,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isHoliday ? FontWeight.bold : FontWeight.w600,
+              color: isHoliday ? AppTheme.error : AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildListTile({
     IconData? icon,
     Widget? customIcon,
-    Color iconColor = Colors.white70,
+    Color iconColor = AppTheme.primaryGreen,
     required String title,
     required Color titleColor,
     String? subtitle,
@@ -298,7 +385,7 @@ class AboutUsScreen extends StatelessWidget {
                     title,
                     style: TextStyle(
                       color: titleColor,
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -307,15 +394,15 @@ class AboutUsScreen extends StatelessWidget {
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12.5,
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-            ?trailingWidget,
+            if (trailingWidget != null) trailingWidget,
           ],
         ),
       ),
@@ -326,7 +413,7 @@ class AboutUsScreen extends StatelessWidget {
     return Divider(
       height: 1,
       thickness: 1,
-      color: Colors.white.withValues(alpha: 0.06),
+      color: Colors.grey.shade200,
       indent: 62,
     );
   }

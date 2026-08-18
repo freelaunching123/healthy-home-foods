@@ -11,6 +11,7 @@ class FruitCreate(BaseModel):
     name: str
     description: Optional[str] = None
     price_per_kg: float
+    unit: str = "kg"
     availability_status: str = "in_stock"
     is_active: bool = True
 
@@ -35,6 +36,7 @@ class FruitUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     price_per_kg: Optional[float] = None
+    unit: Optional[str] = None
     availability_status: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -53,6 +55,7 @@ class FruitResponse(BaseModel):
     name: str
     description: Optional[str]
     price_per_kg: float
+    unit: str = "kg"
     image_url: Optional[str]
     availability_status: str
     is_active: bool

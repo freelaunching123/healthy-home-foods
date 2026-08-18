@@ -11,9 +11,15 @@ class DeliveryShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        if (context.canPop()) {
+        final location = GoRouterState.of(context).matchedLocation;
+        final isRootTab = location == '/delivery' ||
+            location == '/delivery/route' ||
+            location == '/delivery/history' ||
+            location == '/delivery/profile';
+
+        if (!isRootTab && context.canPop()) {
           context.pop();
           return;
         }

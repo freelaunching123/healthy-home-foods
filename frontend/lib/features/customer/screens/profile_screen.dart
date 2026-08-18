@@ -159,11 +159,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _loadProfile();
                     },
                   ),
-                  _ProfileMenuItem(
-                    icon: Icons.info_outline,
-                    title: 'About Us',
-                    onTap: () => context.push('/about-us'),
-                  ),
                   
                   const SizedBox(height: 32),
                   

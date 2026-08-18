@@ -76,8 +76,6 @@ async def get_filtered_deliveries_query(
         stmt = stmt.where(SubscriptionDelivery.scheduled_date.between(start_date, end_date))
     elif selected_date:
         stmt = stmt.where(SubscriptionDelivery.scheduled_date == selected_date)
-    else:
-        stmt = stmt.where(SubscriptionDelivery.scheduled_date == date.today())
 
     # Status filter
     if status:
@@ -183,12 +181,11 @@ async def list_deliveries(
         .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
     )
 
+    fruit_date_col = func.coalesce(FruitOrder.delivery_date, func.date(FruitOrder.created_at))
     if start_date and end_date:
-        fruit_stmt = fruit_stmt.where(FruitOrder.delivery_date.between(start_date, end_date))
+        fruit_stmt = fruit_stmt.where(fruit_date_col.between(start_date, end_date))
     elif selected_date:
-        fruit_stmt = fruit_stmt.where(FruitOrder.delivery_date == selected_date)
-    else:
-        fruit_stmt = fruit_stmt.where(FruitOrder.delivery_date == date.today())
+        fruit_stmt = fruit_stmt.where(fruit_date_col == selected_date)
 
     if status:
         if status in ("failed", "missed", "cancelled", "skipped"):
@@ -215,7 +212,7 @@ async def list_deliveries(
             )
         )
 
-    fruit_stmt = fruit_stmt.order_by(FruitOrder.delivery_date.desc().nulls_last(), FruitOrder.created_at.desc())
+    fruit_stmt = fruit_stmt.order_by(fruit_date_col.desc(), FruitOrder.created_at.desc())
     fruit_res = await db.execute(fruit_stmt)
     fruit_rows = fruit_res.all()
 
@@ -234,7 +231,7 @@ async def list_deliveries(
 
         items.append(AdminDeliveryListItem(
             id=f_order.id,
-            order_type="fruit",
+            order_type="grocery",
             subscription_id=None,
             fruit_order_id=f_order.id,
             customer_name=c_user.full_name,
@@ -244,11 +241,11 @@ async def list_deliveries(
             delivery_partner_phone=p_user.phone if p_user else None,
             delivery_address=addr_str,
             scheduled_date=f_order.delivery_date or f_order.created_at.date(),
-            delivery_time=f_order.delivery_slot or "Standard",
+            delivery_time=f_order.delivery_slot or "Morning",
             amount=float(f_order.total_amount),
             payment_status=pay_status,
             status=f_order.order_status.value if hasattr(f_order.order_status, "value") else str(f_order.order_status),
-            item_summary=f"Fruit Order #{f_order.order_number}",
+            item_summary=f"Grocery Order #{f_order.order_number}",
         ))
 
     # Re-sort combined list by date desc
@@ -467,7 +464,7 @@ async def get_delivery_details(
         .join(Subscription, Subscription.id == SubscriptionDelivery.subscription_id)
         .join(Customer, Customer.id == Subscription.customer_id)
         .join(CustomerUser, CustomerUser.id == Customer.user_id)
-        .join(Address, Address.id == Subscription.address_id)
+        .outerjoin(Address, Address.id == Subscription.address_id)
         .outerjoin(DeliveryAssignment, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
         .outerjoin(DeliveryPartner, DeliveryPartner.id == DeliveryAssignment.delivery_partner_id)
         .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
@@ -534,15 +531,18 @@ async def get_delivery_details(
             longitude=float(addr.longitude) if addr and addr.longitude else None,
         )
 
-        f_items_stmt = select(FruitOrderItem, Fruit).join(Fruit, Fruit.id == FruitOrderItem.fruit_id).where(FruitOrderItem.order_id == f_order.id)
+        f_items_stmt = select(FruitOrderItem, Fruit).outerjoin(Fruit, Fruit.id == FruitOrderItem.fruit_id).where(FruitOrderItem.order_id == f_order.id)
         f_items_res = await db.execute(f_items_stmt)
         products_list = []
         for fi, fr in f_items_res.all():
+            u_val = getattr(fr, "unit", "kg") if fr else "kg"
+            if hasattr(u_val, "value"):
+                u_val = u_val.value
             products_list.append(AdminDeliveryProduct(
-                id=fr.id,
-                name=fr.name,
-                quantity=fi.quantity,
-                unit=fr.unit.value if hasattr(fr.unit, "value") else str(fr.unit)
+                id=fr.id if fr else uuid.uuid4(),
+                name=fr.name if fr else "Fresh Item",
+                quantity=float(fi.quantity_kg),
+                unit=str(u_val or "kg")
             ))
 
         timeline = [AdminDeliveryTimelineEvent(
@@ -834,14 +834,16 @@ async def assign_or_reassign_partner(
                 reference_id=str(delivery.id)
             )
 
-    await NotificationService.send_notification_to_user(
-        db=db,
-        user_id=partner.user_id,
-        title="New Delivery Assigned",
-        body="You have been assigned a new delivery for today.",
-        notification_type="delivery",
-        reference_id=str(delivery.id)
-    )
+    # Notification: send to partner ONLY if scheduled for today
+    if delivery.scheduled_date == date.today():
+        await NotificationService.send_notification_to_user(
+            db=db,
+            user_id=partner.user_id,
+            title="New Delivery Assigned",
+            body="You have been assigned a new delivery for today.",
+            notification_type="delivery",
+            reference_id=str(delivery.id)
+        )
 
     return MessageResponse(message=f"Delivery assigned to {partner_user.full_name}")
 

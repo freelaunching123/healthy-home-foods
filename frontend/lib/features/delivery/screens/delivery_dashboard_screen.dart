@@ -144,7 +144,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
     return Column(
       children: [
         _buildStatCard(
-          'Assigned Deliveries Today', 
+          'Today Deliveries', 
           _stats!['assigned_today']?.toString() ?? '0', 
           Icons.assignment_outlined, 
           Colors.blue,
@@ -420,7 +420,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
                     const Icon(Icons.access_time_outlined, size: 18, color: Colors.grey),
                     const SizedBox(width: 8),
                     Text(
-                      'Delivery Time: ${delivery['scheduled_time'] ?? 'Standard (9 AM - 6 PM)'}',
+                      'Delivery Time: ${delivery['scheduled_time'] ?? 'Morning'}',
                       style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                     ),
                   ],

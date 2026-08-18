@@ -58,10 +58,19 @@ async def _get_customer(db: AsyncSession, user_id: UUID) -> Customer:
     return customer
 
 
-def _generate_order_number() -> str:
+def _generate_order_number(slot: Optional[str] = None) -> str:
     now = datetime.now(timezone.utc)
-    suffix = str(uuid_lib.uuid4()).replace("-", "")[:6].upper()
-    return f"FRT-{now.strftime('%Y%m%d')}-{suffix}"
+    slot_code = "1"
+    if slot:
+        s = str(slot).lower()
+        if "afternoon" in s or "12:" in s or "1:" in s or "2:" in s or "3:" in s or "4:" in s:
+            slot_code = "2"
+        elif "evening" in s or "5:" in s or "6:" in s or "7:" in s or "8:" in s:
+            slot_code = "3"
+        elif "morning" in s:
+            slot_code = "1"
+    suffix = str(uuid_lib.uuid4().int)[-6:]
+    return f"GRC-{now.strftime('%Y%m%d')}-{slot_code}-{suffix}"
 
 
 def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None) -> FruitOrderResponse:
@@ -421,7 +430,7 @@ async def checkout(
     order = FruitOrder(
         customer_id=customer.id,
         address_id=address.id,
-        order_number=_generate_order_number(),
+        order_number=_generate_order_number(payload.delivery_slot),
         total_amount=round(total + delivery_charge, 2),
         payment_status=FruitPaymentStatus.PENDING,
         order_status=FruitOrderStatus.PENDING,
@@ -955,20 +964,18 @@ async def admin_assign_fruit_order(
 
     await db.commit()
 
-    # Notify customer
-    try:
-        from app.services.notification_service import NotificationService
-        cust_res = await db.execute(select(Customer).where(Customer.id == order.customer_id))
-        cust = cust_res.scalar_one_or_none()
-        if cust:
+    # Notify partner ONLY if delivery date is today
+    if partner and (order.delivery_date is None or order.delivery_date == date.today()):
+        try:
+            from app.services.notification_service import NotificationService
             await NotificationService.send_notification_to_user(
-                db=db, user_id=cust.user_id, title="Delivery Assigned",
-                body=f"Your fruit order {order.order_number} has been assigned to a delivery partner.",
+                db=db, user_id=partner.user_id, title="New Delivery Assigned",
+                body=f"You have been assigned a new grocery delivery (#{order.order_number}).",
                 notification_type="delivery", reference_id=str(order.id)
             )
-    except Exception as e:
-        import logging
-        logging.error(f"Failed to notify customer of assignment: {e}")
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to notify partner of assignment: {e}")
 
     return MessageResponse(message="Delivery partner assigned successfully")
 
@@ -1075,7 +1082,8 @@ async def get_available_slots(db: AsyncSession = Depends(get_db)):
     from sqlalchemy import select
 
     now = datetime.datetime.now(datetime.timezone.utc).date()
-    result = await db.execute(select(DeliverySlot).where(DeliverySlot.slot_date >= now))
+    tomorrow = now + datetime.timedelta(days=1)
+    result = await db.execute(select(DeliverySlot).where(DeliverySlot.slot_date >= tomorrow))
     slots = result.scalars().all()
     
     if not slots:
@@ -1095,7 +1103,7 @@ async def get_available_slots(db: AsyncSession = Depends(get_db)):
                 db.add(slot)
         await db.commit()
         
-        result = await db.execute(select(DeliverySlot).where(DeliverySlot.slot_date >= now))
+        result = await db.execute(select(DeliverySlot).where(DeliverySlot.slot_date >= tomorrow))
         slots = result.scalars().all()
         
     return [{"id": str(s.id), "date": s.slot_date.isoformat(), "time_slot": s.time_slot, "is_available": s.is_available} for s in slots]
