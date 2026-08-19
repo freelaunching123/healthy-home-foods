@@ -56,23 +56,55 @@ class _MySubscriptionDetailScreenState extends State<MySubscriptionDetailScreen>
     final id = _subscription?['id'];
     if (id == null) return;
 
-    final confirm = await _showConfirmDialog(
-      title: 'Pause Subscription',
-      content: 'Are you sure you want to pause your meal subscription? You will not receive deliveries while paused.',
-      confirmLabel: 'Pause',
-      confirmColor: AppTheme.warning,
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.pause_circle_outline_rounded, color: AppTheme.warning),
+            SizedBox(width: 8),
+            Text('Pause Subscription?'),
+          ],
+        ),
+        content: const Text(
+          'If you click pause today, you will not receive today\'s delivery. Are you sure you want to pause?',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.warning,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Yes, Pause'),
+          ),
+        ],
+      ),
     );
     if (confirm != true) return;
 
     setState(() => _isActionInProgress = true);
     try {
       await _api.post('${ApiConstants.subscriptions}/$id/pause', data: {'reason': 'User requested'});
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Subscription paused'), backgroundColor: AppTheme.success));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Subscription paused'), backgroundColor: AppTheme.success));
+      }
       _loadCurrentSubscription();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to pause subscription'), backgroundColor: AppTheme.error));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to pause subscription'), backgroundColor: AppTheme.error));
+      }
     } finally {
-      setState(() => _isActionInProgress = false);
+      if (mounted) {
+        setState(() => _isActionInProgress = false);
+      }
     }
   }
 
@@ -83,36 +115,37 @@ class _MySubscriptionDetailScreenState extends State<MySubscriptionDetailScreen>
     setState(() => _isActionInProgress = true);
     try {
       await _api.post('${ApiConstants.subscriptions}/$id/resume');
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Subscription resumed'), backgroundColor: AppTheme.success));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Subscription resumed'), backgroundColor: AppTheme.success));
+      }
       _loadCurrentSubscription();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to resume subscription'), backgroundColor: AppTheme.error));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to resume subscription'), backgroundColor: AppTheme.error));
+      }
     } finally {
-      setState(() => _isActionInProgress = false);
+      if (mounted) {
+        setState(() => _isActionInProgress = false);
+      }
     }
   }
 
-  Future<bool?> _showConfirmDialog({
-    required String title,
-    required String content,
-    required String confirmLabel,
-    required Color confirmColor,
-  }) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(content),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: confirmColor, foregroundColor: Colors.white),
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
-    );
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    if (cleanPhone.isEmpty) return;
+    final Uri launchUri = Uri(scheme: 'tel', path: cleanPhone);
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Error launching phone dialer: $e');
+      try {
+        await launchUrl(launchUri);
+      } catch (_) {}
+    }
   }
 
   @override
@@ -346,7 +379,8 @@ class _MySubscriptionDetailScreenState extends State<MySubscriptionDetailScreen>
                   if (partnerPhone != null)
                     IconButton(
                       icon: const Icon(Icons.phone_rounded, color: AppTheme.primaryGreen),
-                      onPressed: () => launchUrl(Uri.parse('tel:$partnerPhone')),
+                      onPressed: () => _makePhoneCall(partnerPhone),
+                      tooltip: 'Call Delivery Partner',
                     ),
                 ],
               ),

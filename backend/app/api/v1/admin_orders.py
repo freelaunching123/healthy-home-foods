@@ -110,9 +110,16 @@ async def list_all_orders(
         if status and unified_status != status:
             continue
             
+        from app.core.order_utils import format_subscription_order_id
+        order_id_str = format_subscription_order_id(
+            scheduled_date=deliv.scheduled_date,
+            preferred_time=sub.preferred_delivery_time,
+            delivery_id=deliv.id
+        )
+
         unified_orders.append(UnifiedOrderResponse(
             id=str(deliv.id),
-            order_id=f"SUB-{str(deliv.id)[:8].upper()}",
+            order_id=order_id_str,
             order_type="subscription",
             customer_name=c_user.full_name,
             customer_phone=c_user.phone,

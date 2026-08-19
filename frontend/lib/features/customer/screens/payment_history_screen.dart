@@ -497,7 +497,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen>
             const SizedBox(height: 20),
             // Detail Rows
             _detailRow('Transaction ID', id, mono: true),
-            _detailRow('Subscription', payment['subscription_name'] ?? '—'),
+            _detailRow('Item / Plan', payment['subscription_name'] ?? '—'),
             _detailRow('Payment Method', (payment['payment_method'] ?? 'Razorpay').toString().toUpperCase()),
             const Divider(height: 24),
             _detailRow('Base Amount', _formatAmount(payment['amount'])),

@@ -74,6 +74,9 @@
 	<array>
 		<string>fetch</string>
 		<string>remote-notification</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
 	</array>
 </dict>
 </plist>

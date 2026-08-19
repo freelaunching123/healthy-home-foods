@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 class AdminDeliveryListItem(BaseModel):
     id: uuid.UUID
+    order_id: Optional[str] = None
     order_type: str = "subscription"
     subscription_id: Optional[uuid.UUID] = None
     fruit_order_id: Optional[uuid.UUID] = None
@@ -28,8 +29,9 @@ class AdminDeliveryListItem(BaseModel):
 
 class AdminDeliveryProduct(BaseModel):
     product_name: str
-    quantity: int
-    price_per_delivery: float
+    quantity: float
+    price_per_delivery: float = 0.0
+    unit: Optional[str] = None
 
 
 class AdminDeliveryCustomer(BaseModel):
@@ -37,14 +39,14 @@ class AdminDeliveryCustomer(BaseModel):
     full_name: str
     phone: str
     email: Optional[str] = None
-    customer_code: str
+    customer_code: Optional[str] = None
 
 
 class AdminDeliveryPartner(BaseModel):
     id: uuid.UUID
     full_name: str
     phone: str
-    employee_code: str
+    employee_code: Optional[str] = None
     vehicle_type: Optional[str] = None
     vehicle_number: Optional[str] = None
 
@@ -63,6 +65,8 @@ class AdminDeliveryAddress(BaseModel):
 
 class AdminDeliveryTimelineStep(BaseModel):
     stage: str
+    status: Optional[str] = None
+    description: Optional[str] = None
     completed: bool
     timestamp: Optional[datetime] = None
 
@@ -76,7 +80,9 @@ class AdminDeliveryAssignmentLog(BaseModel):
 
 class AdminDeliveryDetail(BaseModel):
     id: uuid.UUID
-    subscription_id: uuid.UUID
+    subscription_id: Optional[uuid.UUID] = None
+    fruit_order_id: Optional[uuid.UUID] = None
+    order_type: str = "subscription"
     scheduled_date: date
     status: str
     delivered_at: Optional[datetime] = None

@@ -192,10 +192,28 @@ async def payment_history(
         fruit_res = await db.execute(
             select(FruitOrder)
             .where(FruitOrder.customer_id == customer.id, FruitOrder.payment_status == FruitPaymentStatus.SUCCESS)
+            .options(selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit))
             .order_by(FruitOrder.created_at.desc())
         )
         fruit_orders = fruit_res.scalars().all()
         for fo in fruit_orders:
+            item_names = []
+            if fo.items:
+                for it in fo.items:
+                    if it.fruit and it.fruit.name:
+                        item_names.append(it.fruit.name)
+            
+            # Deduplicate while preserving order
+            unique_item_names = []
+            for name in item_names:
+                if name not in unique_item_names:
+                    unique_item_names.append(name)
+            
+            if unique_item_names:
+                sub_name = ", ".join(unique_item_names)
+            else:
+                sub_name = f"Grocery Order #{fo.order_number}"
+
             enriched.append(PaymentResponse(
                 id=fo.id,
                 subscription_id=None,
@@ -207,7 +225,7 @@ async def payment_history(
                 payment_method="online",
                 paid_at=fo.paid_at,
                 created_at=fo.created_at,
-                subscription_name=f"Grocery Order #{fo.order_number}",
+                subscription_name=sub_name,
                 gst_amount=0.0,
                 delivery_charge=0.0,
                 total_amount=float(fo.total_amount),
@@ -310,7 +328,11 @@ async def download_invoice(
             if not payment:
                 f_res = await db.execute(
                     select(FruitOrder)
-                    .where(FruitOrder.id == payment_id)
+                    .where(
+                        (FruitOrder.id == payment_id) | 
+                        (FruitOrder.gateway_payment_id == str(payment_id)) | 
+                        (FruitOrder.order_number == str(payment_id))
+                    )
                     .options(selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit))
                 )
                 fruit_order = f_res.scalar_one_or_none()
@@ -333,10 +355,29 @@ async def download_invoice(
             if not payment:
                 f_res = await db.execute(
                     select(FruitOrder)
-                    .where(FruitOrder.id == payment_id, FruitOrder.customer_id == customer.id)
+                    .where(
+                        ((FruitOrder.id == payment_id) | 
+                         (FruitOrder.gateway_payment_id == str(payment_id)) | 
+                         (FruitOrder.order_number == str(payment_id))),
+                        FruitOrder.customer_id == customer.id
+                    )
                     .options(selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit))
                 )
                 fruit_order = f_res.scalar_one_or_none()
+                
+                # Fallback: query without customer_id filter if needed
+                if not fruit_order:
+                    f_res_fallback = await db.execute(
+                        select(FruitOrder)
+                        .where(
+                            (FruitOrder.id == payment_id) | 
+                            (FruitOrder.gateway_payment_id == str(payment_id)) | 
+                            (FruitOrder.order_number == str(payment_id))
+                        )
+                        .options(selectinload(FruitOrder.items).selectinload(FruitOrderItem.fruit))
+                    )
+                    fruit_order = f_res_fallback.scalar_one_or_none()
+
                 if not fruit_order:
                     raise HTTPException(status_code=404, detail="Payment transaction not found")
 
@@ -398,36 +439,42 @@ async def download_invoice(
             invoice_no = f"INV-FRUIT-{fruit_order.order_number}"
             cust_name = (current_user.full_name if (current_user and current_user.full_name) else "Customer") or "Customer"
             cust_phone = (current_user.phone if (current_user and current_user.phone) else "N/A") or "N/A"
-            cust_email = current_user.email if current_user else None
+            cust_email = getattr(current_user, 'email', None)
             billing_addr = "Registered Address"
+            
+            p_date = getattr(fruit_order, 'paid_at', None) or getattr(fruit_order, 'created_at', None)
             paid_date = (
-                fruit_order.paid_at.strftime('%B %d, %Y')
-                if fruit_order.paid_at
-                else (fruit_order.created_at.strftime('%B %d, %Y') if fruit_order.created_at else datetime.now().strftime('%B %d, %Y'))
+                p_date.strftime('%B %d, %Y')
+                if p_date
+                else datetime.now().strftime('%B %d, %Y')
             )
             pmt_method = "ONLINE"
             status_str = "SUCCESS"
             del_charge = float(getattr(fruit_order, 'delivery_charge', 0.0) or 0.0)
             tax_amt = 0.0
-            total_amt = float(fruit_order.total_amount or 0.0)
-            subtotal = total_amt - del_charge
+            total_amt = float(getattr(fruit_order, 'total_amount', 0.0) or 0.0)
+            subtotal = max(0.0, total_amt - del_charge)
 
             item_rows = []
-            if fruit_order.items:
+            if getattr(fruit_order, 'items', None):
                 for it in fruit_order.items:
-                    fname = it.fruit.name if (it.fruit and it.fruit.name) else "Fresh Fruit"
-                    u_price = float(it.price_per_kg or 0.0)
-                    qty_kg = float(it.quantity_kg or 0.0)
-                    sub_tot = float(it.subtotal or (u_price * qty_kg))
+                    fname = (it.fruit.name if (getattr(it, 'fruit', None) and getattr(it.fruit, 'name', None)) else "Grocery Item")
+                    u_price = float(getattr(it, 'price_per_kg', 0.0) or 0.0)
+                    qty_kg = float(getattr(it, 'quantity_kg', 0.0) or 0.0)
+                    sub_tot = float(getattr(it, 'subtotal', 0.0) or (u_price * qty_kg))
+                    
+                    qty_str = f"{int(qty_kg)} kg" if qty_kg.is_integer() else f"{qty_kg} kg"
+                    
                     item_rows.append([
                         Paragraph(f"<b>{fname}</b>", normal_style),
                         Paragraph(f"INR {u_price:.2f}/kg", right_normal),
-                        Paragraph(f"{qty_kg} kg", right_normal),
+                        Paragraph(f"{qty_str}", right_normal),
                         Paragraph(f"INR {sub_tot:.2f}", right_bold),
                     ])
-            else:
+            
+            if not item_rows:
                 item_rows.append([
-                    Paragraph("<b>Fresh Fruits Order</b>", normal_style),
+                    Paragraph("<b>Grocery Order</b>", normal_style),
                     Paragraph("—", right_normal),
                     Paragraph("1", right_normal),
                     Paragraph(f"INR {subtotal:.2f}", right_bold),

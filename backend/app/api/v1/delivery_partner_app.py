@@ -41,34 +41,39 @@ async def get_dashboard_stats(
 ):
     partner = await get_my_partner_profile(db, current_user.id)
     today = date.today()
-    
-    # Base query for today's assignments based on scheduled/delivery date
+
+    # Active deliveries strictly for today (excludes paused & future next-day grocery orders)
+    active_list = await get_active_deliveries(current_user, db)
+    active_count = len(active_list)
+
+    # Base query for today's valid assignments
+    from app.models.subscription import SubscriptionStatus
     query = (
         select(DeliveryAssignment)
         .outerjoin(SubscriptionDelivery, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
+        .outerjoin(Subscription, SubscriptionDelivery.subscription_id == Subscription.id)
         .outerjoin(FruitOrder, DeliveryAssignment.fruit_order_id == FruitOrder.id)
         .where(
             DeliveryAssignment.delivery_partner_id == partner.id,
             or_(
-                SubscriptionDelivery.scheduled_date == today,
-                FruitOrder.delivery_date == today,
                 and_(
-                    DeliveryAssignment.subscription_delivery_id.is_(None),
-                    DeliveryAssignment.fruit_order_id.is_(None),
-                    func.date(DeliveryAssignment.assigned_at) == today
+                    SubscriptionDelivery.scheduled_date == today,
+                    SubscriptionDelivery.status != DeliveryStatus.SKIPPED,
+                    Subscription.status != SubscriptionStatus.PAUSED
+                ),
+                and_(
+                    FruitOrder.delivery_date == today,
+                    FruitOrder.order_status != FruitOrderStatus.CANCELLED
                 )
             )
         )
     )
     result = await db.execute(query)
     assignments = result.scalars().all()
-    
+
     assigned_today = len(assignments)
     completed_today = sum(1 for a in assignments if a.status == AssignmentStatus.DELIVERED)
     failed_deliveries = sum(1 for a in assignments if a.status == AssignmentStatus.FAILED)
-    
-    active_list = await get_active_deliveries(current_user, db)
-    active_count = len(active_list)
     pending_deliveries = active_count
 
     success_rate = 0.0
@@ -121,6 +126,12 @@ async def get_active_deliveries(
             sub = sub_res.scalar_one_or_none()
             if not sub:
                 continue
+
+            # CRITICAL RULE: If subscription is PAUSED by customer, do not show as to-deliver today
+            from app.models.subscription import SubscriptionStatus
+            sub_status_str = sub.status.value if hasattr(sub.status, "value") else str(sub.status)
+            if sub_status_str.lower() in ["paused", "cancelled"] or sub.paused_at is not None:
+                continue
             cust_res = await db.execute(select(Customer).where(Customer.id == sub.customer_id))
             cust = cust_res.scalar_one_or_none()
             if not cust:
@@ -134,17 +145,16 @@ async def get_active_deliveries(
             if not u:
                 continue
             
-            slot_code = "1"
-            if sub.preferred_delivery_time:
-                st = sub.preferred_delivery_time.lower()
-                if "afternoon" in st: slot_code = "2"
-                elif "evening" in st: slot_code = "3"
-            sub_seq = str(sd.id.int)[-5:]
-            d_date = sd.created_at.strftime('%Y%m%d') if sd.created_at else today.strftime('%Y%m%d')
+            from app.core.order_utils import format_subscription_order_id
+            order_id_str = format_subscription_order_id(
+                scheduled_date=sd.scheduled_date,
+                preferred_time=sub.preferred_delivery_time,
+                delivery_id=sd.id
+            )
             
             response_list.append(ActiveDeliveryResponse(
                 id=a.id,
-                order_id=f"SUB-{d_date}-{slot_code}-{sub_seq}",
+                order_id=order_id_str,
                 order_type="subscription",
                 customer_name=u.full_name,
                 customer_phone=u.phone,
@@ -166,9 +176,10 @@ async def get_active_deliveries(
                 continue
             if fo.order_status in [FruitOrderStatus.DELIVERED, FruitOrderStatus.CANCELLED]:
                 continue
-            # CRITICAL RULE: A grocery order scheduled for a future calendar date
-            # MUST NOT be shown as an active delivery on today's list.
-            if fo.delivery_date and fo.delivery_date > today:
+            # CRITICAL RULE: Grocery orders are for NEXT DAY delivery.
+            # Only show to the delivery partner on their actual scheduled delivery date (when today == effective_delivery_date)!
+            effective_delivery_date = fo.delivery_date or (fo.created_at.date() + timedelta(days=1) if fo.created_at else today + timedelta(days=1))
+            if effective_delivery_date != today:
                 continue
             cust_res = await db.execute(select(Customer).where(Customer.id == fo.customer_id))
             cust = cust_res.scalar_one_or_none()
@@ -264,9 +275,14 @@ async def get_history(
           sd_res = await db.execute(select(SubscriptionDelivery).where(SubscriptionDelivery.id == a.subscription_delivery_id))
           sd = sd_res.scalar_one_or_none()
           if sd:
-              order_id = str(sd.id)[-8:].upper()
               sub_res = await db.execute(select(Subscription).where(Subscription.id == sd.subscription_id))
               sub = sub_res.scalar_one()
+              from app.core.order_utils import format_subscription_order_id
+              order_id = format_subscription_order_id(
+                  scheduled_date=sd.scheduled_date,
+                  preferred_time=sub.preferred_delivery_time,
+                  delivery_id=sd.id
+              )
               cust_res = await db.execute(select(Customer).where(Customer.id == sub.customer_id))
               cust = cust_res.scalar_one()
               user_res = await db.execute(select(User).where(User.id == cust.user_id))

@@ -147,6 +147,7 @@ class DeliveryListResponse(BaseModel):
 
 class TodayDeliveryInfo(BaseModel):
     delivery_id: Optional[str] = None
+    order_id: Optional[str] = None
     status: Optional[str] = None
     partner_name: Optional[str] = None
     partner_phone: Optional[str] = None

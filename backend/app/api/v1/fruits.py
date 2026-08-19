@@ -58,19 +58,9 @@ async def _get_customer(db: AsyncSession, user_id: UUID) -> Customer:
     return customer
 
 
-def _generate_order_number(slot: Optional[str] = None) -> str:
-    now = datetime.now(timezone.utc)
-    slot_code = "1"
-    if slot:
-        s = str(slot).lower()
-        if "afternoon" in s or "12:" in s or "1:" in s or "2:" in s or "3:" in s or "4:" in s:
-            slot_code = "2"
-        elif "evening" in s or "5:" in s or "6:" in s or "7:" in s or "8:" in s:
-            slot_code = "3"
-        elif "morning" in s:
-            slot_code = "1"
-    suffix = str(uuid_lib.uuid4().int)[-6:]
-    return f"GRC-{now.strftime('%Y%m%d')}-{slot_code}-{suffix}"
+async def _generate_order_number(db: AsyncSession, slot: Optional[str] = None) -> str:
+    from app.core.order_utils import format_grocery_order_id
+    return await format_grocery_order_id(db, slot)
 
 
 def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None) -> FruitOrderResponse:
@@ -99,10 +89,12 @@ def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None
 
     assigned_partner_id = None
     assigned_partner_name = None
+    assigned_partner_phone = None
     if hasattr(order, "assignment") and order.assignment:
         assigned_partner_id = order.assignment.delivery_partner_id
         if order.assignment.delivery_partner and order.assignment.delivery_partner.user:
             assigned_partner_name = order.assignment.delivery_partner.user.full_name
+            assigned_partner_phone = order.assignment.delivery_partner.user.phone
 
     return FruitOrderResponse(
         id=order.id,
@@ -130,6 +122,7 @@ def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None
         customer_phone=customer_phone,
         assigned_partner_id=assigned_partner_id,
         assigned_partner_name=assigned_partner_name,
+        assigned_partner_phone=assigned_partner_phone,
         delivery_date=order.delivery_date,
         delivery_slot=order.delivery_slot,
         rating=order.rating,
@@ -426,16 +419,22 @@ async def checkout(
             "subtotal": subtotal,
         })
 
-    # Create order
+    today_date = date.today()
+    grocery_delivery_date = payload.delivery_date
+    if not grocery_delivery_date or grocery_delivery_date <= today_date:
+        grocery_delivery_date = today_date + timedelta(days=1)
+
+    order_number_str = await _generate_order_number(db, payload.delivery_slot)
+    # Create order (grocery orders are scheduled for next-day delivery)
     order = FruitOrder(
         customer_id=customer.id,
         address_id=address.id,
-        order_number=_generate_order_number(payload.delivery_slot),
+        order_number=order_number_str,
         total_amount=round(total + delivery_charge, 2),
         payment_status=FruitPaymentStatus.PENDING,
         order_status=FruitOrderStatus.PENDING,
         notes=payload.notes,
-        delivery_date=payload.delivery_date,
+        delivery_date=grocery_delivery_date,
         delivery_slot=payload.delivery_slot,
     )
     db.add(order)
@@ -928,6 +927,12 @@ async def admin_assign_fruit_order(
     order = order_result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Fruit order not found")
+
+    if order.order_status == FruitOrderStatus.DELIVERED:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot change delivery partner for a delivered grocery order"
+        )
 
     # Get existing assignment
     assignment_result = await db.execute(select(DeliveryAssignment).where(DeliveryAssignment.fruit_order_id == order_id))

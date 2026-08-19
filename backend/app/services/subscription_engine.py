@@ -430,7 +430,39 @@ async def pause_subscription(
         pause_reason=reason,
     )
     db.add(pause_log)
-    
+
+    # Cancel/skip any pending or assigned deliveries for today & future dates
+    today = date.today()
+    sd_res = await db.execute(
+        select(SubscriptionDelivery).where(
+            SubscriptionDelivery.subscription_id == subscription.id,
+            SubscriptionDelivery.scheduled_date >= today,
+            SubscriptionDelivery.status.in_([DeliveryStatus.PENDING, DeliveryStatus.ASSIGNED])
+        )
+    )
+    pending_deliveries = sd_res.scalars().all()
+    for sd in pending_deliveries:
+        sd.status = DeliveryStatus.SKIPPED
+        sd.skip_reason = reason or "Customer paused subscription today"
+
+        # Log delivery history
+        del_hist = SubscriptionDeliveryHistory(
+            delivery_id=sd.id,
+            old_status=sd.status.value if hasattr(sd.status, "value") else str(sd.status),
+            new_status=DeliveryStatus.SKIPPED.value if hasattr(DeliveryStatus.SKIPPED, "value") else str(DeliveryStatus.SKIPPED),
+            notes="Skipped due to subscription pause"
+        )
+        db.add(del_hist)
+
+        # Delete/Cancel any active delivery assignment so delivery partner isn't instructed to deliver
+        from app.models.delivery_assignment import DeliveryAssignment
+        assignment_res = await db.execute(
+            select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == sd.id)
+        )
+        assignments = assignment_res.scalars().all()
+        for assignment in assignments:
+            await db.delete(assignment)
+
     await _notify_subscription_change(db, subscription, "pause", reason)
 
     return subscription

@@ -97,6 +97,41 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
   }
 
   Future<void> _pauseSubscription(String id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.pause_circle_outline_rounded, color: AppTheme.warning),
+            SizedBox(width: 8),
+            Text('Pause Subscription?'),
+          ],
+        ),
+        content: const Text(
+          'If you click pause today, you will not receive today\'s delivery. Are you sure you want to pause?',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.warning,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Yes, Pause'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     setState(() => _isActionInProgress = true);
     try {
       await _api.post('${ApiConstants.subscriptions}/$id/pause', data: {'reason': 'User requested'});
@@ -135,6 +170,24 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
       }
     } finally {
       setState(() => _isActionInProgress = false);
+    }
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    if (cleanPhone.isEmpty) return;
+    final Uri launchUri = Uri(scheme: 'tel', path: cleanPhone);
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Error launching phone dialer: $e');
+      try {
+        await launchUrl(launchUri);
+      } catch (_) {}
     }
   }
 
@@ -476,7 +529,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
                   if (partnerPhone != null)
                     IconButton(
                       icon: const Icon(Icons.phone_rounded, color: AppTheme.primaryGreen),
-                      onPressed: () => launchUrl(Uri.parse('tel:$partnerPhone')),
+                      onPressed: () => _makePhoneCall(partnerPhone),
                       tooltip: 'Call Delivery Partner',
                     ),
                 ],

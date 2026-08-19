@@ -244,6 +244,17 @@ class _AdminOrderCard extends StatelessWidget {
     }).join(', ');
     final moreCount = items.length - 2;
 
+    final orderStatus = (order['order_status'] as String? ?? 'pending').toLowerCase();
+    final isDelivered = orderStatus == 'delivered';
+    final assignedPartnerId = order['assigned_partner_id']?.toString();
+    final assignedPartner = partners.firstWhere(
+      (p) => p['id'].toString() == assignedPartnerId,
+      orElse: () => {},
+    );
+    final assignedPartnerName = assignedPartner['full_name'] as String? ??
+        order['assigned_partner_name'] as String? ??
+        'Unassigned';
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -342,47 +353,66 @@ class _AdminOrderCard extends StatelessWidget {
                     const Icon(Icons.local_shipping_outlined, size: 16, color: AppTheme.textSecondary),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: DropdownButton<String?>(
-                        value: order['assigned_partner_id']?.toString(),
-                        hint: Text('Assign Partner', style: GoogleFonts.inter(fontSize: 13)),
-                        isExpanded: true,
-                        isDense: true,
-                        underline: const SizedBox(),
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-                        items: [
-                          DropdownMenuItem<String?>(
-                            value: null,
-                            child: Text('Unassigned', style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic)),
-                          ),
-                          ...partners.map((p) => DropdownMenuItem<String?>(
-                                value: p['id'].toString(),
-                                child: Text(p['full_name'] ?? 'Unknown Partner', style: GoogleFonts.inter(fontSize: 13)),
-                              )),
-                        ],
-                        onChanged: (val) async {
-                          if (val == order['assigned_partner_id']?.toString()) return;
-                          final partnerName = val == null ? 'Unassigned' : partners.firstWhere((p) => p['id'].toString() == val, orElse: () => {'full_name': 'Unknown Partner'})['full_name'] ?? 'Unknown Partner';
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Confirm Assignment'),
-                              content: Text('Assign this order to $partnerName?'),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                ElevatedButton(
-                                  onPressed: () => Navigator.pop(ctx, true), 
-                                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen, foregroundColor: Colors.white),
-                                  child: const Text('Confirm')
+                      child: isDelivered
+                          ? Text(
+                              assignedPartnerId != null ? assignedPartnerName : 'Unassigned',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: AppTheme.textSecondary,
+                                fontWeight: assignedPartnerId != null ? FontWeight.w600 : FontWeight.w400,
+                                fontStyle: assignedPartnerId == null ? FontStyle.italic : FontStyle.normal,
+                              ),
+                            )
+                          : DropdownButton<String?>(
+                              value: assignedPartnerId,
+                              hint: Text('Assign Partner', style: GoogleFonts.inter(fontSize: 13)),
+                              isExpanded: true,
+                              isDense: true,
+                              underline: const SizedBox(),
+                              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                              items: [
+                                DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('Unassigned', style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic)),
                                 ),
+                                ...partners.map((p) => DropdownMenuItem<String?>(
+                                      value: p['id'].toString(),
+                                      child: Text(p['full_name'] ?? 'Unknown Partner', style: GoogleFonts.inter(fontSize: 13)),
+                                    )),
                               ],
+                              onChanged: (val) async {
+                                if (val == assignedPartnerId) return;
+                                final partnerName = val == null
+                                    ? 'Unassigned'
+                                    : partners.firstWhere(
+                                        (p) => p['id'].toString() == val,
+                                        orElse: () => {'full_name': 'Unknown Partner'},
+                                      )['full_name'] ??
+                                      'Unknown Partner';
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Confirm Assignment'),
+                                    content: Text('Assign this order to $partnerName?'),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppTheme.primaryGreen,
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        child: const Text('Confirm'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  onAssignPartner(val);
+                                }
+                              },
                             ),
-                          );
-                          if (confirm == true) {
-                            onAssignPartner(val);
-                          }
-                        },
-                      ),
                     ),
                   ],
                 ),

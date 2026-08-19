@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -67,6 +68,24 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
       );
     } finally {
       setState(() => _submittingRating = false);
+    }
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    if (cleanPhone.isEmpty) return;
+    final Uri launchUri = Uri(scheme: 'tel', path: cleanPhone);
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('Error launching phone dialer: $e');
+      try {
+        await launchUrl(launchUri);
+      } catch (_) {}
     }
   }
 
@@ -307,6 +326,43 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
                     const SizedBox(height: 12),
                     _InfoRow(label: 'Scheduled Date', value: _formatDate(order['delivery_date'] as String)),
                     _InfoRow(label: 'Time Slot', value: order['delivery_slot'] ?? 'N/A'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Assigned Delivery Partner Card
+          if (order['assigned_partner_name'] != null) ...[
+            _Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                      child: const Icon(Icons.person, size: 22, color: AppTheme.primaryGreen),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Delivery Executive', style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
+                          Text(order['assigned_partner_name'] as String, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                          if (order['assigned_partner_phone'] != null)
+                            Text(order['assigned_partner_phone'] as String, style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary)),
+                        ],
+                      ),
+                    ),
+                    if (order['assigned_partner_phone'] != null)
+                      IconButton(
+                        icon: const Icon(Icons.phone_rounded, color: AppTheme.primaryGreen, size: 24),
+                        onPressed: () => _makePhoneCall(order['assigned_partner_phone'] as String),
+                        tooltip: 'Call Delivery Partner',
+                      ),
                   ],
                 ),
               ),

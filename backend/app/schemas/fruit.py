@@ -163,6 +163,7 @@ class FruitOrderResponse(BaseModel):
     # Assigned partner (admin view)
     assigned_partner_id: Optional[uuid.UUID] = None
     assigned_partner_name: Optional[str] = None
+    assigned_partner_phone: Optional[str] = None
     delivery_date: Optional[date] = None
     delivery_slot: Optional[str] = None
     rating: Optional[int] = None

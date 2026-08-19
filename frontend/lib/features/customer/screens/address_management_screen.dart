@@ -1008,6 +1008,8 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
         children: [
           // Google Map
           GoogleMap(
+            mapType: MapType.normal,
+            liteModeEnabled: false,
             initialCameraPosition: CameraPosition(
               target: _selectedLatLng,
               zoom: _currentZoom,
@@ -1022,6 +1024,8 @@ class _MapLocationPickerDialogState extends State<_MapLocationPickerDialog> with
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
             compassEnabled: false,
+            indoorViewEnabled: false,
+            trafficEnabled: false,
           ),
 
           // Static Center Pin overlay

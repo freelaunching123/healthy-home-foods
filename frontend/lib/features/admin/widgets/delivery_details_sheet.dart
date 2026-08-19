@@ -118,49 +118,120 @@ class DeliveryDetailsSheet extends StatelessWidget {
 
         const Text('Delivery Timeline', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        ...timeline.map((event) {
-          final timestamp = event['timestamp'] != null 
-              ? DateFormat('MMM dd, yyyy - hh:mm a').format(DateTime.parse(event['timestamp']).toLocal()) 
-              : '';
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.primaryGreen,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    Container(
-                      width: 2,
-                      height: 30,
-                      color: Colors.grey[300],
-                    )
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        if (timeline.isEmpty)
+          const Text('No timeline available.', style: TextStyle(color: Colors.grey))
+        else
+          ...timeline.asMap().entries.map((entry) {
+            final index = entry.key;
+            final event = entry.value;
+            final isLast = index == timeline.length - 1;
+            
+            final stageName = (event['stage'] ?? event['status'] ?? event['title'] ?? 'Stage ${index + 1}').toString();
+            final isCompleted = event['completed'] == true || event['timestamp'] != null;
+            final description = event['description']?.toString() ?? '';
+            
+            String? timestampStr;
+            if (event['timestamp'] != null) {
+              try {
+                timestampStr = DateFormat('MMM dd, yyyy - hh:mm a').format(DateTime.parse(event['timestamp']).toLocal());
+              } catch (_) {
+                timestampStr = event['timestamp'].toString();
+              }
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
                     children: [
-                      Text(event['status'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      if (event['description'] != null && event['description'].toString().isNotEmpty)
-                        Text(event['description'], style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
-                      if (timestamp.isNotEmpty)
-                        Text('Time: $timestamp', style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w500)),
+                      Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: isCompleted ? AppTheme.primaryGreen : Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isCompleted ? AppTheme.primaryGreen : Colors.grey[400]!,
+                            width: 2,
+                          ),
+                        ),
+                        child: isCompleted
+                            ? const Icon(Icons.check, size: 10, color: Colors.white)
+                            : null,
+                      ),
+                      if (!isLast)
+                        Container(
+                          width: 2,
+                          height: 48,
+                          color: isCompleted ? AppTheme.primaryGreen.withAlpha(128) : Colors.grey[300],
+                        ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          );
-        }),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              stageName,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: isCompleted ? Colors.black87 : Colors.grey[700],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isCompleted ? Colors.green[50] : Colors.grey[100],
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: isCompleted ? Colors.green[200]! : Colors.grey[300]!,
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                isCompleted ? 'Completed' : 'Pending',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: isCompleted ? Colors.green[700] : Colors.grey[600],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (description.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3.0),
+                            child: Text(
+                              description,
+                              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                            ),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3.0),
+                          child: Text(
+                            timestampStr != null ? 'Time: $timestampStr' : 'Time: Pending / Scheduled',
+                            style: TextStyle(
+                              color: timestampStr != null ? Colors.grey[700] : Colors.grey[400],
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
       ],
     );
   }
@@ -193,6 +264,8 @@ class DeliveryDetailsSheet extends StatelessWidget {
     }
 
     return GoogleMap(
+      mapType: MapType.normal,
+      liteModeEnabled: false,
       initialCameraPosition: CameraPosition(
         target: customerPos,
         zoom: 15.0,

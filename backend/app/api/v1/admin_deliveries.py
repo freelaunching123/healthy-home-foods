@@ -141,10 +141,16 @@ async def list_deliveries(
                 addr_str += f", {addr.address_line2}"
             addr_str += f", {addr.city} - {addr.pincode}"
 
-        pay_status = "Paid" if sub.status in [SubscriptionStatus.ACTIVE, SubscriptionStatus.COMPLETED] else "Pending"
+        from app.core.order_utils import format_subscription_order_id
+        sub_ord_id = format_subscription_order_id(
+            scheduled_date=deliv.scheduled_date,
+            preferred_time=sub.preferred_delivery_time,
+            delivery_id=deliv.id
+        )
 
         items.append(AdminDeliveryListItem(
             id=deliv.id,
+            order_id=sub_ord_id,
             order_type="subscription",
             subscription_id=sub.id,
             fruit_order_id=None,
@@ -231,6 +237,7 @@ async def list_deliveries(
 
         items.append(AdminDeliveryListItem(
             id=f_order.id,
+            order_id=f_order.order_number,
             order_type="grocery",
             subscription_id=None,
             fruit_order_id=f_order.id,
@@ -538,36 +545,65 @@ async def get_delivery_details(
             u_val = getattr(fr, "unit", "kg") if fr else "kg"
             if hasattr(u_val, "value"):
                 u_val = u_val.value
+            subtotal_val = float(fi.subtotal) if (hasattr(fi, "subtotal") and fi.subtotal is not None) else float((fi.price_per_kg or 0.0) * (fi.quantity_kg or 0.0))
             products_list.append(AdminDeliveryProduct(
-                id=fr.id if fr else uuid.uuid4(),
-                name=fr.name if fr else "Fresh Item",
-                quantity=float(fi.quantity_kg),
+                product_name=fr.name if fr else "Fresh Item",
+                quantity=float(fi.quantity_kg or 0.0),
+                price_per_delivery=subtotal_val,
                 unit=str(u_val or "kg")
             ))
 
-        timeline = [AdminDeliveryTimelineEvent(
-            status="Order Placed",
-            description=f"Fruit order created",
-            timestamp=f_order.created_at
-        )]
-        if assign:
-            timeline.append(AdminDeliveryTimelineEvent(
-                status="Assigned",
-                description=f"Assigned to {p_user.full_name}",
-                timestamp=assign.assigned_at
-            ))
-            if assign.out_at:
-                timeline.append(AdminDeliveryTimelineEvent(status="Out for Delivery", description="Driver is on the way", timestamp=assign.out_at))
-            if assign.delivered_at:
-                timeline.append(AdminDeliveryTimelineEvent(status="Delivered", description="Order completed", timestamp=assign.delivered_at))
-            elif assign.failed_at:
-                timeline.append(AdminDeliveryTimelineEvent(status="Failed", description=assign.failure_reason or "Delivery failed", timestamp=assign.failed_at))
+        is_assigned = assign is not None
+        partner_name = p_user.full_name if (is_assigned and p_user) else None
+        is_picked_up = is_assigned and getattr(assign, 'picked_up_at', None) is not None
+        is_out = is_assigned and assign.out_at is not None
+        is_delivered = f_order.order_status == FruitOrderStatus.DELIVERED or (is_assigned and assign.delivered_at is not None)
+
+        timeline = [
+            AdminDeliveryTimelineStep(
+                stage="Order Placed",
+                status="Order Placed",
+                description="Grocery order placed successfully",
+                completed=True,
+                timestamp=f_order.created_at
+            ),
+            AdminDeliveryTimelineStep(
+                stage="Partner Assigned",
+                status="Partner Assigned",
+                description=f"Assigned to {partner_name}" if is_assigned else "Awaiting delivery partner assignment",
+                completed=is_assigned,
+                timestamp=assign.assigned_at if is_assigned else None
+            ),
+            AdminDeliveryTimelineStep(
+                stage="Order Picked Up",
+                status="Order Picked Up",
+                description="Grocery items picked up" if is_picked_up else "Awaiting store pickup",
+                completed=is_picked_up,
+                timestamp=assign.picked_up_at if is_picked_up else None
+            ),
+            AdminDeliveryTimelineStep(
+                stage="Out for Delivery",
+                status="Out for Delivery",
+                description="Partner is on the way to delivery address" if is_out else "Awaiting dispatch",
+                completed=is_out,
+                timestamp=assign.out_at if is_out else None
+            ),
+            AdminDeliveryTimelineStep(
+                stage="Delivery Completed",
+                status="Delivery Completed",
+                description="Grocery order delivered successfully" if is_delivered else "Pending final delivery",
+                completed=is_delivered,
+                timestamp=assign.delivered_at if (is_assigned and assign.delivered_at) else None
+            ),
+        ]
 
         assignment_history = []
         
         return AdminDeliveryDetail(
             id=f_order.id,
             subscription_id=None,
+            fruit_order_id=f_order.id,
+            order_type="grocery",
             scheduled_date=f_order.delivery_date or f_order.created_at.date(),
             status=f_order.order_status.value if hasattr(f_order.order_status, "value") else str(f_order.order_status),
             delivered_at=assign.delivered_at if assign else None,
@@ -645,41 +681,53 @@ async def get_delivery_details(
     # Note: Placed uses deliv.created_at
     timeline = []
     
-    # Placed (always completed)
+    is_assigned = deliv.status != DeliveryStatus.PENDING and assign is not None
+    partner_name = p_user.full_name if (is_assigned and partner and p_user) else None
+    is_picked_up = is_assigned and assign.picked_up_at is not None
+    is_out = is_assigned and assign.out_at is not None
+    is_delivered = deliv.status == DeliveryStatus.DELIVERED
+
+    # 1. Order Placed
     timeline.append(AdminDeliveryTimelineStep(
         stage="Order Placed",
+        status="Order Placed",
+        description="Subscription delivery scheduled",
         completed=True,
         timestamp=deliv.created_at
     ))
 
-    # Assigned
-    is_assigned = deliv.status != DeliveryStatus.PENDING and assign is not None
+    # 2. Partner Assigned
     timeline.append(AdminDeliveryTimelineStep(
-        stage="Assigned",
+        stage="Partner Assigned",
+        status="Partner Assigned",
+        description=f"Assigned to {partner_name}" if (is_assigned and partner_name) else "Awaiting delivery partner assignment",
         completed=is_assigned,
         timestamp=assign.assigned_at if is_assigned else None
     ))
 
-    # Picked Up
-    is_picked_up = is_assigned and assign.picked_up_at is not None
+    # 3. Order Picked Up
     timeline.append(AdminDeliveryTimelineStep(
-        stage="Picked Up",
+        stage="Order Picked Up",
+        status="Order Picked Up",
+        description="Meal package picked up from kitchen" if is_picked_up else "Awaiting kitchen pickup",
         completed=is_picked_up,
         timestamp=assign.picked_up_at if is_picked_up else None
     ))
 
-    # Out for Delivery
-    is_out = is_assigned and assign.out_at is not None
+    # 4. Out for Delivery
     timeline.append(AdminDeliveryTimelineStep(
-        stage="Out For Delivery",
+        stage="Out for Delivery",
+        status="Out for Delivery",
+        description="Partner is on the way to customer address" if is_out else "Awaiting dispatch",
         completed=is_out,
         timestamp=assign.out_at if is_out else None
     ))
 
-    # Delivered
-    is_delivered = deliv.status == DeliveryStatus.DELIVERED
+    # 5. Delivery Completed
     timeline.append(AdminDeliveryTimelineStep(
-        stage="Delivered",
+        stage="Delivery Completed",
+        status="Delivery Completed",
+        description="Subscription meal delivered successfully" if is_delivered else "Pending final delivery",
         completed=is_delivered,
         timestamp=deliv.delivered_at if is_delivered else None
     ))
@@ -734,6 +782,8 @@ async def get_delivery_details(
     return AdminDeliveryDetail(
         id=deliv.id,
         subscription_id=sub.id,
+        fruit_order_id=None,
+        order_type="subscription",
         scheduled_date=deliv.scheduled_date,
         status=deliv.status.value if hasattr(deliv.status, "value") else str(deliv.status),
         delivered_at=deliv.delivered_at,

@@ -497,8 +497,16 @@ async def get_current_subscription(
                 partner_name = dp_user.full_name if dp_user else None
                 partner_phone = dp_user.phone if dp_user else None
 
+        from app.core.order_utils import format_subscription_order_id
+        today_sub_ord_id = format_subscription_order_id(
+            scheduled_date=today_delivery.scheduled_date,
+            preferred_time=sub.preferred_delivery_time,
+            delivery_id=today_delivery.id
+        )
+
         today_delivery_info = TodayDeliveryInfo(
             delivery_id=str(today_delivery.id),
+            order_id=today_sub_ord_id,
             status=today_delivery.status.value if hasattr(today_delivery.status, "value") else str(today_delivery.status),
             partner_name=partner_name,
             partner_phone=partner_phone,
