@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/services/auth_service.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -156,27 +157,49 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
   }
 
-  void _onNotificationTap(Map<String, dynamic> notification, int index) {
+  void _onNotificationTap(Map<String, dynamic> notification, int index) async {
     // Mark as read first
     _markAsRead(notification['id'], index);
 
     final actionType = notification['action_type'] as String?;
     final refId = notification['reference_id'] as String?;
 
+    final authService = AuthService();
+    final role = await authService.getUserRole();
+    final isAdmin = role == 'admin' || role == 'super_admin';
+
+    if (!mounted) return;
+
     switch (actionType) {
       case 'delivery':
         if (refId != null) {
-          context.push('/tracking/$refId');
+          if (isAdmin) {
+             context.push('/admin/deliveries');
+          } else {
+             context.push('/tracking/$refId');
+          }
         }
         break;
       case 'subscription':
-        context.push('/profile/subscription');
+        if (isAdmin) {
+          context.push('/admin/subscriptions');
+        } else {
+          context.push('/profile/subscription');
+        }
         break;
       case 'payment':
-        context.push('/payments');
+        if (isAdmin) {
+          context.push('/admin');
+        } else {
+          context.push('/payments');
+        }
         break;
       case 'promo':
-        context.go('/home');
+        if (isAdmin) {
+          context.go('/admin');
+        } else {
+          context.go('/home');
+        }
         break;
       default:
         break;
