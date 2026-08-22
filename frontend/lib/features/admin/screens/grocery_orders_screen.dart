@@ -123,7 +123,7 @@ class _FruitOrdersScreenState extends State<FruitOrdersScreen> {
                   TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
-                      hintText: 'Search by order number...',
+                      hintText: 'Search by order id...',
                       prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textLight),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.search_rounded, color: AppTheme.primaryGreen),
@@ -454,7 +454,7 @@ class _AdminOrderCard extends StatelessWidget {
               const Divider(),
               const SizedBox(height: 10),
               
-              Text('Order Number: ${order['order_number']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text('Order ID: ${order['order_number']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               const SizedBox(height: 4),
               Text('Status: ${order['order_status'].toString().toUpperCase()}', style: const TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 16),

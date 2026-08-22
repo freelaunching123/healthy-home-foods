@@ -188,11 +188,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   // Actions
                   _ProfileMenuItem(
-                    icon: Icons.card_membership_outlined,
-                    title: 'My Subscriptions',
-                    onTap: () => context.go('/subscriptions'),
-                  ),
-                  _ProfileMenuItem(
                     icon: Icons.history_toggle_off_outlined,
                     title: 'Subscription Deliveries',
                     onTap: () => context.push('/profile/delivery-history'),

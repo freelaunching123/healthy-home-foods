@@ -70,10 +70,11 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     @property
     def display_order_id(self) -> str:
-        if not self.order_number_seq:
-            return f"PKG-{str(self.id)[:8].upper()}"
         dt = self.created_at or datetime.now()
         date_str = dt.strftime("%d%m%y")
+        if not self.order_number_seq:
+            seq = hash(str(self.id)) % 100000
+            return f"PKG-{date_str}-{seq:05d}"
         return f"PKG-{date_str}-{self.order_number_seq:05d}"
 
     # Delivery tracking

@@ -96,9 +96,17 @@ def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None
             assigned_partner_name = order.assignment.delivery_partner.user.full_name
             assigned_partner_phone = order.assignment.delivery_partner.user.phone
 
+    # Handle old UUID order numbers
+    display_order_num = order.order_number
+    if len(display_order_num) > 30 and '-' in display_order_num:
+        seq = hash(str(order.id)) % 100000
+        dt = order.created_at or datetime.now()
+        date_str = dt.strftime("%d%m%y")
+        display_order_num = f"GRO-{date_str}-{seq:05d}"
+
     return FruitOrderResponse(
         id=order.id,
-        order_number=order.order_number,
+        order_number=display_order_num,
         total_amount=float(order.total_amount),
         payment_status=order.payment_status.value if hasattr(order.payment_status, "value") else str(order.payment_status),
         order_status=order.order_status.value if hasattr(order.order_status, "value") else str(order.order_status),

@@ -116,6 +116,7 @@ class SubscriptionResponse(BaseModel):
     plan_name: Optional[str] = None
     plan_type: Optional[str] = None
     product_name: Optional[str] = None
+    display_order_id: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -175,6 +176,7 @@ class CurrentSubscriptionResponse(BaseModel):
     total_amount: float
     next_delivery_date: Optional[date] = None
     today_delivery: Optional[TodayDeliveryInfo] = None
+    display_order_id: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

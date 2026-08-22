@@ -210,6 +210,25 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
     }
   }
 
+  String _getProductName(Map<String, dynamic> sub) {
+    if (sub['product_name'] != null && sub['product_name'] != '—') {
+      return sub['product_name'];
+    }
+    if (sub['product'] != null && sub['product']['name'] != null) {
+      return sub['product']['name'];
+    }
+    if (sub['items'] != null && sub['items'] is List && (sub['items'] as List).isNotEmpty) {
+      final items = sub['items'] as List;
+      final firstItem = items[0] is Map ? items[0] as Map<String, dynamic> : <String, dynamic>{};
+      final firstProductName = firstItem['product_name'] ?? firstItem['product']?['name'] ?? 'Item';
+      if (items.length == 1) {
+        return firstProductName;
+      }
+      return '$firstProductName + ${items.length - 1} other(s)';
+    }
+    return 'Custom Package';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -284,7 +303,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            sub['product_name'] ?? 'Custom Package',
+                            _getProductName(sub),
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
                           ),
                           if (sub['plan_name'] != null && sub['plan_name'].toString().isNotEmpty && sub['plan_name'] != '—') ...[
@@ -777,7 +796,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    sub['product']?['name'] ?? 'Custom Package',
+                    _getProductName(sub),
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

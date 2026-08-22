@@ -118,7 +118,7 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
               const SizedBox(height: 10),
               
               Text(
-                'Order ID: ${order['order_id'] ?? order['id'].toString().substring(0, 8).toUpperCase()}',
+                'Order ID: ${order['order_id'] ?? order['order_number'] ?? order['id'].toString().substring(0, 8).toUpperCase()}',
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
               ),const SizedBox(height: 16),
 
