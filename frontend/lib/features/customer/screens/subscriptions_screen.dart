@@ -284,14 +284,16 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            sub['product_name'] ?? 'Meal Plan',
+                            sub['product_name'] ?? 'Custom Package',
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${sub['plan_name'] ?? ''} · ${(sub['plan_type'] ?? '').toString().toUpperCase()}',
-                            style: const TextStyle(fontSize: 13, color: AppTheme.primaryGreen, fontWeight: FontWeight.w600),
-                          ),
+                          if (sub['plan_name'] != null && sub['plan_name'].toString().isNotEmpty && sub['plan_name'] != '—') ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '${sub['plan_name']} · ${(sub['plan_type'] ?? '').toString().toUpperCase()}',
+                              style: const TextStyle(fontSize: 13, color: AppTheme.primaryGreen, fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -666,7 +668,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             TextButton(
-              onPressed: () => context.push('/profile/subscription'),
+              onPressed: () => context.push('/profile/subscription/$subId'),
               child: const Text(
                 'View Full Details →',
                 style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.w600),
@@ -749,7 +751,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
     final completed = sub['completed_deliveries'] ?? 0;
 
     return InkWell(
-      onTap: () => context.push('/profile/subscription'),
+      onTap: () => context.push('/profile/subscription/${sub['id']}'),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -775,7 +777,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    sub['product']?['name'] ?? 'Meal Plan',
+                    sub['product']?['name'] ?? 'Custom Package',
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

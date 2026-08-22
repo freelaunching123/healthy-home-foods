@@ -66,9 +66,34 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     const Color accentColor = AppTheme.primaryGreen;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FBF8),
-      body: SafeArea(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Exit App?'),
+            content: const Text('Are you sure you want to exit the application?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('No', style: TextStyle(color: AppTheme.primaryGreen)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Yes', style: TextStyle(color: AppTheme.error)),
+              ),
+            ],
+          ),
+        );
+        if (shouldExit == true) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FBF8),
+        body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),

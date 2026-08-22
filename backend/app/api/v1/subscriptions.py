@@ -347,7 +347,8 @@ async def list_subscriptions(
     query = select(Subscription).options(
         selectinload(Subscription.items).selectinload(SubscriptionItem.product),
         selectinload(Subscription.customer).selectinload(Customer.user),
-        selectinload(Subscription.plan)
+        selectinload(Subscription.plan),
+        selectinload(Subscription.product)
     )
 
     if not is_admin:
@@ -391,8 +392,20 @@ async def list_subscriptions(
             sub.customer_phone = sub.customer.user.phone
         if sub.plan:
             sub.plan_name = sub.plan.name
+            sub.plan_type = sub.plan.plan_type.value if hasattr(sub.plan.plan_type, "value") else sub.plan.plan_type
         for item in sub.items:
             item.product_name = item.product.name
+
+        # Resolve product name for the subscription itself
+        sub.product_name = "—"
+        if sub.product and sub.product.name:
+            sub.product_name = sub.product.name
+        elif sub.items:
+            prod_names = [item.product.name for item in sub.items if item.product]
+            if len(prod_names) == 1:
+                sub.product_name = prod_names[0]
+            elif len(prod_names) > 1:
+                sub.product_name = f"{prod_names[0]} + {len(prod_names) - 1} other(s)"
 
     return subs
 
@@ -401,26 +414,35 @@ async def list_subscriptions(
 async def get_current_subscription(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    sub_id: Optional[UUID] = Query(None),
 ):
-    """Get the customer's current active/paused subscription with all details."""
+    """Get the customer's current active/paused subscription with all details, or a specific one if sub_id is provided."""
     customer = await _get_customer(db, current_user.id)
     
-    result = await db.execute(
-        select(Subscription)
-        .where(Subscription.customer_id == customer.id)
-        .order_by(Subscription.created_at.desc())
-    )
-    subs = result.scalars().all()
-    if not subs:
-        raise HTTPException(status_code=404, detail="No active subscription found")
-        
-    sub = None
-    for s in subs:
-        if s.status in [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED]:
-            sub = s
-            break
-    if not sub:
-        sub = subs[0]
+    if sub_id:
+        result = await db.execute(
+            select(Subscription).where(Subscription.id == sub_id, Subscription.customer_id == customer.id)
+        )
+        sub = result.scalar_one_or_none()
+        if not sub:
+            raise HTTPException(status_code=404, detail="Subscription not found")
+    else:
+        result = await db.execute(
+            select(Subscription)
+            .where(Subscription.customer_id == customer.id)
+            .order_by(Subscription.created_at.desc())
+        )
+        subs = result.scalars().all()
+        if not subs:
+            raise HTTPException(status_code=404, detail="No active subscription found")
+            
+        sub = None
+        for s in subs:
+            if s.status in [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED]:
+                sub = s
+                break
+        if not sub:
+            sub = subs[0]
         
     res = await db.execute(
         select(Subscription)
@@ -550,6 +572,7 @@ async def get_subscription(
             selectinload(Subscription.items).selectinload(SubscriptionItem.product),
             selectinload(Subscription.customer).selectinload(Customer.user),
             selectinload(Subscription.plan),
+            selectinload(Subscription.product),
             selectinload(Subscription.status_history),
             selectinload(Subscription.pause_history),
             selectinload(Subscription.payment_history),
@@ -570,8 +593,20 @@ async def get_subscription(
         sub.customer_phone = sub.customer.user.phone
     if sub.plan:
         sub.plan_name = sub.plan.name
+        sub.plan_type = sub.plan.plan_type.value if hasattr(sub.plan.plan_type, "value") else sub.plan.plan_type
     for item in sub.items:
         item.product_name = item.product.name
+
+    # Resolve product name for the subscription itself
+    sub.product_name = "—"
+    if sub.product and sub.product.name:
+        sub.product_name = sub.product.name
+    elif sub.items:
+        prod_names = [item.product.name for item in sub.items if item.product]
+        if len(prod_names) == 1:
+            sub.product_name = prod_names[0]
+        elif len(prod_names) > 1:
+            sub.product_name = f"{prod_names[0]} + {len(prod_names) - 1} other(s)"
 
     return sub
 

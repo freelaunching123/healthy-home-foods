@@ -343,7 +343,7 @@ async def checkout(
         "gateway_order_id": payment.gateway_order_id,
         "razorpay_key_id": settings.RAZORPAY_KEY_ID or "mock_key",
         "total_amount": round(total_checkout_amount, 2),
-        "order_number": str(first_sub.id)[:8].upper()
+        "order_number": first_sub.display_order_id
     }
 
 
@@ -444,7 +444,7 @@ async def list_admin_package_orders(
 
         orders_list.append({
             "id": str(sub.id),
-            "order_number": f"PKG-{str(sub.id)[:8].upper()}",
+            "order_number": sub.display_order_id,
             "customer_name": c_user.full_name if c_user else "Unknown Customer",
             "customer_phone": c_user.phone if c_user else "N/A",
             "payment_status": "success" if sub.status != SubscriptionStatus.PENDING_PAYMENT else "pending",

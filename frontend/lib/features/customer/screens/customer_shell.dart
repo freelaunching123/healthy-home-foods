@@ -31,31 +31,16 @@ class _CustomerShellState extends State<CustomerShell> {
         final shouldExit = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              children: const [
-                Icon(Icons.exit_to_app_rounded, color: AppTheme.error),
-                SizedBox(width: 10),
-                Text('Exit App?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              ],
-            ),
-            content: const Text(
-              'Are you sure you want to exit the application?',
-              style: TextStyle(fontSize: 14),
-            ),
+            title: const Text('Exit App?'),
+            content: const Text('Are you sure you want to exit the application?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('No', style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                child: const Text('No', style: TextStyle(color: AppTheme.primaryGreen)),
               ),
-              ElevatedButton(
+              TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.error,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
-                ),
-                child: const Text('Yes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: const Text('Yes', style: TextStyle(color: AppTheme.error)),
               ),
             ],
           ),

@@ -25,7 +25,7 @@ class AdminShell extends StatelessWidget {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('No'),
+                child: const Text('No', style: TextStyle(color: AppTheme.primaryGreen)),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),

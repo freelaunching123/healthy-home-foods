@@ -194,75 +194,10 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
     }
   }
 
-  Future<void> _cancelSubscription(String subId) async {
-    final reasonCtrl = TextEditingController();
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Subscription'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Provide a reason for cancelling this subscription:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonCtrl,
-              decoration: const InputDecoration(
-                hintText: 'e.g. Client requested, payment failure...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error, foregroundColor: Colors.white),
-            onPressed: () {
-              if (reasonCtrl.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Reason is required for cancellation'), backgroundColor: AppTheme.error),
-                );
-                return;
-              }
-              Navigator.pop(context, true);
-            },
-            child: const Text('Cancel Subscription'),
-          ),
-        ],
-      ),
-    );
 
-    if (confirm != true) return;
-
-    setState(() => _isLoading = true);
-    try {
-      await _api.post('/subscriptions/$subId/cancel', data: {
-        'reason': reasonCtrl.text,
-      });
-      _loadSubscriptions(refresh: true);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Subscription cancelled successfully'), backgroundColor: AppTheme.success),
-        );
-      }
-    } catch (e) {
-      _loadSubscriptions(refresh: true);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to cancel: $e'), backgroundColor: AppTheme.error),
-        );
-      }
-    }
-  }
 
   Future<void> _renewSubscription(String subId, String currentPlanId, bool autoRenew) async {
-    String selectedPlanId = currentPlanId;
+    String? selectedPlanId = currentPlanId.isNotEmpty ? currentPlanId : null;
     bool isAutoRenew = autoRenew;
 
     final confirm = await showDialog<bool>(
@@ -313,7 +248,15 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen, foregroundColor: Colors.white),
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () {
+                  if (selectedPlanId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please select a plan to renew'), backgroundColor: AppTheme.error),
+                    );
+                    return;
+                  }
+                  Navigator.pop(context, true);
+                },
                 child: const Text('Confirm Renewal'),
               ),
             ],
@@ -624,20 +567,6 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
                                             onPressed: () => _resumeSubscription(subId),
                                           ),
                                           const SizedBox(width: 8),
-                                        ],
-
-                                        if (['active', 'paused', 'pending_payment'].contains(status)) ...[
-                                          ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppTheme.error,
-                                              minimumSize: const Size(80, 36),
-                                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            ),
-                                            icon: const Icon(Icons.cancel_outlined, size: 16),
-                                            label: const Text('Cancel', style: TextStyle(fontSize: 12, color: Colors.white)),
-                                            onPressed: () => _cancelSubscription(subId),
-                                          ),
                                         ],
 
                                         if (['completed', 'cancelled'].contains(status)) ...[

@@ -105,7 +105,6 @@ async def activate_subscription(db: AsyncSession, subscription: Subscription) ->
     """Activates subscription after payment success and generates first delivery."""
     old_status = subscription.status.value if hasattr(subscription.status, "value") else str(subscription.status)
     subscription.status = SubscriptionStatus.ACTIVE
-    subscription.start_date = date.today()
 
     # Status history log
     history = SubscriptionStatusHistory(
@@ -131,7 +130,12 @@ async def activate_subscription(db: AsyncSession, subscription: Subscription) ->
     db.add(pay_history)
 
     await db.flush()
-    await _generate_next_delivery(db, subscription)
+    delivery = await _generate_next_delivery(db, subscription)
+    if delivery:
+        subscription.start_date = delivery.scheduled_date
+    else:
+        subscription.start_date = date.today() + timedelta(days=1)
+        
     return subscription
 
 
@@ -151,7 +155,7 @@ async def _generate_next_delivery(db: AsyncSession, subscription: Subscription) 
         .limit(1)
     )
     last = result.scalar_one_or_none()
-    next_date = (last.scheduled_date + timedelta(days=1)) if last else date.today()
+    next_date = (last.scheduled_date + timedelta(days=1)) if last else (date.today() + timedelta(days=1))
 
     # Skip Sundays (configurable in future)
     while next_date.weekday() == 6:
@@ -552,6 +556,14 @@ async def cancel_subscription(db: AsyncSession, subscription: Subscription, reas
             notes="Skipped due to subscription cancellation"
         )
         db.add(del_history)
+
+        # REMOVE active assignments so they do not show in Delivery Partner app
+        from app.models.delivery_assignment import DeliveryAssignment
+        assignment_res = await db.execute(
+            select(DeliveryAssignment).where(DeliveryAssignment.subscription_delivery_id == delivery.id)
+        )
+        for assignment in assignment_res.scalars().all():
+            await db.delete(assignment)
 
     return subscription
 

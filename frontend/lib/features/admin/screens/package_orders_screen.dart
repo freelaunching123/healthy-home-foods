@@ -117,8 +117,10 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
               const Divider(),
               const SizedBox(height: 10),
               
-              Text('Order Number: ${order['order_number']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 16),
+              Text(
+                'Order ID: ${order['order_id'] ?? order['id'].toString().substring(0, 8).toUpperCase()}',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),const SizedBox(height: 16),
 
               const Text('Customer Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               const SizedBox(height: 8),

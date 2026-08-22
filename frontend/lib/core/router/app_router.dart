@@ -152,6 +152,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/about-us', builder: (_, _) => const AboutUsScreen()),
     GoRoute(path: '/profile/edit', builder: (_, _) => const EditProfileScreen()),
     GoRoute(path: '/profile/subscription', builder: (_, _) => const MySubscriptionDetailScreen()),
+    GoRoute(
+      path: '/profile/subscription/:id',
+      builder: (_, state) => MySubscriptionDetailScreen(subscriptionId: state.pathParameters['id']),
+    ),
     GoRoute(path: '/profile/delivery-history', builder: (_, _) => const CustomerDeliveryHistoryScreen()),
     GoRoute(path: '/profile/addresses', builder: (_, _) => const AddressManagementScreen()),
     GoRoute(path: '/wishlist', builder: (_, _) => const WishlistScreen()),

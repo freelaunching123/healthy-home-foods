@@ -114,6 +114,8 @@ class SubscriptionResponse(BaseModel):
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
     plan_name: Optional[str] = None
+    plan_type: Optional[str] = None
+    product_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

@@ -484,7 +484,8 @@ async def create_delivery_partner(
         except Exception as e:
             raise HTTPException(status_code=400, detail="Invalid photo data")
 
-    employee_code = f"DP{shortuuid.ShortUUID().random(length=6).upper()}"
+    from app.core.order_utils import generate_delivery_partner_employee_code
+    employee_code = await generate_delivery_partner_employee_code(db)
     dp = DeliveryPartner(
         user_id=user.id,
         employee_code=employee_code,

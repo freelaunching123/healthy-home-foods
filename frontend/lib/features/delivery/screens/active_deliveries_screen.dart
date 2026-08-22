@@ -161,15 +161,6 @@ class _ActiveDeliveriesScreenState extends State<ActiveDeliveriesScreen> {
               const SizedBox(height: 16),
               if (currentStatus == 'pending')
                 ListTile(
-                  leading: const Icon(Icons.shopping_bag, color: Colors.blue),
-                  title: const Text('Mark as Picked Up'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _updateStatus(assignmentId, 'picked_up');
-                  },
-                ),
-              if (currentStatus == 'pending' || currentStatus == 'picked_up')
-                ListTile(
                   leading: const Icon(Icons.local_shipping, color: Colors.orange),
                   title: const Text('Mark Out For Delivery'),
                   onTap: () {

@@ -8,7 +8,6 @@ class DeliveryUnifiedCard extends StatelessWidget {
   final VoidCallback onTap;
 
   // New action callbacks
-  final VoidCallback? onCancelTap;
   final VoidCallback? onNavigateTap;
   final VoidCallback? onMarkOutTap;
   final VoidCallback? onDeliveredTap;
@@ -20,7 +19,6 @@ class DeliveryUnifiedCard extends StatelessWidget {
     required this.delivery,
     required this.onAssignTap,
     required this.onTap,
-    this.onCancelTap,
     this.onNavigateTap,
     this.onMarkOutTap,
     this.onDeliveredTap,
@@ -211,12 +209,6 @@ class DeliveryUnifiedCard extends StatelessWidget {
       return Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          TextButton(
-            onPressed: onCancelTap,
-            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
-            child: const Text('Cancel'),
-          ),
-          const SizedBox(width: 8),
           ElevatedButton.icon(
             onPressed: onAssignTap,
             icon: const Icon(Icons.person_add, size: 16),

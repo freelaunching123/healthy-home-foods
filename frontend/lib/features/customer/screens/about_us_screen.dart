@@ -110,19 +110,19 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: AppTheme.primaryGreen.withOpacity(0.1),
+                color: AppTheme.error.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
+                border: Border.all(color: AppTheme.error.withOpacity(0.3)),
               ),
               child: Row(
                 children: const [
-                  Icon(Icons.event_busy_outlined, color: AppTheme.primaryGreen, size: 20),
+                  Icon(Icons.event_busy_outlined, color: AppTheme.error, size: 20),
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Every Sunday is Holiday',
                       style: TextStyle(
-                        color: AppTheme.primaryGreen,
+                        color: AppTheme.error,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -231,14 +231,7 @@ class _AboutUsScreenState extends State<AboutUsScreen> {
                   ),
                   _buildDivider(),
 
-                  // 3. Restaurant Category
-                  _buildListTile(
-                    icon: Icons.category_outlined,
-                    iconColor: AppTheme.primaryGreen,
-                    title: 'Restaurant',
-                    titleColor: AppTheme.textPrimary,
-                  ),
-                  _buildDivider(),
+
 
                   // 4. Location
                   _buildListTile(

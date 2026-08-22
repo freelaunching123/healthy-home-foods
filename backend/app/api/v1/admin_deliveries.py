@@ -161,7 +161,7 @@ async def list_deliveries(
             delivery_partner_phone=p_user.phone if p_user else None,
             delivery_address=addr_str,
             scheduled_date=deliv.scheduled_date,
-            delivery_time=sub.preferred_delivery_time,
+            delivery_time=(sub.preferred_delivery_time or "Morning").split(' (')[0],
             amount=float(sub.price_per_delivery) if sub.price_per_delivery is not None else 0.0,
             payment_status=pay_status,
             status=deliv.status.value if hasattr(deliv.status, "value") else str(deliv.status),
@@ -248,7 +248,7 @@ async def list_deliveries(
             delivery_partner_phone=p_user.phone if p_user else None,
             delivery_address=addr_str,
             scheduled_date=f_order.delivery_date or f_order.created_at.date(),
-            delivery_time=f_order.delivery_slot or "Morning",
+            delivery_time=(f_order.delivery_slot or "Morning").split(' (')[0],
             amount=float(f_order.total_amount),
             payment_status=pay_status,
             status=f_order.order_status.value if hasattr(f_order.order_status, "value") else str(f_order.order_status),
@@ -575,13 +575,6 @@ async def get_delivery_details(
                 timestamp=assign.assigned_at if is_assigned else None
             ),
             AdminDeliveryTimelineStep(
-                stage="Order Picked Up",
-                status="Order Picked Up",
-                description="Grocery items picked up" if is_picked_up else "Awaiting store pickup",
-                completed=is_picked_up,
-                timestamp=assign.picked_up_at if is_picked_up else None
-            ),
-            AdminDeliveryTimelineStep(
                 stage="Out for Delivery",
                 status="Out for Delivery",
                 description="Partner is on the way to delivery address" if is_out else "Awaiting dispatch",
@@ -614,7 +607,7 @@ async def get_delivery_details(
             amount=float(f_order.total_amount),
             payment_method=None,
             payment_status="Paid" if (f_order.payment_status.value if hasattr(f_order.payment_status, "value") else str(f_order.payment_status)) == "success" else "Pending",
-            preferred_delivery_time=f_order.delivery_slot or "Standard",
+            preferred_delivery_time=(f_order.delivery_slot or "Standard").split(' (')[0],
             customer=customer_detail,
             delivery_partner=partner_detail,
             address=address_detail,
@@ -705,16 +698,7 @@ async def get_delivery_details(
         timestamp=assign.assigned_at if is_assigned else None
     ))
 
-    # 3. Order Picked Up
-    timeline.append(AdminDeliveryTimelineStep(
-        stage="Order Picked Up",
-        status="Order Picked Up",
-        description="Meal package picked up from kitchen" if is_picked_up else "Awaiting kitchen pickup",
-        completed=is_picked_up,
-        timestamp=assign.picked_up_at if is_picked_up else None
-    ))
-
-    # 4. Out for Delivery
+    # 3. Out for Delivery
     timeline.append(AdminDeliveryTimelineStep(
         stage="Out for Delivery",
         status="Out for Delivery",
@@ -794,7 +778,7 @@ async def get_delivery_details(
         amount=float(sub.price_per_delivery) if sub.price_per_delivery is not None else 0.0,
         payment_method=pay_method,
         payment_status=pay_status,
-        preferred_delivery_time=sub.preferred_delivery_time,
+        preferred_delivery_time=(sub.preferred_delivery_time or "Morning").split(' (')[0],
         customer=customer_detail,
         delivery_partner=partner_detail,
         address=address_detail,

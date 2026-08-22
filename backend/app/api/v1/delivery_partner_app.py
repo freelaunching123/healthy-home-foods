@@ -46,35 +46,26 @@ async def get_dashboard_stats(
     active_list = await get_active_deliveries(current_user, db)
     active_count = len(active_list)
 
-    # Base query for today's valid assignments
-    from app.models.subscription import SubscriptionStatus
-    query = (
-        select(DeliveryAssignment)
-        .outerjoin(SubscriptionDelivery, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
-        .outerjoin(Subscription, SubscriptionDelivery.subscription_id == Subscription.id)
-        .outerjoin(FruitOrder, DeliveryAssignment.fruit_order_id == FruitOrder.id)
-        .where(
-            DeliveryAssignment.delivery_partner_id == partner.id,
-            or_(
-                and_(
-                    SubscriptionDelivery.scheduled_date == today,
-                    SubscriptionDelivery.status != DeliveryStatus.SKIPPED,
-                    Subscription.status != SubscriptionStatus.PAUSED
-                ),
-                and_(
-                    FruitOrder.delivery_date == today,
-                    FruitOrder.order_status != FruitOrderStatus.CANCELLED
-                )
-            )
+    now = datetime.now(timezone.utc)
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Completed or failed TODAY (by action date)
+    query = select(DeliveryAssignment).where(
+        DeliveryAssignment.delivery_partner_id == partner.id,
+        DeliveryAssignment.status.in_([AssignmentStatus.DELIVERED, AssignmentStatus.FAILED]),
+        or_(
+            DeliveryAssignment.delivered_at >= start_of_today,
+            DeliveryAssignment.failed_at >= start_of_today
         )
     )
     result = await db.execute(query)
-    assignments = result.scalars().all()
+    actioned_assignments = result.scalars().all()
 
-    assigned_today = len(assignments)
-    completed_today = sum(1 for a in assignments if a.status == AssignmentStatus.DELIVERED)
-    failed_deliveries = sum(1 for a in assignments if a.status == AssignmentStatus.FAILED)
+    completed_today = sum(1 for a in actioned_assignments if a.status == AssignmentStatus.DELIVERED)
+    failed_deliveries = sum(1 for a in actioned_assignments if a.status == AssignmentStatus.FAILED)
+    
     pending_deliveries = active_count
+    assigned_today = pending_deliveries + completed_today + failed_deliveries
 
     success_rate = 0.0
     if assigned_today > 0:
@@ -166,7 +157,7 @@ async def get_active_deliveries(
                 items_summary="Subscription Meal",
                 total_amount=0.0, # Prepaid usually
                 delivery_instructions=sub.notes,
-                scheduled_time=sub.preferred_delivery_time or "Morning (7-9 AM)"
+                scheduled_time=(sub.preferred_delivery_time or "Morning").split(' (')[0]
             ))
         elif a.fruit_order_id:
             # Fruit Order
@@ -208,7 +199,7 @@ async def get_active_deliveries(
                 items_summary="Fresh Fruits Order",
                 total_amount=float(fo.total_amount),
                 delivery_instructions=fo.notes,
-                scheduled_time=fo.delivery_slot or "Morning"
+                scheduled_time=(fo.delivery_slot or "Morning").split(' (')[0]
             ))
             
     return response_list
@@ -402,7 +393,7 @@ async def get_assignment_details(
             items_summary="Subscription Meal",
             total_amount=0.0,
             delivery_instructions=sub.notes,
-            scheduled_time=sub.preferred_delivery_time or "Morning (7-9 AM)"
+            scheduled_time=(sub.preferred_delivery_time or "Morning").split(' (')[0]
         )
     elif a.fruit_order_id:
         fo_res = await db.execute(select(FruitOrder).where(FruitOrder.id == a.fruit_order_id))
@@ -438,7 +429,7 @@ async def get_assignment_details(
             items_summary=items_summary or "Fresh Fruits Order",
             total_amount=float(fo.total_amount),
             delivery_instructions=fo.notes,
-            scheduled_time=fo.delivery_slot or "Morning"
+            scheduled_time=(fo.delivery_slot or "Morning").split(' (')[0]
         )
 
 from app.schemas.common import UpdateDeliveryStatusRequest

@@ -43,25 +43,57 @@ def format_subscription_order_id(
 async def format_grocery_order_id(db: AsyncSession, slot: Optional[str] = None) -> str:
     """
     Generates a grocery order ID in the required sequence format:
-    GRC-YYYYMMDD-S-SEQUENCE (e.g., GRC-20260819-1-100001)
+    GRC-DDMMYY-00001
     - GRC: Grocery prefix
-    - YYYYMMDD: Year, Month, Date
-    - S: 1 (Morning), 2 (Afternoon), 3 (Evening)
-    - SEQUENCE: 6-digit sequential counter starting from 100001
+    - DDMMYY: Date, Month, Year
+    - 00001: 5-digit sequential counter
     """
     now = datetime.now(timezone.utc)
-    slot_code = "1"
-    if slot:
-        s = str(slot).lower()
-        if "afternoon" in s or "12:" in s or "1:" in s or "2:" in s or "3:" in s or "4:" in s:
-            slot_code = "2"
-        elif "evening" in s or "5:" in s or "6:" in s or "7:" in s or "8:" in s:
-            slot_code = "3"
-        elif "morning" in s:
-            slot_code = "1"
+    
+    from sqlalchemy import text
+    try:
+        res = await db.execute(text("SELECT nextval('grocery_order_number_seq')"))
+        seq = res.scalar()
+    except Exception:
+        # Fallback if sequence is not yet created
+        from app.models.fruit import FruitOrder
+        count_res = await db.execute(select(func.count(FruitOrder.id)))
+        count = count_res.scalar() or 0
+        seq = 1 + count
+        
+    date_str = now.strftime('%d%m%y')
+    return f"GRC-{date_str}-{seq:05d}"
 
-    from app.models.fruit import FruitOrder
-    count_res = await db.execute(select(func.count(FruitOrder.id)))
-    count = count_res.scalar() or 0
-    seq = 100001 + count
-    return f"GRC-{now.strftime('%Y%m%d')}-{slot_code}-{seq}"
+
+async def generate_delivery_partner_employee_code(db: AsyncSession) -> str:
+    """
+    Generates a unique Employee ID for a Delivery Partner.
+    Format: HHF-DEL-<SEQUENCE>
+    Sequence is a 3-digit zero-padded number, starting at 001 (max 999).
+    """
+    from app.models.delivery_partner import DeliveryPartner
+    
+    # Get the maximum sequence number currently in use
+    max_code_result = await db.execute(
+        select(func.max(DeliveryPartner.employee_code))
+        .where(DeliveryPartner.employee_code.like("HHF-DEL-%"))
+    )
+    max_code = max_code_result.scalar()
+    
+    new_seq = 1
+    if max_code:
+        try:
+            # Extract the sequence number from HHF-DEL-XXX
+            seq = int(max_code.split("-")[-1])
+            new_seq = seq + 1
+        except ValueError:
+            new_seq = 1
+            
+    if new_seq > 999:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum delivery partner capacity reached. Please alert admin to raise digit count."
+        )
+        
+    return f"HHF-DEL-{new_seq:03d}"

@@ -7,7 +7,8 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
 
 class MySubscriptionDetailScreen extends StatefulWidget {
-  const MySubscriptionDetailScreen({super.key});
+  final String? subscriptionId;
+  const MySubscriptionDetailScreen({super.key, this.subscriptionId});
 
   @override
   State<MySubscriptionDetailScreen> createState() => _MySubscriptionDetailScreenState();
@@ -28,7 +29,10 @@ class _MySubscriptionDetailScreenState extends State<MySubscriptionDetailScreen>
   Future<void> _loadCurrentSubscription() async {
     setState(() => _isLoading = true);
     try {
-      final res = await _api.get(ApiConstants.subscriptionCurrent);
+      final endpoint = widget.subscriptionId != null 
+          ? '${ApiConstants.subscriptionCurrent}?sub_id=${widget.subscriptionId}' 
+          : ApiConstants.subscriptionCurrent;
+      final res = await _api.get(endpoint);
       setState(() {
         _subscription = res.data;
       });
@@ -242,11 +246,13 @@ class _MySubscriptionDetailScreenState extends State<MySubscriptionDetailScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '${_subscription?['plan_name']} (${_subscription?['plan_type']?.toUpperCase()})',
-              style: const TextStyle(fontSize: 15, color: AppTheme.primaryGreen, fontWeight: FontWeight.w600),
-            ),
+            if (_subscription?['plan_name'] != null && _subscription?['plan_name'] != '—') ...[
+              const SizedBox(height: 8),
+              Text(
+                '${_subscription?['plan_name']} (${_subscription?['plan_type']?.toUpperCase()})',
+                style: const TextStyle(fontSize: 15, color: AppTheme.primaryGreen, fontWeight: FontWeight.w600),
+              ),
+            ],
             const Divider(height: 24, thickness: 1),
             Row(
               children: [

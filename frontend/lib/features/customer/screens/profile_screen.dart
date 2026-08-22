@@ -120,17 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Profile'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () async {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                await _confirmExitApp(context);
-              }
-            },
-            tooltip: 'Back / Exit',
-          ),
+          automaticallyImplyLeading: false,
           actions: [
             IconButton(
               icon: const Icon(Icons.settings),
@@ -199,8 +189,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // Actions
                   _ProfileMenuItem(
                     icon: Icons.card_membership_outlined,
-                    title: 'My Subscription',
-                    onTap: () => context.push('/profile/subscription'),
+                    title: 'My Subscriptions',
+                    onTap: () => context.go('/subscriptions'),
                   ),
                   _ProfileMenuItem(
                     icon: Icons.history_toggle_off_outlined,

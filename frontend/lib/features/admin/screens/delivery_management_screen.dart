@@ -652,7 +652,6 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
                               delivery: delivery,
                               onTap: () => _showDeliveryDetails(delivery),
                               onAssignTap: () => _showAssignDialog(delivery),
-                              onCancelTap: () => _updateStatus(delivery['id'], 'cancelled'),
                               onMarkOutTap: () => _updateStatus(delivery['id'], 'out_for_delivery'),
                               onDeliveredTap: () => _updateStatus(delivery['id'], 'delivered'),
                               onFailedTap: () => _updateStatus(delivery['id'], 'failed'),

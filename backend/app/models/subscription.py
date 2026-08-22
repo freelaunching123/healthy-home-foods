@@ -62,6 +62,19 @@ class Subscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("delivery_partners.id", ondelete="SET NULL"),
         nullable=True, index=True
     )
+    
+    from sqlalchemy import Sequence
+    order_number_seq: Mapped[Optional[int]] = mapped_column(
+        Integer, Sequence("subscription_order_number_seq"), unique=True, nullable=True
+    )
+
+    @property
+    def display_order_id(self) -> str:
+        if not self.order_number_seq:
+            return f"PKG-{str(self.id)[:8].upper()}"
+        dt = self.created_at or datetime.now()
+        date_str = dt.strftime("%d%m%y")
+        return f"PKG-{date_str}-{self.order_number_seq:05d}"
 
     # Delivery tracking
     total_deliveries: Mapped[int] = mapped_column(Integer, nullable=False)   # copied from plan
