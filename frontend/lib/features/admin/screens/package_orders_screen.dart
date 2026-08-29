@@ -118,7 +118,7 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
               const SizedBox(height: 10),
               
               Text(
-                'Order ID: ${order['order_id'] ?? order['order_number'] ?? order['id'].toString().substring(0, 8).toUpperCase()}',
+                'Order ID: ${order['display_order_id'] ?? order['order_id'] ?? order['order_number'] ?? order['id'].toString().substring(0, 8).toUpperCase()}',
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
               ),const SizedBox(height: 16),
 
@@ -198,7 +198,7 @@ class _AdminPackageOrderCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Text(order['order_number'] as String,
+                Text((order['display_order_id'] ?? order['order_number']).toString(),
                     style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
               ],
             ),

@@ -137,7 +137,7 @@ class _OrderCard extends StatelessWidget {
     final paymentStatus = order['payment_status'] as String? ?? 'pending';
     final total = (order['total_amount'] as num).toDouble();
     final items = order['items'] as List? ?? [];
-    final orderNum = order['order_number'] as String;
+    final orderNum = (order['display_order_id'] ?? order['order_number']).toString();
     final createdAt = order['created_at'] as String?;
     final statusColor = _orderStatusColor(orderStatus);
 

@@ -46,7 +46,9 @@ async def get_dashboard_stats(
     active_list = await get_active_deliveries(current_user, db)
     active_count = len(active_list)
 
-    now = datetime.now(timezone.utc)
+    # Use IST (UTC+5:30) for "today" calculation since the business operates in India
+    ist = timezone(timedelta(hours=5, minutes=30))
+    now = datetime.now(ist)
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Completed or failed TODAY (by action date)
@@ -235,7 +237,8 @@ async def get_history(
 ):
     partner = await get_my_partner_profile(db, current_user.id)
     
-    now = datetime.now(timezone.utc)
+    ist = timezone(timedelta(hours=5, minutes=30))
+    now = datetime.now(ist)
     if filter_period == "week":
         start_date = now - timedelta(days=7)
     elif filter_period == "month":

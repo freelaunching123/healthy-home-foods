@@ -273,7 +273,7 @@ class _AdminOrderCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Text(order['order_number'] as String,
+                Text((order['display_order_id'] ?? order['order_number']).toString(),
                     style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
                 const Spacer(),
                 Container(
@@ -454,7 +454,7 @@ class _AdminOrderCard extends StatelessWidget {
               const Divider(),
               const SizedBox(height: 10),
               
-              Text('Order ID: ${order['order_number']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text('Order ID: ${order['display_order_id'] ?? order['order_number']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               const SizedBox(height: 4),
               Text('Status: ${order['order_status'].toString().toUpperCase()}', style: const TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 16),

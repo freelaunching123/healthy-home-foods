@@ -148,7 +148,7 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
                 Row(
                   children: [
                     Text(
-                      order['order_number'] as String,
+                      (order['display_order_id'] ?? order['order_number']).toString(),
                       style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.white),
                     ),
                     const Spacer(),

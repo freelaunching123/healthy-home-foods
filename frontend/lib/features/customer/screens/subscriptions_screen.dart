@@ -226,6 +226,12 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
       }
       return '$firstProductName + ${items.length - 1} other(s)';
     }
+    if (sub['package_name'] != null && sub['package_name'] != '—') {
+      return sub['package_name'];
+    }
+    if (sub['plan_name'] != null && sub['plan_name'] != '—') {
+      return sub['plan_name'];
+    }
     return 'Custom Package';
   }
 

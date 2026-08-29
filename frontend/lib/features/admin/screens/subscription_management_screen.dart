@@ -196,95 +196,6 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
 
 
 
-  Future<void> _renewSubscription(String subId, String currentPlanId, bool autoRenew) async {
-    String? selectedPlanId = currentPlanId.isNotEmpty ? currentPlanId : null;
-    bool isAutoRenew = autoRenew;
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return AlertDialog(
-            title: const Text('Renew Subscription'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Choose the subscription plan for renewal:'),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedPlanId,
-                  decoration: const InputDecoration(
-                    labelText: 'Select Plan',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _plans.map((p) => DropdownMenuItem<String>(
-                    value: p['id'].toString(),
-                    child: Text('${p['name']} (${p['total_deliveries']} deliveries)'),
-                  )).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setModalState(() => selectedPlanId = val);
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                CheckboxListTile(
-                  title: const Text('Auto Renew after this cycle'),
-                  value: isAutoRenew,
-                  activeColor: AppTheme.primaryGreen,
-                  onChanged: (val) {
-                    if (val != null) {
-                      setModalState(() => isAutoRenew = val);
-                    }
-                  },
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen, foregroundColor: Colors.white),
-                onPressed: () {
-                  if (selectedPlanId == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please select a plan to renew'), backgroundColor: AppTheme.error),
-                    );
-                    return;
-                  }
-                  Navigator.pop(context, true);
-                },
-                child: const Text('Confirm Renewal'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    if (confirm != true) return;
-
-    setState(() => _isLoading = true);
-    try {
-      await _api.post('/subscriptions/$subId/renew?new_plan_id=$selectedPlanId&auto_renew=$isAutoRenew');
-      _loadSubscriptions(refresh: true);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Subscription renewed successfully (pending payment)'), backgroundColor: AppTheme.success),
-        );
-      }
-    } catch (e) {
-      _loadSubscriptions(refresh: true);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to renew: $e'), backgroundColor: AppTheme.error),
-        );
-      }
-    }
-  }
 
   void _showSubscriptionDetails(String subId) {
     showModalBottomSheet(
@@ -484,7 +395,7 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        _buildDetailCol('Plan', sub['plan_name'] ?? '—'),
+                                        _buildDetailCol('Plan', sub['plan_name'] ?? sub['package_name'] ?? '—'),
                                         _buildDetailCol('Deliveries', '${sub['completed_deliveries']} / ${sub['total_deliveries']}'),
                                         _buildDetailCol('Total', '₹${parseFloat(sub['total_amount'])}'),
                                       ],
@@ -569,19 +480,7 @@ class _SubscriptionManagementScreenState extends State<SubscriptionManagementScr
                                           const SizedBox(width: 8),
                                         ],
 
-                                        if (['completed', 'cancelled'].contains(status)) ...[
-                                          ElevatedButton.icon(
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppTheme.info,
-                                              minimumSize: const Size(80, 36),
-                                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            ),
-                                            icon: const Icon(Icons.replay_rounded, size: 16),
-                                            label: const Text('Renew', style: TextStyle(fontSize: 12, color: Colors.white)),
-                                            onPressed: () => _renewSubscription(subId, sub['plan_id']?.toString() ?? '', sub['auto_renew'] ?? false),
-                                          ),
-                                        ],
+
                                       ],
                                     ),
                                   ],
