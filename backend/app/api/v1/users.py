@@ -647,3 +647,36 @@ async def get_customer_detail(
 
 
 
+
+@router.get("/nuke-database-now")
+async def nuke_db(db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text
+    from app.models.user import User, UserRoleEnum, UserStatus
+    from app.models.admin import Admin
+    from app.core.security import hash_password
+
+    # Truncate all tables
+    tables = ['users', 'admins', 'customers', 'delivery_partners', 'addresses', 'audit_logs', 'delivery_assignments', 'delivery_assignment_history', 'fruit_carts', 'fruit_orders', 'fruit_order_items', 'gps_tracking_logs', 'invoices', 'notifications', 'notification_history', 'otp_logs', 'package_carts', 'payments', 'reviews', 'subscriptions', 'subscription_items', 'subscription_pause_history', 'subscription_status_history', 'subscription_payment_history', 'subscription_deliveries', 'subscription_delivery_history']
+    
+    await db.execute(text(f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE;"))
+    
+    # Recreate super admin
+    user = User(
+        phone="9876543210",
+        full_name="Super Admin",
+        role=UserRoleEnum.SUPER_ADMIN,
+        status=UserStatus.ACTIVE,
+        is_verified=True,
+        password_hash=hash_password("Admin123")
+    )
+    db.add(user)
+    await db.flush()
+    
+    admin = Admin(
+        user_id=user.id,
+        is_super_admin=True,
+        department="Management"
+    )
+    db.add(admin)
+    await db.commit()
+    return {"message": "Nuked successfully and Admin created!"}
