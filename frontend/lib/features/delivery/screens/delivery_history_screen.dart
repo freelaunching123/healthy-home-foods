@@ -296,6 +296,7 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
     final status = item['status'] as String? ?? '';
     final isDelivered = status == 'delivered';
     final isFailed = status == 'failed';
+    final isMissed = status == 'missed';
     final dateStr = item['delivery_date']?.toString() ?? '';
     final orderType = item['order_type'] == 'fruit' ? 'Grocery Order' : 'Subscription';
     
@@ -318,33 +319,43 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade100, width: 1.5),
+        side: BorderSide(color: Colors.grey.shade100, width: 1),
       ),
+      elevation: 0,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              backgroundColor: isDelivered 
-                  ? AppTheme.primaryGreen.withValues(alpha: 0.1) 
-                  : isFailed 
-                      ? Colors.red.withValues(alpha: 0.1)
-                      : Colors.blue.withValues(alpha: 0.1),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isDelivered 
+                    ? AppTheme.primaryGreen.withValues(alpha: 0.1) 
+                    : isFailed 
+                        ? Colors.red.withValues(alpha: 0.1) 
+                        : isMissed
+                            ? Colors.orange.withValues(alpha: 0.1)
+                            : Colors.blue.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
               child: Icon(
                 isDelivered 
                     ? Icons.check_circle_outline 
                     : isFailed 
                         ? Icons.error_outline 
-                        : Icons.local_shipping_outlined,
+                        : isMissed
+                            ? Icons.cancel_schedule_send_outlined
+                            : Icons.local_shipping_outlined,
                 color: isDelivered 
                     ? AppTheme.primaryGreen 
                     : isFailed 
                         ? Colors.red 
-                        : Colors.blue,
+                        : isMissed
+                            ? Colors.orange
+                            : Colors.blue,
               ),
             ),
             const SizedBox(width: 12),
@@ -366,7 +377,9 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
                               ? AppTheme.primaryGreen.withValues(alpha: 0.08) 
                               : isFailed 
                                   ? Colors.red.withValues(alpha: 0.08)
-                                  : Colors.blue.withValues(alpha: 0.08),
+                                  : isMissed
+                                      ? Colors.orange.withValues(alpha: 0.08)
+                                      : Colors.blue.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -377,7 +390,9 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
                                 ? AppTheme.primaryGreen 
                                 : isFailed 
                                     ? Colors.red 
-                                    : Colors.blue,
+                                    : isMissed
+                                        ? Colors.orange
+                                        : Colors.blue,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

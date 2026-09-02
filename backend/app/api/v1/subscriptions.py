@@ -608,6 +608,9 @@ async def get_subscription(
         elif len(prod_names) > 1:
             sub.product_name = f"{prod_names[0]} + {len(prod_names) - 1} other(s)"
 
+    from app.core.order_utils import format_package_order_id
+    sub.display_order_id = await format_package_order_id(db, sub.created_at, str(sub.id))
+
     return sub
 
 
@@ -834,3 +837,74 @@ async def skip_delivery_endpoint(
         raise HTTPException(status_code=400, detail=str(e))
 
     return MessageResponse(message="Delivery day skipped and extended successfully")
+
+@router.get("/package-orders/history", response_model=list[__import__('app.schemas.subscription', fromlist=['PackageOrderHistoryResponse']).PackageOrderHistoryResponse])
+async def package_order_history(
+    current_user: User = Depends(require_customer),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all package orders (subscriptions) for the current customer."""
+    from app.models.payment import Payment
+    from sqlalchemy.orm import joinedload
+    
+    customer = await _get_customer(db, current_user.id)
+    result = await db.execute(
+        select(Subscription)
+        .where(Subscription.customer_id == customer.id)
+        .options(
+            selectinload(Subscription.items).selectinload(SubscriptionItem.product),
+            selectinload(Subscription.address),
+            selectinload(Subscription.payment_history),
+            selectinload(Subscription.payments)
+        )
+        .order_by(Subscription.created_at.desc())
+    )
+    subs = result.scalars().all()
+    
+    # Map into response formatting
+    response_list = []
+    for sub in subs:
+        sub_dict = {
+            "id": sub.id,
+            "plan_id": sub.plan_id,
+            "product_id": sub.product_id,
+            "address_id": sub.address_id,
+            "status": str(sub.status.value) if hasattr(sub.status, "value") else str(sub.status),
+            "total_deliveries": sub.total_deliveries,
+            "completed_deliveries": sub.completed_deliveries,
+            "missed_deliveries": sub.missed_deliveries,
+            "start_date": sub.start_date,
+            "expected_end_date": sub.expected_end_date,
+            "package_price": sub.package_price,
+            "price_per_delivery": sub.price_per_delivery,
+            "total_amount": sub.total_amount,
+            "delivery_charge": sub.delivery_charge,
+            "tax_amount": sub.tax_amount,
+            "auto_renew": sub.auto_renew,
+            "preferred_delivery_time": sub.preferred_delivery_time,
+            "created_at": sub.created_at,
+            "items": sub.items,
+        }
+        
+        gateway_order_id = None
+        gateway_payment_id = None
+        display_order_id = None
+        if sub.payments and len(sub.payments) > 0:
+            first_payment = sorted(sub.payments, key=lambda p: p.created_at)[0]
+            gateway_order_id = first_payment.gateway_order_id
+            gateway_payment_id = first_payment.gateway_payment_id
+            
+        from app.core.order_utils import format_package_order_id
+        display_order_id = await format_package_order_id(db, sub.created_at, str(sub.id))
+
+        response_list.append(
+            __import__('app.schemas.subscription', fromlist=['PackageOrderHistoryResponse']).PackageOrderHistoryResponse(
+                **sub_dict,
+                gateway_order_id=gateway_order_id,
+                gateway_payment_id=gateway_payment_id,
+                display_order_id=display_order_id
+            )
+        )
+        
+    return response_list
+

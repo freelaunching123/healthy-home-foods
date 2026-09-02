@@ -7,23 +7,19 @@ import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
 
-class FruitOrderDetailScreen extends StatefulWidget {
+class PackageOrderDetailScreen extends StatefulWidget {
   final String orderId;
-  const FruitOrderDetailScreen({super.key, required this.orderId});
+  const PackageOrderDetailScreen({super.key, required this.orderId});
 
   @override
-  State<FruitOrderDetailScreen> createState() => _FruitOrderDetailScreenState();
+  State<PackageOrderDetailScreen> createState() => _PackageOrderDetailScreenState();
 }
 
-class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
+class _PackageOrderDetailScreenState extends State<PackageOrderDetailScreen> {
   final _api = ApiClient();
   Map<String, dynamic>? _order;
   bool _loading = true;
   String? _error;
-
-  int _selectedRating = 0;
-  final _reviewController = TextEditingController();
-  bool _submittingRating = false;
 
   @override
   void initState() {
@@ -33,43 +29,19 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
 
   @override
   void dispose() {
-    _reviewController.dispose();
     super.dispose();
   }
 
   Future<void> _loadOrder() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final res = await _api.get('${ApiConstants.fruitOrders}/${widget.orderId}');
+      final res = await _api.get('${ApiConstants.subscriptions}/${widget.orderId}');
       setState(() { _order = Map<String, dynamic>.from(res.data as Map); _loading = false; });
     } catch (e) {
       setState(() { _error = 'Failed to load order details.'; _loading = false; });
     }
   }
 
-  Future<void> _submitRating() async {
-    if (_selectedRating <= 0) return;
-    setState(() => _submittingRating = true);
-    try {
-      await _api.post(
-        '${ApiConstants.fruitOrders}/${widget.orderId}/rate',
-        data: {
-          'rating': _selectedRating,
-          'review_text': _reviewController.text.trim().isNotEmpty ? _reviewController.text.trim() : null,
-        },
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Feedback submitted successfully!'), backgroundColor: AppTheme.success),
-      );
-      _loadOrder();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to submit feedback'), backgroundColor: AppTheme.error),
-      );
-    } finally {
-      setState(() => _submittingRating = false);
-    }
-  }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
     final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
@@ -121,8 +93,8 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
   Widget _buildDetail() {
     final order = _order!;
     final items = order['items'] as List? ?? [];
-    final orderStatus = order['order_status'] as String? ?? 'pending';
-    final paymentStatus = order['payment_status'] as String? ?? 'pending';
+    final orderStatus = order['status'] as String? ?? 'pending';
+    final paymentStatus = 'success';
     final total = (order['total_amount'] as num).toDouble();
     final baseUrl = _api.dio.options.baseUrl.replaceAll('/api/v1', '');
 
@@ -148,7 +120,7 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
                 Row(
                   children: [
                     Text(
-                      (order['display_order_id'] ?? order['order_number']).toString(),
+                      (order['display_order_id'] ?? order['id']).toString(),
                       style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.white),
                     ),
                     const Spacer(),
@@ -193,53 +165,34 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
                 Divider(height: 1, color: Colors.grey.shade100),
                 ...items.asMap().entries.map((e) {
                   final item = e.value as Map<String, dynamic>;
-                  final qty = (item['quantity_kg'] as num).toDouble();
-                  final price = (item['price_per_kg'] as num).toDouble();
-                  final subtotal = (item['subtotal'] as num).toDouble();
-                  final unit = (item['unit']?.toString() ?? 'kg').toUpperCase();
-                  final unitValue = item['unit_value']?.toString() ?? '1';
-                  final displayUnit = unit == 'ML' ? '$unitValue ml' : '1 kg';
-                  final imageUrl = item['fruit_image_url'] as String?;
+                  final qty = (item['quantity'] as num).toInt();
+                  final name = item['product'] != null ? item['product']['name'] : item['product_name'] ?? 'Package';
                   return Column(
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: SizedBox(
-                                width: 48, height: 48,
-                                child: imageUrl != null
-                                    ? CachedNetworkImage(
-                                        imageUrl: '$baseUrl$imageUrl', fit: BoxFit.cover,
-                                        errorWidget: (_, __, ___) => Container(
-                                          color: AppTheme.primaryGreen.withValues(alpha: 0.08),
-                                          child: const Center(child: Icon(Icons.eco_rounded, size: 20, color: AppTheme.primaryGreen)),
-                                        ),
-                                      )
-                                    : Container(
-                                        color: AppTheme.primaryGreen.withValues(alpha: 0.08),
-                                        child: const Center(child: Icon(Icons.eco_rounded, size: 20, color: AppTheme.primaryGreen)),
-                                      ),
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(8),
                               ),
+                              child: const Icon(Icons.inventory_2_outlined, color: Colors.grey),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 14),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(item['fruit_name'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-                                  Text(
-                                    '${qty % 1 == 0 ? qty.toInt() : qty} Qty × ₹${price.toStringAsFixed(0)} ($displayUnit)',
-                                    style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary),
-                                  ),
+                                  Text(name, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+                                  const SizedBox(height: 2),
+                                  Text('Qty: $qty', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
                                 ],
                               ),
-                            ),
-                            Text(
-                              '₹${subtotal.toStringAsFixed(2)}',
-                              style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: AppTheme.primaryGreen),
                             ),
                           ],
                         ),
@@ -277,8 +230,6 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
                   const SizedBox(height: 12),
                   _InfoRow(label: 'Payment Status', value: _statusLabel(paymentStatus),
                       valueColor: paymentStatus == 'success' ? AppTheme.success : paymentStatus == 'failed' ? AppTheme.error : AppTheme.warning),
-                  if (order['gateway_order_id'] != null)
-                    _InfoRow(label: 'Order ID', value: order['gateway_order_id'] as String),
                   if (order['gateway_payment_id'] != null)
                     _InfoRow(label: 'Payment ID', value: order['gateway_payment_id'] as String),
                   if (order['paid_at'] != null)
@@ -291,7 +242,7 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
           const SizedBox(height: 14),
 
           // Delivery address
-          if (order['address_line1'] != null)
+          if (order['address'] != null)
             _Card(
               child: Padding(
                 padding: const EdgeInsets.all(14),
@@ -306,7 +257,7 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            '${order['address_line1']}, ${order['address_city']}',
+                            '${order['address']['address_line1']}, ${order['address']['city']}',
                             style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 13),
                           ),
                         ),
@@ -320,17 +271,38 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
           const SizedBox(height: 14),
 
           // Delivery schedule card
-          if (order['delivery_date'] != null) ...[
+          if (order['start_date'] != null) ...[
             _Card(
               child: Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Delivery Schedule', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
-                    const SizedBox(height: 12),
-                    _InfoRow(label: 'Scheduled Date', value: _formatDate(order['delivery_date'] as String)),
-                    _InfoRow(label: 'Time Slot', value: order['delivery_slot'] ?? 'N/A'),
+                    Text('Delivery Start Date', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.primaryGreen),
+                        const SizedBox(width: 6),
+                        Text(
+                          _formatDate(order['start_date'] as String),
+                          style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    if (order['preferred_delivery_time'] != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time_rounded, size: 16, color: AppTheme.primaryGreen),
+                          const SizedBox(width: 6),
+                          Text(
+                            order['preferred_delivery_time'] as String,
+                            style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -372,98 +344,6 @@ class _FruitOrderDetailScreenState extends State<FruitOrderDetailScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-          ],
-
-          // Rating card
-          if (orderStatus == 'delivered') ...[
-            if (order['rating'] != null)
-              _Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Your Rating & Review', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: List.generate(5, (starIndex) {
-                          return Icon(
-                            starIndex < (order['rating'] as int) ? Icons.star_rounded : Icons.star_border_rounded,
-                            color: Colors.amber,
-                            size: 24,
-                          );
-                        }),
-                      ),
-                      if (order['review_text'] != null && (order['review_text'] as String).isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          '"${order['review_text']}"',
-                          style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic, color: AppTheme.textSecondary),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              )
-            else
-              _Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Rate Your Order', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15)),
-                      const SizedBox(height: 6),
-                      Text('How was your grocery order delivery?', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary)),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: List.generate(5, (starIndex) {
-                          final starVal = starIndex + 1;
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedRating = starVal;
-                              });
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: Icon(
-                                starVal <= _selectedRating ? Icons.star_rounded : Icons.star_border_rounded,
-                                color: Colors.amber,
-                                size: 32,
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                      if (_selectedRating > 0) ...[
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _reviewController,
-                          maxLines: 2,
-                          decoration: InputDecoration(
-                            hintText: 'Share your feedback (optional)...',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: _submittingRating ? null : _submitRating,
-                          style: ElevatedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 40),
-                            backgroundColor: AppTheme.primaryGreen,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: _submittingRating
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : const Text('Submit Feedback'),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
             const SizedBox(height: 14),
           ],
 

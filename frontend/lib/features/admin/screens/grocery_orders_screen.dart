@@ -478,6 +478,8 @@ class _AdminOrderCard extends StatelessWidget {
               const Text('Payment Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               const SizedBox(height: 8),
               _DetailRow(label: 'Payment Status', value: order['payment_status'] ?? 'pending'),
+              _DetailRow(label: 'Gateway Order ID', value: order['gateway_order_id'] ?? 'N/A'),
+              _DetailRow(label: 'Gateway Payment ID', value: order['gateway_payment_id'] ?? 'N/A'),
               _DetailRow(label: 'Total Amount', value: '₹${(order['total_amount'] as num).toDouble().toStringAsFixed(2)}'),
               const SizedBox(height: 16),
 

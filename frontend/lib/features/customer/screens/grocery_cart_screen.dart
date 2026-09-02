@@ -142,6 +142,9 @@ class _FruitCartScreenState extends State<FruitCartScreen> {
           final qty = (item['quantity_kg'] as num).toDouble();
           final price = (item['unit_price'] as num).toDouble();
           final subtotal = (item['subtotal'] as num).toDouble();
+          final unit = (item['unit']?.toString() ?? 'kg').toUpperCase();
+          final unitValue = item['unit_value']?.toString() ?? '1';
+          final displayUnit = unit == 'ML' ? '$unitValue ml' : '1 kg';
           final imageUrl = item['fruit_image_url'] as String?;
 
           return Container(
@@ -187,7 +190,7 @@ class _FruitCartScreenState extends State<FruitCartScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '₹${price.toStringAsFixed(0)} / KG',
+                          '₹${price.toStringAsFixed(0)} ($displayUnit)',
                           style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary),
                         ),
                         const SizedBox(height: 6),
@@ -348,8 +351,8 @@ class _InlineQtyStepper extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
-              '${qty.toInt()} KG',
-              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700),
+              '${qty.toInt()}',
+              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
             ),
           ),
           GestureDetector(

@@ -108,9 +108,9 @@ async def get_active_deliveries(
             sd = sd_res.scalar_one_or_none()
             if not sd:
                 continue
-            # CRITICAL RULE: A subscription delivery scheduled for a future calendar date
-            # MUST NOT be shown as an active delivery on today's list. Only one delivery per calendar day.
-            if sd.scheduled_date > today:
+            # CRITICAL RULE: A subscription delivery scheduled for a past or future calendar date
+            # MUST NOT be shown as an active delivery on today's list. Only show deliveries specifically for today.
+            if sd.scheduled_date != today:
                 continue
             if sd.status in [DeliveryStatus.DELIVERED, DeliveryStatus.SKIPPED]:
                 continue
@@ -250,9 +250,9 @@ async def get_history(
         DeliveryAssignment.delivery_partner_id == partner.id,
         or_(
             DeliveryAssignment.delivered_at >= start_date,
-            DeliveryAssignment.failed_at >= start_date
-        ),
-        DeliveryAssignment.status.in_([AssignmentStatus.DELIVERED, AssignmentStatus.FAILED])
+            DeliveryAssignment.failed_at >= start_date,
+            DeliveryAssignment.assigned_at >= start_date
+        )
     ).order_by(DeliveryAssignment.assigned_at.desc())
     
     result = await db.execute(query)
@@ -295,11 +295,25 @@ async def get_history(
               customer_name = u.full_name
               product_name = f"Fruit Order {fo.order_number}"
               
+      is_missed = False
+      if a.status not in [AssignmentStatus.DELIVERED, AssignmentStatus.FAILED]:
+          if sd and sd.scheduled_date < date.today():
+              is_missed = True
+          elif fo:
+              effective_delivery_date = fo.delivery_date or (fo.created_at.date() + timedelta(days=1) if fo.created_at else date.today() + timedelta(days=1))
+              if effective_delivery_date < date.today():
+                  is_missed = True
+
+      if not (a.status in [AssignmentStatus.DELIVERED, AssignmentStatus.FAILED] or is_missed):
+          continue
+          
+      final_status = "missed" if is_missed else (a.status.value if hasattr(a.status, "value") else str(a.status))
+
       histories.append(DeliveryHistoryResponse(
           id=a.id,
           delivery_date=dt.date() if dt else date.today(),
           product_name=product_name,
-          status=a.status.value,
+          status=final_status,
           order_type="subscription" if a.subscription_delivery_id else "fruit",
           customer_name=customer_name,
           delivery_time=dt,

@@ -479,6 +479,10 @@ async def resume_subscription(db: AsyncSession, subscription: Subscription) -> S
 
     paused_days = 0
     if subscription.paused_at:
+        # Prevent resuming on the exact same day it was paused
+        if subscription.paused_at.date() == datetime.now(timezone.utc).date():
+            raise ValueError("You cannot resume a subscription on the exact same day you paused it.")
+            
         paused_days = (datetime.now(timezone.utc) - subscription.paused_at).days
         subscription.total_paused_days += paused_days
 

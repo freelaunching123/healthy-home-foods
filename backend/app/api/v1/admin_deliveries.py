@@ -148,6 +148,9 @@ async def list_deliveries(
             delivery_id=deliv.id
         )
 
+        sub_status = sub.status.value if hasattr(sub.status, "value") else str(sub.status)
+        pay_status = "Pending" if sub_status == "pending_payment" else "Paid"
+
         items.append(AdminDeliveryListItem(
             id=deliv.id,
             order_id=sub_ord_id,

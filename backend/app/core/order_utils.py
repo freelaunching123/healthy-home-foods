@@ -97,3 +97,12 @@ async def generate_delivery_partner_employee_code(db: AsyncSession) -> str:
         )
         
     return f"HHF-DEL-{new_seq:03d}"
+
+async def format_package_order_id(db: AsyncSession, created_at: datetime, id_str: str) -> str:
+    """
+    Generates a package order ID.
+    PKG-YYYYMMDD-ID
+    """
+    d_str = created_at.strftime('%Y%m%d')
+    seq_str = str(abs(hash(id_str)) % 100000).zfill(5)
+    return f"PKG-{d_str}-{seq_str}"

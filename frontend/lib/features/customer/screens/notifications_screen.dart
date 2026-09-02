@@ -181,17 +181,34 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         }
         break;
       case 'subscription':
+      case 'pause':
+      case 'resume':
+      case 'cancel':
         if (isAdmin) {
           context.push('/admin/subscriptions');
         } else {
           context.push('/profile/subscription');
         }
         break;
+      case 'order':
+        if (isAdmin) {
+          context.push('/admin/packages/orders');
+        } else {
+          context.push('/profile/subscription');
+        }
+        break;
+      case 'fruit_order':
+        if (isAdmin) {
+          context.push('/admin/fruits/orders');
+        } else {
+          context.push('/fruits/orders');
+        }
+        break;
       case 'payment':
         if (isAdmin) {
-          context.push('/admin');
+          context.go('/admin');
         } else {
-          context.push('/payments');
+          context.go('/payments');
         }
         break;
       case 'promo':

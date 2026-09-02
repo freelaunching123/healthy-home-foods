@@ -1046,6 +1046,9 @@ class _FruitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final available = fruit['availability_status'] == 'in_stock' && fruit['is_active'] == true;
     final price = (fruit['price_per_kg'] as num?)?.toDouble() ?? 0;
+    final unit = (fruit['unit']?.toString() ?? 'kg').toUpperCase();
+    final unitValue = fruit['unit_value']?.toString() ?? '1';
+    final displayUnit = unit == 'ML' ? '$unitValue ml' : '1 kg';
     final imageUrl = fruit['image_url'] as String?;
     final fullImageUrl = imageUrl != null ? '$baseUrl$imageUrl' : null;
 
@@ -1142,7 +1145,7 @@ class _FruitCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '₹${price.toStringAsFixed(0)} / KG',
+                          '₹${price.toStringAsFixed(0)} ($displayUnit)',
                           style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryGreen),
                         ),
                       ],
@@ -1197,7 +1200,7 @@ class _QtyStepper extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: GestureDetector(onTap: () => onChanged((quantity - 1.0).clamp(0.0, 999.0)), child: Container(decoration: const BoxDecoration(color: AppTheme.scaffoldBg, borderRadius: BorderRadius.horizontal(left: Radius.circular(7))), child: const Center(child: Icon(Icons.remove_rounded, size: 14, color: AppTheme.primaryGreen))))),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Text('${quantity.toInt()} KG', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.textPrimary))),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Text('${quantity.toInt()}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.textPrimary))),
           Expanded(child: GestureDetector(onTap: () => onChanged(quantity + 1.0), child: Container(decoration: const BoxDecoration(color: AppTheme.primaryGreen, borderRadius: BorderRadius.horizontal(right: Radius.circular(7))), child: const Center(child: Icon(Icons.add_rounded, size: 14, color: Colors.white))))),
         ],
       ),

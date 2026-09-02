@@ -24,6 +24,7 @@ class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
+  final _unitValueCtrl = TextEditingController(text: '1');
 
   String _availability = 'in_stock';
   String _unit = 'kg';
@@ -69,6 +70,7 @@ class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _priceCtrl.dispose();
+    _unitValueCtrl.dispose();
     super.dispose();
   }
 
@@ -80,6 +82,7 @@ class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
       _nameCtrl.text = data['name'] as String? ?? '';
       _descCtrl.text = data['description'] as String? ?? '';
       _priceCtrl.text = (data['price_per_kg'] as num?)?.toString() ?? '';
+      _unitValueCtrl.text = data['unit_value'] as String? ?? '1';
       setState(() {
         _selectedCategoryId = data['category_id'] as String?;
         _availability = data['availability_status'] as String? ?? 'in_stock';
@@ -118,6 +121,7 @@ class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
         'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         'price_per_kg': double.parse(_priceCtrl.text.trim()),
         'unit': _unit,
+        'unit_value': _unit == 'ml' ? _unitValueCtrl.text.trim() : '1',
         'availability_status': _availability,
         'is_active': _isActive,
       };
@@ -334,10 +338,19 @@ class _AddEditGroceryScreenState extends State<AddEditGroceryScreen> {
                         items: const [
                           DropdownMenuItem(value: 'kg', child: Text('Kilogram (kg)')),
                           DropdownMenuItem(value: 'ml', child: Text('Milliliter (ml)')),
-                          DropdownMenuItem(value: 'ltr', child: Text('Liter (ltr)')),
                         ],
                         onChanged: (val) => setState(() => _unit = val ?? 'kg'),
                       ),
+                      if (_unit == 'ml') ...[
+                        const SizedBox(height: 16),
+                        _label('Volume in ml (e.g. 300) *'),
+                        TextFormField(
+                          controller: _unitValueCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: _inputDecoration('Enter ml volume'),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                        ),
+                      ],
                     ]),
 
                     const SizedBox(height: 16),

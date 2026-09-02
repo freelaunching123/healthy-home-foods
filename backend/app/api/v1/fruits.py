@@ -7,7 +7,7 @@ import hashlib
 import os
 import shutil
 import uuid as uuid_lib
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
 from typing import Optional
 from uuid import UUID
 
@@ -72,6 +72,8 @@ def _build_order_response(order: FruitOrder, customer: Optional[Customer] = None
             fruit_id=item.fruit_id,
             fruit_name=fruit.name if fruit else "Unknown",
             fruit_image_url=fruit.image_url if fruit else None,
+            unit=fruit.unit if fruit else "kg",
+            unit_value=fruit.unit_value if fruit and fruit.unit_value else "1",
             quantity_kg=float(item.quantity_kg),
             price_per_kg=float(item.price_per_kg),
             subtotal=float(item.subtotal),
@@ -216,6 +218,8 @@ async def get_cart(
                 fruit.availability_status.value if fruit and hasattr(fruit.availability_status, "value")
                 else (str(fruit.availability_status) if fruit else "unknown")
             ),
+            unit=fruit.unit if fruit else "kg",
+            unit_value=fruit.unit_value if fruit and fruit.unit_value else "1",
             quantity_kg=float(item.quantity_kg),
             unit_price=float(item.unit_price),
             subtotal=subtotal,

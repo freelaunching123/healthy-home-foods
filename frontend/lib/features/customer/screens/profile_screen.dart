@@ -188,9 +188,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   // Actions
                   _ProfileMenuItem(
-                    icon: Icons.history_toggle_off_outlined,
-                    title: 'Subscription Deliveries',
-                    onTap: () => context.push('/profile/delivery-history'),
+                    icon: Icons.inventory_2_outlined,
+                    title: 'Package Order History',
+                    onTap: () => context.push('/profile/package-history'),
                   ),
                   _ProfileMenuItem(
                     icon: Icons.shopping_bag_outlined,

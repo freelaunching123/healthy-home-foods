@@ -105,6 +105,7 @@ class ApiConstants {
   static const String packageOrdersCheckout = '/packages/orders/checkout';
   static const String packageOrdersVerify = '/packages/orders/verify-payment';
   static const String adminPackageOrders = '/packages/orders/admin/package-orders';
+  static const String packageOrdersHistory = '/subscriptions/package-orders/history';
 
   // Subscription
   static String cancelSubscription(String id) => '/subscriptions/$id/cancel';

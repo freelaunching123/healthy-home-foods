@@ -147,6 +147,9 @@ class _FruitDetailScreenState extends State<FruitDetailScreen> {
 
     final available = _fruit!['availability_status'] == 'in_stock' && _fruit!['is_active'] == true;
     final price = (_fruit!['price_per_kg'] as num).toDouble();
+    final unit = (_fruit!['unit']?.toString() ?? 'kg').toUpperCase();
+    final unitValue = _fruit!['unit_value']?.toString() ?? '1';
+    final displayUnit = unit == 'ML' ? '$unitValue ml' : '1 kg';
     final baseUrl = _api.dio.options.baseUrl.replaceAll('/api/v1', '');
     final imageUrl = _fruit!['image_url'] != null ? '$baseUrl${_fruit!['image_url']}' : null;
 
@@ -225,7 +228,7 @@ class _FruitDetailScreenState extends State<FruitDetailScreen> {
                         style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen),
                       ),
                       const SizedBox(width: 4),
-                      Text('/KG', style: GoogleFonts.inter(fontSize: 14, color: AppTheme.textSecondary, height: 2)),
+                      Text('($displayUnit)', style: GoogleFonts.inter(fontSize: 14, color: AppTheme.textSecondary, height: 2.2, fontWeight: FontWeight.w500)),
                     ],
                   ),
                   
@@ -368,7 +371,7 @@ class _FruitDetailScreenState extends State<FruitDetailScreen> {
                         child: Center(
                           child: _isCartLoading 
                               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                              : Text('${_cartQuantity.toInt()} kg', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                              : Text('${_cartQuantity.toInt()}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
                       ),
                       IconButton(

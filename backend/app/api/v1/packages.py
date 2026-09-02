@@ -339,6 +339,8 @@ async def checkout(
         amount=round(total_checkout_amount, 2)
     )
     
+    await db.refresh(first_sub)
+
     return {
         "gateway_order_id": payment.gateway_order_id,
         "razorpay_key_id": settings.RAZORPAY_KEY_ID or "mock_key",
@@ -392,6 +394,7 @@ async def list_admin_package_orders(
             selectinload(Subscription.customer).selectinload(Customer.user),
             selectinload(Subscription.items).selectinload(SubscriptionItem.product),
             selectinload(Subscription.payments),
+            selectinload(Subscription.address),
         )
         .order_by(Subscription.created_at.desc())
     )
@@ -442,17 +445,29 @@ async def list_admin_package_orders(
                 "subtotal": float(sub.total_amount),
             })
 
+        address = sub.address
         orders_list.append({
             "id": str(sub.id),
             "order_number": sub.display_order_id,
             "customer_name": c_user.full_name if c_user else "Unknown Customer",
             "customer_phone": c_user.phone if c_user else "N/A",
+            "recipient_name": address.recipient_name if address else None,
+            "recipient_phone": address.recipient_phone if address else None,
+            "address_line1": address.address_line1 if address else None,
+            "address_line2": address.address_line2 if address else None,
+            "address_city": address.city if address else None,
+            "address_state": address.state if address else None,
+            "address_pincode": address.pincode if address else None,
+            "latitude": float(address.latitude) if address and address.latitude else None,
+            "longitude": float(address.longitude) if address and address.longitude else None,
+            "start_date": sub.start_date.isoformat() if sub.start_date else None,
             "payment_status": "success" if sub.status != SubscriptionStatus.PENDING_PAYMENT else "pending",
             "gateway_order_id": latest_payment.gateway_order_id if latest_payment else "N/A",
             "gateway_payment_id": latest_payment.gateway_payment_id if latest_payment else "N/A",
             "total_amount": float(sub.total_amount),
             "created_at": sub.created_at.isoformat() if sub.created_at else datetime.now().isoformat(),
             "items": items_list,
+            "preferred_delivery_time": sub.preferred_delivery_time,
             "delivery_partner_id": str(sub.delivery_partner_id) if sub.delivery_partner_id else None,
         })
         

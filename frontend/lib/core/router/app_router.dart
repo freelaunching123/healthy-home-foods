@@ -21,6 +21,8 @@ import '../../features/customer/screens/settings_screen.dart';
 import '../../features/customer/screens/edit_profile_screen.dart';
 import '../../features/customer/screens/my_subscription_detail_screen.dart';
 import '../../features/customer/screens/delivery_history_screen.dart';
+import '../../features/customer/screens/package_order_history_screen.dart';
+import '../../features/customer/screens/package_order_detail_screen.dart';
 import '../../features/customer/screens/address_management_screen.dart';
 import '../../features/customer/screens/wishlist_screen.dart';
 import '../../features/customer/screens/reviews_screen.dart';
@@ -156,7 +158,11 @@ final GoRouter appRouter = GoRouter(
       path: '/profile/subscription/:id',
       builder: (_, state) => MySubscriptionDetailScreen(subscriptionId: state.pathParameters['id']),
     ),
-    GoRoute(path: '/profile/delivery-history', builder: (_, _) => const CustomerDeliveryHistoryScreen()),
+    GoRoute(path: '/profile/package-history', builder: (_, _) => const PackageOrderHistoryScreen()),
+    GoRoute(
+      path: '/profile/package-history/:id',
+      builder: (_, state) => PackageOrderDetailScreen(orderId: state.pathParameters['id']!),
+    ),
     GoRoute(path: '/profile/addresses', builder: (_, _) => const AddressManagementScreen()),
     GoRoute(path: '/wishlist', builder: (_, _) => const WishlistScreen()),
     GoRoute(

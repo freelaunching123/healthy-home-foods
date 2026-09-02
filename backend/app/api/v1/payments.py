@@ -99,7 +99,7 @@ async def payment_history(
 ):
     """Return enriched payment history for the current customer (both Packages and Fruit Orders)."""
     from sqlalchemy.orm import selectinload
-    from app.models.fruit import FruitOrder, FruitPaymentStatus
+    from app.models.fruit import FruitOrder, FruitPaymentStatus, FruitOrderItem
     customer = await _get_customer(db, current_user.id)
     
     query = (
@@ -245,7 +245,7 @@ async def payment_summary(
     from sqlalchemy import func as sqlfunc
     customer = await _get_customer(db, current_user.id)
 
-    from app.models.fruit import FruitOrder, FruitPaymentStatus
+    from app.models.fruit import FruitOrder, FruitPaymentStatus, FruitOrderItem
 
     total_result = await db.execute(
         select(
@@ -437,6 +437,7 @@ async def download_invoice(
 
         if fruit_order:
             invoice_no = f"INV-FRUIT-{fruit_order.order_number}"
+            order_no = fruit_order.order_number
             cust_name = (current_user.full_name if (current_user and current_user.full_name) else "Customer") or "Customer"
             cust_phone = (current_user.phone if (current_user and current_user.phone) else "N/A") or "N/A"
             cust_email = getattr(current_user, 'email', None)
@@ -450,10 +451,18 @@ async def download_invoice(
             )
             pmt_method = "ONLINE"
             status_str = "SUCCESS"
-            del_charge = float(getattr(fruit_order, 'delivery_charge', 0.0) or 0.0)
             tax_amt = 0.0
             total_amt = float(getattr(fruit_order, 'total_amount', 0.0) or 0.0)
-            subtotal = max(0.0, total_amt - del_charge)
+            
+            calculated_subtotal = 0.0
+            if getattr(fruit_order, 'items', None):
+                for it in fruit_order.items:
+                    u_price = float(getattr(it, 'price_per_kg', 0.0) or 0.0)
+                    qty_kg = float(getattr(it, 'quantity_kg', 0.0) or 0.0)
+                    calculated_subtotal += float(getattr(it, 'subtotal', 0.0) or (u_price * qty_kg))
+            
+            subtotal = calculated_subtotal if calculated_subtotal > 0 else total_amt
+            del_charge = max(0.0, total_amt - subtotal)
 
             item_rows = []
             if getattr(fruit_order, 'items', None):
@@ -485,6 +494,8 @@ async def download_invoice(
 
             now_str = datetime.now().strftime('%Y%m')
             created_str = payment.created_at.strftime('%Y%m') if (payment and payment.created_at is not None) else now_str
+
+            order_no = getattr(sub, 'display_order_id', "N/A") if sub else "N/A"
 
             invoice_no = (
                 invoice.invoice_number
@@ -644,6 +655,7 @@ async def download_invoice(
             Paragraph("INVOICE DETAILS", h2_style),
             Spacer(1, 4),
             Paragraph(f"<b>Invoice No:</b> {invoice_no}", normal_style),
+            Paragraph(f"<b>Order No:</b> {order_no}", normal_style),
             Paragraph(f"<b>Date:</b> {paid_date}", normal_style),
             Paragraph(f"<b>Payment Method:</b> {pmt_method.upper()}", normal_style),
             Paragraph(f"<b>Status:</b> <font color='#2E7D32'><b>{status_str.upper()}</b></font>", normal_style),

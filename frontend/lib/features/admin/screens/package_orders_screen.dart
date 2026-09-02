@@ -122,10 +122,20 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
               ),const SizedBox(height: 16),
 
-              const Text('Customer Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const Text('Customer & Recipient Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               const SizedBox(height: 8),
               _DetailRow(label: 'Customer Name', value: order['customer_name'] ?? 'N/A'),
               _DetailRow(label: 'Customer Phone', value: order['customer_phone'] ?? 'N/A'),
+              _DetailRow(label: 'Recipient Name', value: order['recipient_name'] ?? 'N/A'),
+              _DetailRow(label: 'Recipient Phone', value: order['recipient_phone'] ?? 'N/A'),
+              const SizedBox(height: 16),
+
+              const Text('Delivery Address & Schedule', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(height: 8),
+              _DetailRow(label: 'Address', value: '${order['address_line1'] ?? ''} ${order['address_line2'] ?? ''}, ${order['address_city'] ?? ''}, ${order['address_state'] ?? ''} - ${order['address_pincode'] ?? ''}'),
+              _DetailRow(label: 'Coordinates (Lat, Lng)', value: order['latitude'] != null && order['longitude'] != null ? '${order['latitude']}, ${order['longitude']}' : 'N/A'),
+              _DetailRow(label: 'Scheduled Date', value: order['start_date'] != null ? order['start_date'].toString().split('T')[0] : 'N/A'),
+              _DetailRow(label: 'Time Slot', value: order['preferred_delivery_time'] ?? 'N/A'),
               const SizedBox(height: 16),
 
               const Text('Payment Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
@@ -137,6 +147,7 @@ class _PackageOrdersScreenState extends State<PackageOrdersScreen> {
               const SizedBox(height: 16),
 
               const Text('Packages Subscribed', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(height: 8),
               const SizedBox(height: 8),
               ...items.map((item) {
                 final qty = (item['quantity'] as num).toInt();

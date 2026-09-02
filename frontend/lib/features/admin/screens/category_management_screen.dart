@@ -219,7 +219,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                   Expanded(
                     child: _TabChip(
                       label: 'Grocery Categories',
-                      icon: Icons.local_grocery_store_outlined,
+                      icon: Icons.shopping_bag_outlined,
                       isSelected: _currentCategoryType == 'grocery',
                       onTap: () {
                         if (_currentCategoryType != 'grocery') {

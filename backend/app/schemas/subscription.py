@@ -180,3 +180,9 @@ class CurrentSubscriptionResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+class PackageOrderHistoryResponse(SubscriptionResponse):
+    gateway_order_id: Optional[str] = None
+    gateway_payment_id: Optional[str] = None
+    display_order_id: Optional[str] = None
+

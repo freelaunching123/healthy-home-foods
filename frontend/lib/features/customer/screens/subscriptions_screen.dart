@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dio/dio.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -162,10 +163,14 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen>
         );
       }
       await _loadAll();
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
+        String msg = 'Failed to resume';
+        if (e is DioException && e.response?.data != null && e.response!.data['detail'] != null) {
+          msg = e.response!.data['detail'].toString();
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to resume'), backgroundColor: AppTheme.error),
+          SnackBar(content: Text(msg), backgroundColor: AppTheme.error),
         );
       }
     } finally {

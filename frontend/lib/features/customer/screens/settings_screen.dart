@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'address_management_screen.dart';
+import 'help_support_screen.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/api_client.dart';
 import '../../../core/services/auth_service.dart';
@@ -276,7 +278,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: const Text('Help & Support'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help & Support coming soon')));
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportScreen()));
                   },
                 ),
                 const Divider(),

@@ -12,6 +12,7 @@ class FruitCreate(BaseModel):
     description: Optional[str] = None
     price_per_kg: float
     unit: str = "kg"
+    unit_value: str = "1"
     availability_status: str = "in_stock"
     is_active: bool = True
 
@@ -37,6 +38,7 @@ class FruitUpdate(BaseModel):
     description: Optional[str] = None
     price_per_kg: Optional[float] = None
     unit: Optional[str] = None
+    unit_value: Optional[str] = None
     availability_status: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -56,6 +58,7 @@ class FruitResponse(BaseModel):
     description: Optional[str]
     price_per_kg: float
     unit: str = "kg"
+    unit_value: Optional[str] = "1"
     image_url: Optional[str]
     availability_status: str
     is_active: bool
@@ -100,6 +103,8 @@ class FruitCartItemResponse(BaseModel):
     fruit_name: str
     fruit_image_url: Optional[str]
     fruit_availability_status: str
+    unit: str = "kg"
+    unit_value: str = "1"
     quantity_kg: float
     unit_price: float
     subtotal: float
@@ -127,6 +132,8 @@ class FruitOrderItemResponse(BaseModel):
     fruit_id: Optional[uuid.UUID] = None
     fruit_name: str
     fruit_image_url: Optional[str]
+    unit: str = "kg"
+    unit_value: str = "1"
     quantity_kg: float
     price_per_kg: float
     subtotal: float

@@ -241,6 +241,16 @@ class PaymentService:
         # Send notifications
         from app.services.notification_service import NotificationService
         
+        # Payment Successful notification
+        await NotificationService.send_notification_to_user(
+            db=db,
+            user_id=user.id,
+            title="Payment Successful",
+            body=f"Your payment of ₹{order.total_amount} was successful.",
+            notification_type="payment",
+            reference_id=str(order.id)
+        )
+
         # User notification
         await NotificationService.send_notification_to_user(
             db=db,
