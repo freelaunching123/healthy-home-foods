@@ -1,12 +1,12 @@
 import requests
 
-url = 'http://3.88.231.234:1234/api/v1/auth/login'
+url = 'http://98.93.196.212:1234/api/v1/auth/login'
 res = requests.post(url, json={'mobile_number': '9876543210', 'password': 'Admin123'})
 if res.status_code != 200:
     print('Login failed:', res.status_code, res.text)
     exit(1)
 
 token = res.json()['access_token']
-fruits_url = 'http://3.88.231.234:1234/api/v1/fruits/admin/fruits'
+fruits_url = 'http://98.93.196.212:1234/api/v1/fruits/admin/fruits'
 res2 = requests.get(fruits_url, headers={'Authorization': f'Bearer {token}'})
 print('Fruits:', res2.status_code, res2.text[:200])
