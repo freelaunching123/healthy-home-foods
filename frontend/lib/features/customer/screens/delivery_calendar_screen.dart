@@ -43,8 +43,8 @@ class _DeliveryCalendarScreenState extends State<DeliveryCalendarScreen> {
         debugPrint('Error fetching subscription details: $e');
       }
 
-      // 2. Fetch Deliveries list
-      final delRes = await _api.get('${ApiConstants.subscriptions}/${widget.subscriptionId}/deliveries');
+      // 2. Fetch Deliveries list (page_size=100 to get full list)
+      final delRes = await _api.get('${ApiConstants.subscriptions}/${widget.subscriptionId}/deliveries?page_size=100');
       final items = delRes.data['items'] as List<dynamic>? ?? [];
 
       final Map<DateTime, List<dynamic>> newMap = {};
@@ -69,11 +69,6 @@ class _DeliveryCalendarScreenState extends State<DeliveryCalendarScreen> {
 
   void _computeSchedule() {
     if (_subDetail == null) return;
-
-    final startDateStr = _subDetail!['start_date'] as String?;
-    if (startDateStr == null) return;
-    final startDateParsed = DateTime.parse(startDateStr).toLocal();
-    final start = DateTime(startDateParsed.year, startDateParsed.month, startDateParsed.day);
 
     final totalDeliveries = (_subDetail!['total_deliveries'] as num?)?.toInt() ?? 6;
     final pauseHistory = _subDetail!['pause_history'] as List<dynamic>? ?? [];
@@ -118,33 +113,68 @@ class _DeliveryCalendarScreenState extends State<DeliveryCalendarScreen> {
 
     _pausedDates = paused;
 
-    // Compute delivery schedule: start date to N delivery days
     final Map<DateTime, String> schedule = {};
     int scheduledCount = 0;
-    var currentDay = start;
 
+    // 1. First register actual deliveries recorded in the database
+    final sortedExistingDates = _deliveriesMap.keys.toList()..sort();
+    DateTime? lastScheduledDate;
+
+    for (var d in sortedExistingDates) {
+      final events = _deliveriesMap[d] ?? [];
+      if (events.isNotEmpty) {
+        final ev = events.first;
+        final evStatus = (ev['status'] ?? '').toString().toLowerCase();
+        if (evStatus != 'cancelled' && evStatus != 'skipped') {
+          scheduledCount++;
+          if (evStatus == 'delivered') {
+            schedule[d] = 'Day $scheduledCount of $totalDeliveries • Delivered';
+          } else if (evStatus == 'out_for_delivery') {
+            schedule[d] = 'Day $scheduledCount of $totalDeliveries • Out for Delivery';
+          } else {
+            schedule[d] = 'Day $scheduledCount of $totalDeliveries • Scheduled';
+          }
+          lastScheduledDate = d;
+        }
+      }
+    }
+
+    // 2. Determine start date for future projected deliveries
+    DateTime currentDay;
+    if (lastScheduledDate != null) {
+      currentDay = lastScheduledDate.add(const Duration(days: 1));
+    } else {
+      final startDateStr = _subDetail!['start_date'] as String?;
+      if (startDateStr != null) {
+        final parsed = DateTime.parse(startDateStr).toLocal();
+        currentDay = DateTime(parsed.year, parsed.month, parsed.day);
+      } else {
+        final now = DateTime.now();
+        currentDay = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+      }
+    }
+
+    // 3. Project remaining deliveries across future non-Sunday, non-paused days
     int maxLoop = 365;
     while (scheduledCount < totalDeliveries && maxLoop > 0) {
       maxLoop--;
       final normalized = DateTime(currentDay.year, currentDay.month, currentDay.day);
 
       if (currentDay.weekday == DateTime.sunday) {
-        // Sunday is Holiday - skipped from delivery count
+        // Sunday is Holiday
       } else if (paused.contains(normalized)) {
-        // Paused day - skipped from delivery count & extends schedule
-      } else {
-        // Valid working delivery day
+        // Paused day
+      } else if (!schedule.containsKey(normalized)) {
         scheduledCount++;
-        schedule[normalized] = 'Scheduled Day $scheduledCount';
+        schedule[normalized] = 'Day $scheduledCount of $totalDeliveries • Scheduled';
+        lastScheduledDate = normalized;
       }
 
-      if (scheduledCount < totalDeliveries) {
-        currentDay = currentDay.add(const Duration(days: 1));
-      }
+      currentDay = currentDay.add(const Duration(days: 1));
     }
 
     _deliveryScheduleMap = schedule;
-    _computedEndDate = currentDay;
+    _computedEndDate = lastScheduledDate ?? currentDay;
   }
 
   List<dynamic> _getEventsForDay(DateTime day) {
@@ -352,8 +382,12 @@ class _DeliveryCalendarScreenState extends State<DeliveryCalendarScreen> {
     final total = _subDetail!['total_deliveries'] ?? 6;
     final completed = _subDetail!['completed_deliveries'] ?? 0;
     final startDateStr = _subDetail!['start_date'] as String?;
+    final sortedExistingDates = _deliveriesMap.keys.toList()..sort();
+    final firstDeliveryDate = sortedExistingDates.isNotEmpty ? sortedExistingDates.first : null;
     String startDateFormatted = '—';
-    if (startDateStr != null) {
+    if (firstDeliveryDate != null) {
+      startDateFormatted = DateFormat('MMM dd, yyyy').format(firstDeliveryDate);
+    } else if (startDateStr != null) {
       try {
         startDateFormatted = DateFormat('MMM dd, yyyy').format(DateTime.parse(startDateStr));
       } catch (_) {}
@@ -526,7 +560,6 @@ class _DeliveryCalendarScreenState extends State<DeliveryCalendarScreen> {
 
     if (dbEvents.isNotEmpty) {
       final dayLabel = _deliveryScheduleMap[normalized] ?? '';
-      final total = (_subDetail?['total_deliveries'] as num?)?.toInt() ?? 6;
       final planName = _subDetail?['plan_name'] ?? _subDetail?['product_name'] ?? 'Package Delivery';
       final session = (_subDetail?['delivery_session'] ?? 'Morning').toString();
 
