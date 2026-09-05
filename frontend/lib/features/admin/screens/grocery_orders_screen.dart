@@ -488,10 +488,13 @@ class _AdminOrderCard extends StatelessWidget {
               ...items.map((item) {
                 final qty = (item['quantity_kg'] as num).toDouble();
                 final price = (item['price_per_kg'] as num).toDouble();
+                final unit = (item['unit']?.toString() ?? 'kg').toLowerCase();
+                final unitValue = item['unit_value']?.toString() ?? '1';
+                final displayUnit = unit == 'ml' ? (unitValue.isNotEmpty && unitValue != '1' ? '$unitValue ml' : 'ml') : 'KG';
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(item['fruit_name'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  subtitle: Text('${qty % 1 == 0 ? qty.toInt() : qty} KG × ₹${price.toStringAsFixed(0)}'),
+                  subtitle: Text('${qty % 1 == 0 ? qty.toInt() : qty} × ₹${price.toStringAsFixed(0)} / $displayUnit'),
                   trailing: Text('₹${(item['subtotal'] as num).toDouble().toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
                 );
               }),

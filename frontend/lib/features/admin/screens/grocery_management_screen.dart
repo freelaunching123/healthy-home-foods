@@ -370,6 +370,10 @@ class _FruitTile extends StatelessWidget {
     final price = (fruit['price_per_kg'] as num).toDouble();
     final imageUrl = fruit['image_url'] as String?;
 
+    final unit = (fruit['unit']?.toString() ?? 'kg').toLowerCase();
+    final unitValue = fruit['unit_value']?.toString() ?? '1';
+    final unitDisplay = unit == 'ml' ? (unitValue.isNotEmpty && unitValue != '1' ? '$unitValue ml' : 'ml') : 'KG';
+
     Color availColor = AppTheme.success;
     if (avail == 'out_of_stock') availColor = AppTheme.error;
     else if (avail == 'temporarily_unavailable') availColor = AppTheme.warning;
@@ -428,7 +432,7 @@ class _FruitTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Text('₹${price.toStringAsFixed(0)} / KG',
+                  Text('₹${price.toStringAsFixed(0)} / $unitDisplay',
                       style: GoogleFonts.inter(fontSize: 13, color: AppTheme.primaryGreen, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   Container(

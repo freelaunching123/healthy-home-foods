@@ -525,35 +525,105 @@ class _DeliveryCalendarScreenState extends State<DeliveryCalendarScreen> {
     }
 
     if (dbEvents.isNotEmpty) {
+      final dayLabel = _deliveryScheduleMap[normalized] ?? '';
+      final total = (_subDetail?['total_deliveries'] as num?)?.toInt() ?? 6;
+      final planName = _subDetail?['plan_name'] ?? _subDetail?['product_name'] ?? 'Package Delivery';
+      final session = (_subDetail?['delivery_session'] ?? 'Morning').toString();
+
       return Column(
         children: dbEvents.map((delivery) {
-          final status = delivery['status'] ?? 'pending';
+          final status = (delivery['status'] ?? 'pending').toString().toLowerCase();
           final color = _getStatusColor(status);
-          return Card(
-            margin: const EdgeInsets.only(bottom: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: color.withValues(alpha: 0.1),
-                child: Icon(
-                  status == 'delivered' ? Icons.check : 
-                  status == 'out_for_delivery' ? Icons.directions_bike :
-                  Icons.local_shipping,
-                  color: color,
-                ),
-              ),
-              title: Text(status.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontWeight: FontWeight.w700, color: color, fontSize: 14)),
-              subtitle: Text('Delivery ID: ${delivery['id'].toString().substring(0, 8)}...'),
-              trailing: status == 'out_for_delivery'
-                  ? ElevatedButton(
-                      onPressed: () => context.push('/tracking/${delivery['id']}'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        minimumSize: const Size(0, 36),
+          final deliveredAt = delivery['delivered_at'] as String?;
+          String deliveredTimeStr = '';
+          if (deliveredAt != null) {
+            try {
+              deliveredTimeStr = DateFormat('hh:mm a').format(DateTime.parse(deliveredAt).toLocal());
+            } catch (_) {}
+          }
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: color.withValues(alpha: 0.25), width: 1.2),
+              boxShadow: [
+                BoxShadow(color: color.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 3)),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text('Track'),
-                    )
-                  : null,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            status == 'delivered' ? Icons.check_circle_rounded :
+                            status == 'out_for_delivery' ? Icons.directions_bike_rounded :
+                            Icons.local_shipping_rounded,
+                            color: color,
+                            size: 15,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            status.replaceAll('_', ' ').toUpperCase(),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: color),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (dayLabel.isNotEmpty)
+                      Text(
+                        dayLabel,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.primaryGreen),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  planName,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.schedule_rounded, size: 14, color: AppTheme.textSecondary),
+                    const SizedBox(width: 4),
+                    Text(
+                      deliveredTimeStr.isNotEmpty ? 'Delivered at $deliveredTimeStr' : '$session Session Delivery',
+                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                if (status == 'out_for_delivery') ...[
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.push('/tracking/${delivery['id']}'),
+                      icon: const Icon(Icons.location_on, size: 16),
+                      label: const Text('Track Live Delivery'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           );
         }).toList(),
@@ -562,26 +632,49 @@ class _DeliveryCalendarScreenState extends State<DeliveryCalendarScreen> {
 
     if (isDeliveryDay) {
       final label = _deliveryScheduleMap[normalized] ?? 'Scheduled Delivery';
+      final planName = _subDetail?['plan_name'] ?? _subDetail?['product_name'] ?? 'Package Delivery';
+      final session = (_subDetail?['delivery_session'] ?? 'Morning').toString();
+
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppTheme.primaryGreen.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.2)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.25), width: 1.2),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.local_shipping_rounded, color: AppTheme.primaryGreen, size: 28),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.primaryGreen)),
-                  const SizedBox(height: 2),
-                  const Text('Scheduled delivery day for your subscription plan.', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-                ],
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.event_available_rounded, color: AppTheme.primaryGreen, size: 14),
+                      SizedBox(width: 6),
+                      Text('SCHEDULED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.primaryGreen)),
+                    ],
+                  ),
+                ),
+                Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppTheme.primaryGreen)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(planName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.access_time_rounded, size: 14, color: AppTheme.textSecondary),
+                const SizedBox(width: 4),
+                Text('Scheduled for $session Session', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
+              ],
             ),
           ],
         ),

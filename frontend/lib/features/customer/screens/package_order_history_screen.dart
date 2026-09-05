@@ -50,7 +50,7 @@ class _PackageOrderHistoryScreenState extends State<PackageOrderHistoryScreen> {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/Packages');
+              context.go('/packages');
             }
           },
         ),
@@ -84,7 +84,7 @@ class _PackageOrderHistoryScreenState extends State<PackageOrderHistoryScreen> {
         Text('Start ordering groceries!', style: GoogleFonts.inter(color: AppTheme.textSecondary)),
         const SizedBox(height: 24),
         ElevatedButton(
-          onPressed: () => context.go('/Packages'),
+          onPressed: () => context.go('/packages'),
           style: ElevatedButton.styleFrom(minimumSize: const Size(200, 44)),
           child: const Text('Browse Groceries'),
         ),

@@ -396,9 +396,15 @@ async def get_assignment_details(
         user_res = await db.execute(select(User).where(User.id == cust.user_id))
         u = user_res.scalar_one()
         
+        from app.core.order_utils import format_subscription_order_id
+        order_id_str = format_subscription_order_id(
+            scheduled_date=sd.scheduled_date,
+            preferred_time=sub.preferred_delivery_time,
+            delivery_id=sd.id
+        )
         return ActiveDeliveryResponse(
             id=a.id,
-            order_id=str(sd.id)[-8:].upper(),
+            order_id=order_id_str,
             order_type="subscription",
             customer_name=u.full_name,
             customer_phone=u.phone,

@@ -163,19 +163,33 @@ class DeliveryUnifiedCard extends StatelessWidget {
             ),
           ),
           
-          // Action Buttons Bottom Bar (Compact)
-          Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFFFAFAFA),
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
-              border: Border(top: BorderSide(color: Color(0xFFF0F0F0))),
+          // Action Buttons Bottom Bar — only shown for actionable statuses
+          if (_hasActionBar(status))
+            Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFFFAFAFA),
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(12)),
+                border: Border(top: BorderSide(color: Color(0xFFF0F0F0))),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: _buildActionRow(status),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: _buildActionRow(status),
-          ),
         ],
       ),
     );
+  }
+
+  /// Returns true only for statuses that have interactive action buttons.
+  /// Completed / terminal statuses skip the action bar entirely to avoid visual gaps.
+  bool _hasActionBar(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+      case 'assigned':
+      case 'out_for_delivery':
+        return true;
+      default:
+        return false; // delivered, failed, missed, skipped, cancelled → no action bar
+    }
   }
 
   Widget _buildMetaItem(IconData icon, String label, String value, {bool? isSuccess}) {

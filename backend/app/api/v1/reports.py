@@ -23,11 +23,11 @@ router = APIRouter(prefix="/reports", tags=["Reports & Analytics"])
 
 def parse_dates(start_date: str | None, end_date: str | None):
     try:
-        sd = datetime.strptime(start_date, "%Y-%m-%d").date() if start_date else (date.today() - timedelta(days=30))
-        ed = datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else date.today()
+        sd = datetime.strptime(start_date.strip(), "%Y-%m-%d").date() if (start_date and start_date.strip() and start_date.strip() != "null") else date(2020, 1, 1)
+        ed = datetime.strptime(end_date.strip(), "%Y-%m-%d").date() if (end_date and end_date.strip() and end_date.strip() != "null") else (date.today() + timedelta(days=1))
         return sd, ed
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    except Exception:
+        return date(2020, 1, 1), (date.today() + timedelta(days=1))
 
 @router.get("/overview")
 async def get_overview(
@@ -241,38 +241,129 @@ async def get_payments(
 
 @router.get("/export/excel")
 async def export_excel(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_super_admin)
 ):
     import openpyxl
-    overview = await get_admin_overview(db=db)
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    
+    sd, ed = parse_dates(start_date, end_date)
+    
+    # Query summary metrics for the given date range
+    pkg_rev = await db.scalar(select(func.coalesce(func.sum(Payment.amount), 0)).where(and_(Payment.status == PaymentStatus.SUCCESS, func.date(Payment.paid_at) >= sd, func.date(Payment.paid_at) <= ed)))
+    frt_rev = await db.scalar(select(func.coalesce(func.sum(FruitOrder.total_amount), 0)).where(and_(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS, func.date(FruitOrder.paid_at) >= sd, func.date(FruitOrder.paid_at) <= ed)))
+    total_revenue = float(pkg_rev or 0) + float(frt_rev or 0)
+    
+    pkg_orders = await db.scalar(select(func.count(Subscription.id)).where(and_(func.date(Subscription.created_at) >= sd, func.date(Subscription.created_at) <= ed, Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED]))))
+    frt_orders = await db.scalar(select(func.count(FruitOrder.id)).where(and_(func.date(FruitOrder.created_at) >= sd, func.date(FruitOrder.created_at) <= ed, FruitOrder.payment_status == FruitPaymentStatus.SUCCESS)))
+    total_orders = (pkg_orders or 0) + (frt_orders or 0)
+    
+    active_subs = await db.scalar(select(func.count(Subscription.id)).where(Subscription.status == SubscriptionStatus.ACTIVE))
+    pending_deliv = await db.scalar(select(func.count(SubscriptionDelivery.id)).where(and_(func.date(SubscriptionDelivery.scheduled_date) >= sd, func.date(SubscriptionDelivery.scheduled_date) <= ed, SubscriptionDelivery.status == DeliveryStatus.PENDING)))
+    
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Overview Report"
+    ws.title = "Executive Summary"
     
-    ws.append(["Report generated on", date.today().isoformat()])
+    header_fill = PatternFill(start_color="1B5E20", end_color="1B5E20", fill_type="solid")
+    section_fill = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
+    header_font = Font(name="Calibri", size=14, bold=True, color="FFFFFF")
+    section_font = Font(name="Calibri", size=12, bold=True, color="1B5E20")
+    bold_font = Font(name="Calibri", size=11, bold=True)
+    regular_font = Font(name="Calibri", size=11)
+    
+    # Title Banner
+    ws.merge_cells("A1:D1")
+    ws["A1"] = "HEALTHY HOME FOODS - BUSINESS REPORT"
+    ws["A1"].font = header_font
+    ws["A1"].fill = header_fill
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 30
+    
+    ws["A2"] = f"Period: {sd.strftime('%d %b %Y')} to {ed.strftime('%d %b %Y')}"
+    ws["A2"].font = Font(italic=True, size=10, color="555555")
+    ws["C2"] = f"Generated On: {date.today().strftime('%d %b %Y')}"
+    ws["C2"].font = Font(italic=True, size=10, color="555555")
+    
     ws.append([])
     
-    ws.append(["--- SUMMARY ---"])
-    summary = overview["summary"]
-    ws.append(["Today's Revenue", f"Rs. {summary['todays_revenue']:.2f}"])
-    ws.append(["Orders Today", summary['orders_today']])
-    ws.append(["Active Subscribers", summary['active_subscribers']])
-    ws.append(["Pending Deliveries", summary['pending_deliveries']])
+    # Section 1: Business Overview
+    ws.append(["EXECUTIVE METRICS", "", "", ""])
+    curr_row = ws.max_row
+    ws.merge_cells(f"A{curr_row}:D{curr_row}")
+    ws[f"A{curr_row}"].font = section_font
+    ws[f"A{curr_row}"].fill = section_fill
+    
+    metrics = [
+        ("Total Revenue", f"Rs. {total_revenue:,.2f}"),
+        ("Package Revenue", f"Rs. {float(pkg_rev or 0):,.2f}"),
+        ("Grocery Revenue", f"Rs. {float(frt_rev or 0):,.2f}"),
+        ("Total Orders Placed", str(total_orders)),
+        ("Package Subscriptions", str(pkg_orders or 0)),
+        ("Grocery Orders", str(frt_orders or 0)),
+        ("Active Subscribers", str(active_subs or 0)),
+        ("Pending Deliveries", str(pending_deliv or 0)),
+    ]
+    for label, val in metrics:
+        ws.append([label, val])
+        ws.cell(row=ws.max_row, column=1).font = regular_font
+        ws.cell(row=ws.max_row, column=2).font = bold_font
+    
     ws.append([])
     
-    ws.append(["--- QUICK INSIGHTS ---"])
-    insights = overview["quick_insights"]
-    if insights["top_selling_package"]:
-        ws.append(["Top Selling Package", f"{insights['top_selling_package']['name']} (x{insights['top_selling_package']['count']})"])
-    if insights["most_ordered_fruit"]:
-        ws.append(["Most Ordered Fruit", f"{insights['most_ordered_fruit']['name']} (x{insights['most_ordered_fruit']['count']})"])
+    # Section 2: Top Selling Packages
+    ws.append(["TOP PACKAGES PERFORMANCE", "", "", ""])
+    curr_row = ws.max_row
+    ws.merge_cells(f"A{curr_row}:D{curr_row}")
+    ws[f"A{curr_row}"].font = section_font
+    ws[f"A{curr_row}"].fill = section_fill
+    ws.append(["Package Name", "Total Orders", "Revenue Generated"])
+    ws.cell(row=ws.max_row, column=1).font = bold_font
+    ws.cell(row=ws.max_row, column=2).font = bold_font
+    ws.cell(row=ws.max_row, column=3).font = bold_font
+    
+    pkg_stmt = (
+        select(Product.name, func.count(Subscription.id).label('c'), func.sum(Subscription.total_amount))
+        .join(Subscription, Subscription.product_id == Product.id)
+        .where(and_(func.date(Subscription.created_at) >= sd, func.date(Subscription.created_at) <= ed, Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED])))
+        .group_by(Product.id, Product.name)
+        .order_by(desc('c'))
+    )
+    pkg_res = await db.execute(pkg_stmt)
+    for row in pkg_res.all():
+        ws.append([row[0], row[1], f"Rs. {float(row[2] or 0):,.2f}"])
+        
     ws.append([])
     
-    ws.append(["--- REVENUE CHART (LAST 7 DAYS) ---"])
-    ws.append(["Date", "Revenue"])
-    for day in overview["revenue_chart"]:
-        ws.append([day["date"], f"Rs. {day['revenue']:.2f}"])
+    # Section 3: Top Selling Groceries
+    ws.append(["TOP GROCERIES PERFORMANCE", "", "", ""])
+    curr_row = ws.max_row
+    ws.merge_cells(f"A{curr_row}:D{curr_row}")
+    ws[f"A{curr_row}"].font = section_font
+    ws[f"A{curr_row}"].fill = section_fill
+    ws.append(["Grocery Item", "Quantity Sold", "Revenue Generated"])
+    ws.cell(row=ws.max_row, column=1).font = bold_font
+    ws.cell(row=ws.max_row, column=2).font = bold_font
+    ws.cell(row=ws.max_row, column=3).font = bold_font
+    
+    frt_stmt = (
+        select(Fruit.name, func.sum(FruitOrderItem.quantity_kg).label('q'), func.sum(FruitOrderItem.price_per_kg * FruitOrderItem.quantity_kg).label('rev'))
+        .join(FruitOrderItem, FruitOrderItem.fruit_id == Fruit.id)
+        .join(FruitOrder, FruitOrder.id == FruitOrderItem.order_id)
+        .where(and_(func.date(FruitOrder.created_at) >= sd, func.date(FruitOrder.created_at) <= ed, FruitOrder.payment_status == FruitPaymentStatus.SUCCESS))
+        .group_by(Fruit.id, Fruit.name)
+        .order_by(desc('q'))
+    )
+    frt_res = await db.execute(frt_stmt)
+    for row in frt_res.all():
+        ws.append([row[0], int(row[1] or 0), f"Rs. {float(row[2] or 0):,.2f}"])
+        
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = col[0].column_letter
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 18)
         
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -280,58 +371,147 @@ async def export_excel(
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=report.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename=report_{sd}_{ed}.xlsx"},
     )
 
 @router.get("/export/pdf")
 async def export_pdf(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_super_admin)
 ):
     from fpdf import FPDF
     
-    overview = await get_admin_overview(db=db)
-    summary = overview["summary"]
-    insights = overview["quick_insights"]
+    sd, ed = parse_dates(start_date, end_date)
+    
+    pkg_rev = await db.scalar(select(func.coalesce(func.sum(Payment.amount), 0)).where(and_(Payment.status == PaymentStatus.SUCCESS, func.date(Payment.paid_at) >= sd, func.date(Payment.paid_at) <= ed)))
+    frt_rev = await db.scalar(select(func.coalesce(func.sum(FruitOrder.total_amount), 0)).where(and_(FruitOrder.payment_status == FruitPaymentStatus.SUCCESS, func.date(FruitOrder.paid_at) >= sd, func.date(FruitOrder.paid_at) <= ed)))
+    total_revenue = float(pkg_rev or 0) + float(frt_rev or 0)
+    
+    pkg_orders = await db.scalar(select(func.count(Subscription.id)).where(and_(func.date(Subscription.created_at) >= sd, func.date(Subscription.created_at) <= ed, Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED]))))
+    frt_orders = await db.scalar(select(func.count(FruitOrder.id)).where(and_(func.date(FruitOrder.created_at) >= sd, func.date(FruitOrder.created_at) <= ed, FruitOrder.payment_status == FruitPaymentStatus.SUCCESS)))
+    total_orders = (pkg_orders or 0) + (frt_orders or 0)
+    
+    active_subs = await db.scalar(select(func.count(Subscription.id)).where(Subscription.status == SubscriptionStatus.ACTIVE))
+    pending_deliv = await db.scalar(select(func.count(SubscriptionDelivery.id)).where(and_(func.date(SubscriptionDelivery.scheduled_date) >= sd, func.date(SubscriptionDelivery.scheduled_date) <= ed, SubscriptionDelivery.status == DeliveryStatus.PENDING)))
     
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("helvetica", size=16, style="B")
-    pdf.cell(200, 10, txt="Healthy Home Foods - Admin Report", ln=True, align='C')
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # Header Banner (Dark Green)
+    pdf.set_fill_color(27, 94, 32)
+    pdf.rect(0, 0, 210, 28, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", size=18, style="B")
+    pdf.set_xy(10, 6)
+    pdf.cell(190, 8, txt="HEALTHY HOME FOODS", ln=True, align='C')
     pdf.set_font("helvetica", size=10)
-    pdf.cell(200, 10, txt=f"Generated on: {date.today().isoformat()}", ln=True, align='C')
-    pdf.ln(10)
+    pdf.cell(190, 6, txt="Business Performance & Analytics Report", ln=True, align='C')
     
-    pdf.set_font("helvetica", size=14, style="B")
-    pdf.cell(200, 10, txt="Summary", ln=True)
-    pdf.set_font("helvetica", size=12)
-    pdf.cell(200, 10, txt=f"Today's Revenue: Rs. {summary['todays_revenue']:.2f}", ln=True)
-    pdf.cell(200, 10, txt=f"Orders Today: {summary['orders_today']}", ln=True)
-    pdf.cell(200, 10, txt=f"Active Subscribers: {summary['active_subscribers']}", ln=True)
-    pdf.cell(200, 10, txt=f"Pending Deliveries: {summary['pending_deliveries']}", ln=True)
-    pdf.ln(5)
+    pdf.set_text_color(60, 60, 60)
+    pdf.set_xy(10, 32)
+    pdf.set_font("helvetica", size=9)
+    pdf.cell(95, 6, txt=f"Reporting Period: {sd.strftime('%d %b %Y')} to {ed.strftime('%d %b %Y')}", ln=False)
+    pdf.cell(95, 6, txt=f"Generated On: {date.today().strftime('%d %b %Y')}", ln=True, align='R')
+    pdf.ln(4)
     
-    pdf.set_font("helvetica", size=14, style="B")
-    pdf.cell(200, 10, txt="Quick Insights", ln=True)
-    pdf.set_font("helvetica", size=12)
-    if insights["top_selling_package"]:
-        pdf.cell(200, 10, txt=f"Top Selling Package: {insights['top_selling_package']['name']} (x{insights['top_selling_package']['count']})", ln=True)
-    if insights["most_ordered_fruit"]:
-        pdf.cell(200, 10, txt=f"Most Ordered Fruit: {insights['most_ordered_fruit']['name']} (x{insights['most_ordered_fruit']['count']})", ln=True)
-    pdf.ln(5)
+    # Executive Summary Header
+    pdf.set_fill_color(232, 245, 233)
+    pdf.set_text_color(27, 94, 32)
+    pdf.set_font("helvetica", size=12, style="B")
+    pdf.cell(190, 8, txt="  Executive Overview", ln=True, fill=True)
+    pdf.ln(2)
     
-    pdf.set_font("helvetica", size=14, style="B")
-    pdf.cell(200, 10, txt="Revenue Last 7 Days", ln=True)
-    pdf.set_font("helvetica", size=12)
-    for day in overview["revenue_chart"]:
-        pdf.cell(200, 10, txt=f"{day['date']}: Rs. {day['revenue']:.2f}", ln=True)
+    pdf.set_text_color(40, 40, 40)
+    pdf.set_font("helvetica", size=10)
     
-    pdf_bytes = pdf.output(dest='S')
+    metrics = [
+        ("Total Revenue", f"Rs. {total_revenue:,.2f}", "Total Orders", str(total_orders)),
+        ("Package Revenue", f"Rs. {float(pkg_rev or 0):,.2f}", "Package Subscriptions", str(pkg_orders or 0)),
+        ("Grocery Revenue", f"Rs. {float(frt_rev or 0):,.2f}", "Grocery Orders", str(frt_orders or 0)),
+        ("Active Subscribers", str(active_subs or 0), "Pending Deliveries", str(pending_deliv or 0)),
+    ]
+    for m1_l, m1_v, m2_l, m2_v in metrics:
+        pdf.set_font("helvetica", style="", size=9)
+        pdf.cell(45, 7, txt=m1_l, border='B')
+        pdf.set_font("helvetica", style="B", size=9)
+        pdf.cell(50, 7, txt=m1_v, border='B')
+        pdf.set_font("helvetica", style="", size=9)
+        pdf.cell(45, 7, txt=m2_l, border='B')
+        pdf.set_font("helvetica", style="B", size=9)
+        pdf.cell(50, 7, txt=m2_v, border='B', ln=True)
+        
+    pdf.ln(6)
+    
+    # Top Selling Packages
+    pdf.set_fill_color(232, 245, 233)
+    pdf.set_text_color(27, 94, 32)
+    pdf.set_font("helvetica", size=12, style="B")
+    pdf.cell(190, 8, txt="  Top Packages Performance", ln=True, fill=True)
+    pdf.ln(2)
+    
+    pdf.set_fill_color(245, 245, 245)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("helvetica", style="B", size=9)
+    pdf.cell(90, 7, txt="Package Name", border=1, fill=True)
+    pdf.cell(40, 7, txt="Orders", border=1, align='C', fill=True)
+    pdf.cell(60, 7, txt="Revenue", border=1, align='R', fill=True, ln=True)
+    
+    pkg_stmt = (
+        select(Product.name, func.count(Subscription.id).label('c'), func.sum(Subscription.total_amount))
+        .join(Subscription, Subscription.product_id == Product.id)
+        .where(and_(func.date(Subscription.created_at) >= sd, func.date(Subscription.created_at) <= ed, Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.PAUSED, SubscriptionStatus.COMPLETED])))
+        .group_by(Product.id, Product.name)
+        .order_by(desc('c'))
+        .limit(6)
+    )
+    pkg_res = await db.execute(pkg_stmt)
+    pdf.set_font("helvetica", size=9)
+    for row in pkg_res.all():
+        pdf.cell(90, 6, txt=str(row[0]), border=1)
+        pdf.cell(40, 6, txt=str(row[1]), border=1, align='C')
+        pdf.cell(60, 6, txt=f"Rs. {float(row[2] or 0):,.2f}", border=1, align='R', ln=True)
+        
+    pdf.ln(6)
+    
+    # Top Selling Groceries
+    pdf.set_fill_color(232, 245, 233)
+    pdf.set_text_color(27, 94, 32)
+    pdf.set_font("helvetica", size=12, style="B")
+    pdf.cell(190, 8, txt="  Top Groceries Performance", ln=True, fill=True)
+    pdf.ln(2)
+    
+    pdf.set_fill_color(245, 245, 245)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("helvetica", style="B", size=9)
+    pdf.cell(90, 7, txt="Grocery Item", border=1, fill=True)
+    pdf.cell(40, 7, txt="Quantity Sold", border=1, align='C', fill=True)
+    pdf.cell(60, 7, txt="Revenue", border=1, align='R', fill=True, ln=True)
+    
+    frt_stmt = (
+        select(Fruit.name, func.sum(FruitOrderItem.quantity_kg).label('q'), func.sum(FruitOrderItem.price_per_kg * FruitOrderItem.quantity_kg).label('rev'))
+        .join(FruitOrderItem, FruitOrderItem.fruit_id == Fruit.id)
+        .join(FruitOrder, FruitOrder.id == FruitOrderItem.order_id)
+        .where(and_(func.date(FruitOrder.created_at) >= sd, func.date(FruitOrder.created_at) <= ed, FruitOrder.payment_status == FruitPaymentStatus.SUCCESS))
+        .group_by(Fruit.id, Fruit.name)
+        .order_by(desc('q'))
+        .limit(6)
+    )
+    frt_res = await db.execute(frt_stmt)
+    pdf.set_font("helvetica", size=9)
+    for row in frt_res.all():
+        pdf.cell(90, 6, txt=str(row[0]), border=1)
+        pdf.cell(40, 6, txt=str(int(row[1] or 0)), border=1, align='C')
+        pdf.cell(60, 6, txt=f"Rs. {float(row[2] or 0):,.2f}", border=1, align='R', ln=True)
+        
+    pdf_bytes = bytes(pdf.output())
     
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf", 
-        headers={"Content-Disposition": "attachment; filename=report.pdf"}
+        headers={"Content-Disposition": f"attachment; filename=report_{sd}_{ed}.pdf"}
     )
 
 @router.get("/admin-overview")

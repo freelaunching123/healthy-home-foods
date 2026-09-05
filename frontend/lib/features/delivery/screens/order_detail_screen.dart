@@ -55,20 +55,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Order marked as ${status.toUpperCase()}!'),
+            content: Text(
+              status == 'delivered'
+                  ? '✅ Delivery completed successfully!'
+                  : 'Order marked as ${status.toUpperCase()}!',
+            ),
             backgroundColor: AppTheme.success,
+            duration: const Duration(seconds: 2),
           ),
         );
       }
-      _loadDetails();
+      // For terminal statuses, reload then pop back so dashboard refreshes
+      if (status == 'delivered' || status == 'failed') {
+        await _loadDetails();
+        await Future.delayed(const Duration(milliseconds: 1800));
+        if (mounted) {
+          // Pop with result=true so caller knows to refresh
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        _loadDetails();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to update status'), backgroundColor: AppTheme.error),
         );
-      }
-    } finally {
-      if (mounted) {
         setState(() => _isLoading = false);
       }
     }

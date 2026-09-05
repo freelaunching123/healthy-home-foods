@@ -236,20 +236,22 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
     setState(() => _isActionInProgress = true);
     try {
       if (orderType == 'subscription') {
-        // Find subscription_id
+        // Find subscription_id from the delivery
         final deliv = _deliveries.firstWhere((d) => d['id'] == id);
         final subId = deliv['subscription_id'];
-        await _api.post('/packages/orders/admin/package-orders/$subId/assign', data: {
+        await _api.post('/admin/deliveries/subscription/$subId/assign', data: {
           'delivery_partner_id': partnerId
         });
       } else {
-        await _api.post('/fruits/admin/orders/$id/assign', data: {
+        // Grocery / fruit order — id IS the fruit_order_id
+        await _api.post('/admin/deliveries/fruit/$id/assign', data: {
           'delivery_partner_id': partnerId
         });
       }
       _showSuccessSnackBar('Partner assigned successfully');
       await _loadDeliveries();
     } catch (e) {
+      debugPrint('Assign partner error: $e');
       _showErrorSnackBar('Failed to assign partner');
     } finally {
       setState(() => _isActionInProgress = false);
@@ -286,7 +288,8 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
   Future<void> _showDeliveryDetails(Map<String, dynamic> delivery) async {
     setState(() => _isActionInProgress = true);
     try {
-      final res = await _api.get('/admin/deliveries/${delivery['id']}');
+      final deliveryId = delivery['id']?.toString() ?? '';
+      final res = await _api.get('/admin/deliveries/$deliveryId');
       if (mounted) {
         showModalBottomSheet(
           context: context,
@@ -296,13 +299,13 @@ class _DeliveryManagementScreenState extends State<DeliveryManagementScreen> {
         );
       }
     } catch (e) {
+      debugPrint('Delivery detail error: $e');
       if (mounted) {
-        _showErrorSnackBar('Failed to load delivery details');
+        final orderType = delivery['order_type'] ?? 'order';
+        _showErrorSnackBar('Failed to load $orderType delivery details. Please try again.');
       }
     } finally {
-      if (mounted) {
-        setState(() => _isActionInProgress = false);
-      }
+      if (mounted) setState(() => _isActionInProgress = false);
     }
   }
 

@@ -233,9 +233,41 @@ class _DeliveryProfileScreenState extends State<DeliveryProfileScreen> {
                             ),
                           ),
                           onPressed: () async {
-                            await AuthService().logout();
-                            if (context.mounted) {
-                              context.go('/login');
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                title: const Row(
+                                  children: [
+                                    Icon(Icons.logout, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text('Logout Confirmation', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                content: const Text('Are you sure you want to log out of your delivery partner account?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text('Logout'),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (confirmed == true && context.mounted) {
+                              await AuthService().logout();
+                              if (context.mounted) {
+                                context.go('/login');
+                              }
                             }
                           },
                         ),

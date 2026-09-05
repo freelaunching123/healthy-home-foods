@@ -31,6 +31,8 @@ services:
       dockerfile: Dockerfile
     container_name: hhf_backend_prod
     restart: always
+    ports:
+      - "1234:1234"
     depends_on:
       - db
       - redis
