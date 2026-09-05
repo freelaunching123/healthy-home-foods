@@ -587,6 +587,7 @@ async def admin_list_fruits(
     search: Optional[str] = Query(None),
     availability: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
+    category_id: Optional[UUID] = Query(None),
     _: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -600,6 +601,8 @@ async def admin_list_fruits(
             query = query.where(Fruit.availability_status == avail_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid availability value: {availability}")
+    if category_id:
+        query = query.where(Fruit.category_id == category_id)
     if search:
         query = query.where(
             or_(Fruit.name.ilike(f"%{search}%"), Fruit.description.ilike(f"%{search}%"))
@@ -635,6 +638,8 @@ async def admin_create_fruit(
         name=payload.name.strip(),
         description=payload.description,
         price_per_kg=payload.price_per_kg,
+        unit=payload.unit,
+        unit_value=payload.unit_value,
         availability_status=avail,
         is_active=payload.is_active,
     )
