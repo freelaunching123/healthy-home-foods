@@ -28,6 +28,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   String? _endDate;
 
   bool _isLoading = true;
+  bool _isExportingPdf = false;
+  bool _isExportingExcel = false;
   String? _error;
 
   Map<String, dynamic>? _overviewData;
@@ -1022,9 +1024,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _exportReport(isPdf: true),
-                  icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
-                  label: const Text('Export PDF'),
+                  onPressed: (_isExportingPdf || _isExportingExcel) ? null : () => _exportReport(isPdf: true),
+                  icon: _isExportingPdf
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                  label: Text(_isExportingPdf ? 'Exporting...' : 'Export PDF'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFDC2626),
                     foregroundColor: Colors.white,
@@ -1037,9 +1045,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _exportReport(isPdf: false),
-                  icon: const Icon(Icons.table_chart_rounded, size: 18),
-                  label: const Text('Export Excel'),
+                  onPressed: (_isExportingPdf || _isExportingExcel) ? null : () => _exportReport(isPdf: false),
+                  icon: _isExportingExcel
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.table_chart_rounded, size: 18),
+                  label: Text(_isExportingExcel ? 'Exporting...' : 'Export Excel'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),
                     foregroundColor: Colors.white,
@@ -1057,38 +1071,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _exportReport({required bool isPdf}) async {
+    setState(() {
+      if (isPdf) {
+        _isExportingPdf = true;
+      } else {
+        _isExportingExcel = true;
+      }
+    });
+
     final endpoint = isPdf ? ApiConstants.reportsExportPdf : ApiConstants.reportsExportExcel;
     final filename = isPdf
         ? 'HealthyHomeFoods_Report_${DateTime.now().millisecondsSinceEpoch}.pdf'
         : 'HealthyHomeFoods_Report_${DateTime.now().millisecondsSinceEpoch}.xlsx';
 
-    // Show loading overlay
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Center(
-        child: Card(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(color: AppTheme.primaryGreen),
-                const SizedBox(height: 16),
-                Text(
-                  'Generating ${isPdf ? "PDF Document" : "Excel Spreadsheet"}...',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
     try {
-      final dir = await getTemporaryDirectory();
+      Directory dir;
+      try {
+        dir = await getApplicationDocumentsDirectory();
+      } catch (_) {
+        dir = await getTemporaryDirectory();
+      }
       final savePath = '${dir.path}/$filename';
 
       final queryParams = <String, dynamic>{};
@@ -1102,12 +1104,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
       );
 
       if (mounted) {
-        Navigator.pop(context); // Dismiss loading overlay
+        setState(() {
+          _isExportingPdf = false;
+          _isExportingExcel = false;
+        });
         _showExportSuccessModal(savePath, filename, isPdf);
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Dismiss loading overlay
+        setState(() {
+          _isExportingPdf = false;
+          _isExportingExcel = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to export report: $e'),

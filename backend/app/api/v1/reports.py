@@ -360,10 +360,10 @@ async def export_excel(
     for row in frt_res.all():
         ws.append([row[0], int(row[1] or 0), f"Rs. {float(row[2] or 0):,.2f}"])
         
-    for col in ws.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = col[0].column_letter
-        ws.column_dimensions[col_letter].width = max(max_len + 4, 18)
+    ws.column_dimensions['A'].width = 30
+    ws.column_dimensions['B'].width = 24
+    ws.column_dimensions['C'].width = 24
+    ws.column_dimensions['D'].width = 24
         
     buffer = io.BytesIO()
     wb.save(buffer)
