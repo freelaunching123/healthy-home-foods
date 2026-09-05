@@ -231,7 +231,7 @@ async def get_route(
 
 @router.get("/history", response_model=List[DeliveryHistoryResponse])
 async def get_history(
-    filter_period: str = "today", # today, week, month
+    filter_period: str = "today", # today, week, month, all
     current_user: User = Depends(require_delivery_partner),
     db: AsyncSession = Depends(get_db),
 ):
@@ -239,84 +239,105 @@ async def get_history(
     
     ist = timezone(timedelta(hours=5, minutes=30))
     now = datetime.now(ist)
-    if filter_period == "week":
-        start_date = now - timedelta(days=7)
-    elif filter_period == "month":
-        start_date = now - timedelta(days=30)
-    else:
-        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        
+    
+    # Query delivery partner assignments ordered by latest action/assigned date
     query = select(DeliveryAssignment).where(
-        DeliveryAssignment.delivery_partner_id == partner.id,
-        or_(
-            DeliveryAssignment.delivered_at >= start_date,
-            DeliveryAssignment.failed_at >= start_date,
-            DeliveryAssignment.assigned_at >= start_date
-        )
-    ).order_by(DeliveryAssignment.assigned_at.desc())
+        DeliveryAssignment.delivery_partner_id == partner.id
+    ).order_by(
+        DeliveryAssignment.assigned_at.desc()
+    )
     
     result = await db.execute(query)
     assignments = result.scalars().all()
     
     histories = []
     for a in assignments:
-      customer_name = ""
+      customer_name = "Customer"
       product_name = ""
       order_id = ""
+      
       dt = a.delivered_at or a.failed_at or a.assigned_at
+      if dt:
+          dt_ist = dt.astimezone(ist) if dt.tzinfo else dt.replace(tzinfo=timezone.utc).astimezone(ist)
+      else:
+          dt_ist = now
+          
+      deliv_date = dt_ist.date()
+      sd = None
+      fo = None
       
       if a.subscription_delivery_id:
           sd_res = await db.execute(select(SubscriptionDelivery).where(SubscriptionDelivery.id == a.subscription_delivery_id))
           sd = sd_res.scalar_one_or_none()
           if sd:
+              if sd.scheduled_date:
+                  deliv_date = sd.scheduled_date
               sub_res = await db.execute(select(Subscription).where(Subscription.id == sd.subscription_id))
-              sub = sub_res.scalar_one()
-              from app.core.order_utils import format_subscription_order_id
-              order_id = format_subscription_order_id(
-                  scheduled_date=sd.scheduled_date,
-                  preferred_time=sub.preferred_delivery_time,
-                  delivery_id=sd.id
-              )
-              cust_res = await db.execute(select(Customer).where(Customer.id == sub.customer_id))
-              cust = cust_res.scalar_one()
-              user_res = await db.execute(select(User).where(User.id == cust.user_id))
-              u = user_res.scalar_one()
-              customer_name = u.full_name
+              sub = sub_res.scalar_one_or_none()
+              if sub:
+                  from app.core.order_utils import format_subscription_order_id
+                  order_id = format_subscription_order_id(
+                      scheduled_date=sd.scheduled_date,
+                      preferred_time=sub.preferred_delivery_time,
+                      delivery_id=sd.id
+                  )
+                  cust_res = await db.execute(select(Customer).where(Customer.id == sub.customer_id))
+                  cust = cust_res.scalar_one_or_none()
+                  if cust:
+                      user_res = await db.execute(select(User).where(User.id == cust.user_id))
+                      u = user_res.scalar_one_or_none()
+                      if u:
+                          customer_name = u.full_name
+                  product_name = "Subscription Meal"
+          if not order_id:
+              order_id = f"SUB-{str(a.subscription_delivery_id)[:8]}"
+          if not product_name:
               product_name = "Subscription Meal"
+              
       elif a.fruit_order_id:
           fo_res = await db.execute(select(FruitOrder).where(FruitOrder.id == a.fruit_order_id))
           fo = fo_res.scalar_one_or_none()
           if fo:
               order_id = fo.order_number
+              if fo.delivery_date:
+                  deliv_date = fo.delivery_date
               cust_res = await db.execute(select(Customer).where(Customer.id == fo.customer_id))
-              cust = cust_res.scalar_one()
-              user_res = await db.execute(select(User).where(User.id == cust.user_id))
-              u = user_res.scalar_one()
-              customer_name = u.full_name
-              product_name = f"Fruit Order {fo.order_number}"
+              cust = cust_res.scalar_one_or_none()
+              if cust:
+                  user_res = await db.execute(select(User).where(User.id == cust.user_id))
+                  u = user_res.scalar_one_or_none()
+                  if u:
+                      customer_name = u.full_name
+              product_name = f"Grocery Order {fo.order_number}"
+          if not order_id:
+              order_id = f"ORD-{str(a.fruit_order_id)[:8]}"
+          if not product_name:
+              product_name = f"Grocery Order {order_id}"
               
+      status_val = a.status.value if hasattr(a.status, "value") else str(a.status).lower()
       is_missed = False
-      if a.status not in [AssignmentStatus.DELIVERED, AssignmentStatus.FAILED]:
-          if sd and sd.scheduled_date < date.today():
+      if status_val not in ["delivered", "failed"]:
+          today_date = now.date()
+          if sd and sd.scheduled_date and sd.scheduled_date < today_date:
               is_missed = True
           elif fo:
-              effective_delivery_date = fo.delivery_date or (fo.created_at.date() + timedelta(days=1) if fo.created_at else date.today() + timedelta(days=1))
-              if effective_delivery_date < date.today():
+              effective_delivery_date = fo.delivery_date or (fo.created_at.date() + timedelta(days=1) if fo.created_at else today_date)
+              if effective_delivery_date < today_date:
                   is_missed = True
 
-      if not (a.status in [AssignmentStatus.DELIVERED, AssignmentStatus.FAILED] or is_missed):
+      if not (status_val in ["delivered", "failed"] or is_missed):
           continue
           
-      final_status = "missed" if is_missed else (a.status.value if hasattr(a.status, "value") else str(a.status))
+      final_status = "missed" if is_missed else status_val
 
       histories.append(DeliveryHistoryResponse(
           id=a.id,
-          delivery_date=dt.date() if dt else date.today(),
+          delivery_date=deliv_date,
           product_name=product_name,
           status=final_status,
           order_type="subscription" if a.subscription_delivery_id else "fruit",
           customer_name=customer_name,
-          delivery_time=dt,
+          delivery_time=dt_ist,
           order_id=order_id
       ))
         
@@ -386,15 +407,19 @@ async def get_assignment_details(
         
     if a.subscription_delivery_id:
         sd_res = await db.execute(select(SubscriptionDelivery).where(SubscriptionDelivery.id == a.subscription_delivery_id))
-        sd = sd_res.scalar_one()
+        sd = sd_res.scalar_one_or_none()
+        if not sd:
+            raise HTTPException(status_code=404, detail="Subscription delivery not found")
         sub_res = await db.execute(select(Subscription).where(Subscription.id == sd.subscription_id))
-        sub = sub_res.scalar_one()
+        sub = sub_res.scalar_one_or_none()
+        if not sub:
+            raise HTTPException(status_code=404, detail="Subscription not found")
         cust_res = await db.execute(select(Customer).where(Customer.id == sub.customer_id))
-        cust = cust_res.scalar_one()
+        cust = cust_res.scalar_one_or_none()
         addr_res = await db.execute(select(Address).where(Address.id == sub.address_id))
-        addr = addr_res.scalar_one()
-        user_res = await db.execute(select(User).where(User.id == cust.user_id))
-        u = user_res.scalar_one()
+        addr = addr_res.scalar_one_or_none()
+        user_res = await db.execute(select(User).where(User.id == cust.user_id)) if cust else None
+        u = user_res.scalar_one_or_none() if user_res else None
         
         from app.core.order_utils import format_subscription_order_id
         order_id_str = format_subscription_order_id(
@@ -402,16 +427,17 @@ async def get_assignment_details(
             preferred_time=sub.preferred_delivery_time,
             delivery_id=sd.id
         )
+        addr_str = f"{addr.address_line1}, {addr.city}, {addr.pincode}" if addr else "Address not specified"
         return ActiveDeliveryResponse(
             id=a.id,
             order_id=order_id_str,
             order_type="subscription",
-            customer_name=u.full_name,
-            customer_phone=u.phone,
-            delivery_address=f"{addr.address_line1}, {addr.city}, {addr.pincode}",
-            latitude=float(addr.latitude) if addr.latitude else None,
-            longitude=float(addr.longitude) if addr.longitude else None,
-            status=a.status.value,
+            customer_name=u.full_name if u else "Customer",
+            customer_phone=u.phone if u else "",
+            delivery_address=addr_str,
+            latitude=float(addr.latitude) if (addr and addr.latitude) else None,
+            longitude=float(addr.longitude) if (addr and addr.longitude) else None,
+            status=a.status.value if hasattr(a.status, "value") else str(a.status),
             assigned_at=a.assigned_at,
             items_summary="Subscription Meal",
             total_amount=0.0,
@@ -420,13 +446,15 @@ async def get_assignment_details(
         )
     elif a.fruit_order_id:
         fo_res = await db.execute(select(FruitOrder).where(FruitOrder.id == a.fruit_order_id))
-        fo = fo_res.scalar_one()
+        fo = fo_res.scalar_one_or_none()
+        if not fo:
+            raise HTTPException(status_code=404, detail="Fruit order not found")
         cust_res = await db.execute(select(Customer).where(Customer.id == fo.customer_id))
-        cust = cust_res.scalar_one()
+        cust = cust_res.scalar_one_or_none()
         addr_res = await db.execute(select(Address).where(Address.id == fo.address_id))
-        addr = addr_res.scalar_one()
-        user_res = await db.execute(select(User).where(User.id == cust.user_id))
-        u = user_res.scalar_one()
+        addr = addr_res.scalar_one_or_none()
+        user_res = await db.execute(select(User).where(User.id == cust.user_id)) if cust else None
+        u = user_res.scalar_one_or_none() if user_res else None
         
         # Get items for fruit order
         from app.models.fruit import FruitOrderItem, Fruit
@@ -438,16 +466,17 @@ async def get_assignment_details(
         items_rows = items_result.all()
         items_summary = ", ".join([f"{f.name if f else 'Fresh Fruit'} ({item.quantity_kg} kg)" for item, f in items_rows])
         
+        addr_str = f"{addr.address_line1}, {addr.city}, {addr.pincode}" if addr else "Address not specified"
         return ActiveDeliveryResponse(
             id=a.id,
             order_id=fo.order_number,
             order_type="fruit",
-            customer_name=u.full_name,
-            customer_phone=u.phone,
-            delivery_address=f"{addr.address_line1}, {addr.city}, {addr.pincode}",
-            latitude=float(addr.latitude) if addr.latitude else None,
-            longitude=float(addr.longitude) if addr.longitude else None,
-            status=a.status.value,
+            customer_name=u.full_name if u else "Customer",
+            customer_phone=u.phone if u else "",
+            delivery_address=addr_str,
+            latitude=float(addr.latitude) if (addr and addr.latitude) else None,
+            longitude=float(addr.longitude) if (addr and addr.longitude) else None,
+            status=a.status.value if hasattr(a.status, "value") else str(a.status),
             assigned_at=a.assigned_at,
             items_summary=items_summary or "Fresh Fruits Order",
             total_amount=float(fo.total_amount),

@@ -16,7 +16,8 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
   List<dynamic> _history = [];
   List<dynamic> _filteredHistory = [];
   bool _isLoading = true;
-  String _selectedFilter = 'today'; // today, week, month
+  String? _errorMessage;
+  String _selectedFilter = 'today'; // today, week, month, all
   String _searchQuery = '';
 
   int _completedToday = 0;
@@ -30,20 +31,46 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
   }
 
   Future<void> _loadHistory() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
-      // Always load the maximum window (month) so we can calculate stats client-side
       final res = await _api.get('${ApiConstants.partnerHistory}?filter_period=month');
-      setState(() {
-        _history = res.data is List ? res.data : [];
-        _calculateStats();
-        _applyFiltersAndSearch();
-      });
+      if (mounted) {
+        setState(() {
+          _history = res.data is List ? res.data : [];
+          _calculateStats();
+          _applyFiltersAndSearch();
+          _errorMessage = null;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading history: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load delivery history. Pull down or tap to retry.';
+        });
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
+  }
+
+  DateTime? _extractDate(dynamic item) {
+    try {
+      final delTime = item['delivery_time']?.toString();
+      if (delTime != null && delTime.isNotEmpty) {
+        return DateTime.parse(delTime).toLocal();
+      }
+      final dateStr = item['delivery_date']?.toString();
+      if (dateStr != null && dateStr.isNotEmpty) {
+        return DateTime.parse(dateStr).toLocal();
+      }
+    } catch (_) {}
+    return null;
   }
 
   void _calculateStats() {
@@ -54,25 +81,24 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
     int monthCount = 0;
 
     for (var item in _history) {
-      if (item['status'] != 'delivered') continue;
-      try {
-        final dateStr = item['delivery_date']?.toString() ?? '';
-        if (dateStr.isEmpty) continue;
-        final parsedDate = DateTime.parse(dateStr);
-        final dateOnly = DateTime(parsedDate.year, parsedDate.month, parsedDate.day);
-        final diffDays = today.difference(dateOnly).inDays;
-        
-        if (dateOnly.isAtSameMomentAs(today)) {
-          todayCount++;
-        }
-        if (diffDays >= 0 && diffDays < 7) {
-          weekCount++;
-        }
-        if (diffDays >= 0 && diffDays < 30) {
-          monthCount++;
-        }
-      } catch (e) {
-        debugPrint('Error parsing date for stats: $e');
+      final status = (item['status'] ?? '').toString().toLowerCase();
+      if (status != 'delivered') continue;
+      
+      final dt = _extractDate(item);
+      if (dt == null) continue;
+      
+      final dateOnly = DateTime(dt.year, dt.month, dt.day);
+      final isToday = (dateOnly.year == today.year && dateOnly.month == today.month && dateOnly.day == today.day);
+      final diffDays = today.difference(dateOnly).inDays;
+      
+      if (isToday || diffDays == 0) {
+        todayCount++;
+      }
+      if (diffDays >= 0 && diffDays < 7) {
+        weekCount++;
+      }
+      if (diffDays >= 0 && diffDays < 30) {
+        monthCount++;
       }
     }
 
@@ -87,23 +113,22 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
     
     // 1. Filter by Period
     List<dynamic> periodFiltered = _history.where((item) {
-      try {
-        final dateStr = item['delivery_date']?.toString() ?? '';
-        if (dateStr.isEmpty) return false;
-        final parsedDate = DateTime.parse(dateStr);
-        final dateOnly = DateTime(parsedDate.year, parsedDate.month, parsedDate.day);
-        final diffDays = today.difference(dateOnly).inDays;
+      if (_selectedFilter == 'all') return true;
+      final dt = _extractDate(item);
+      if (dt == null) return false;
+      
+      final dateOnly = DateTime(dt.year, dt.month, dt.day);
+      final isToday = (dateOnly.year == today.year && dateOnly.month == today.month && dateOnly.day == today.day);
+      final diffDays = today.difference(dateOnly).inDays;
 
-        if (_selectedFilter == 'today') {
-          return dateOnly.isAtSameMomentAs(today);
-        } else if (_selectedFilter == 'week') {
-          return diffDays >= 0 && diffDays < 7;
-        } else {
-          return diffDays >= 0 && diffDays < 30;
-        }
-      } catch (_) {
-        return false;
+      if (_selectedFilter == 'today') {
+        return isToday || diffDays == 0;
+      } else if (_selectedFilter == 'week') {
+        return diffDays >= 0 && diffDays < 7;
+      } else if (_selectedFilter == 'month') {
+        return diffDays >= 0 && diffDays < 30;
       }
+      return true;
     }).toList();
 
     // 2. Filter by Search Query
@@ -126,80 +151,120 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
         title: const Text('Delivery History'),
-
-      ),
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search by Customer or Order ID...',
-                prefixIcon: const Icon(Icons.search_rounded, color: Colors.grey),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
-                ),
-              ),
-              onChanged: (val) {
-                setState(() {
-                  _searchQuery = val;
-                  _applyFiltersAndSearch();
-                });
-              },
-            ),
-          ),
-
-          // Summary Cards Row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: Row(
-              children: [
-                Expanded(child: _buildSummaryCard('Today', '$_completedToday', AppTheme.primaryGreen)),
-                const SizedBox(width: 8),
-                Expanded(child: _buildSummaryCard('This Week', '$_completedThisWeek', Colors.blue)),
-                const SizedBox(width: 8),
-                Expanded(child: _buildSummaryCard('This Month', '$_completedThisMonth', Colors.purple)),
-              ],
-            ),
-          ),
-
-          // Date Filters Tabs
-          _buildFilterTabs(),
-
-          // Deliveries List
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
-                : _filteredHistory.isEmpty
-                    ? Center(
-                        child: Text(
-                          _searchQuery.isEmpty ? 'No deliveries recorded for this period.' : 'No matches found.',
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                      )
-                    : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filteredHistory.length,
-                          itemBuilder: (context, index) {
-                            final item = _filteredHistory[index];
-                            return _buildHistoryCard(item);
-                          },
-                        ),
-          ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _loadHistory,
+            tooltip: 'Refresh',
+          )
         ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadHistory,
+        color: AppTheme.primaryGreen,
+        child: Column(
+          children: [
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search by Customer or Order ID...',
+                  prefixIcon: const Icon(Icons.search_rounded, color: Colors.grey),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppTheme.primaryGreen, width: 2),
+                  ),
+                ),
+                onChanged: (val) {
+                  setState(() {
+                    _searchQuery = val;
+                    _applyFiltersAndSearch();
+                  });
+                },
+              ),
+            ),
+
+            // Summary Cards Row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  Expanded(child: _buildSummaryCard('Today', '$_completedToday', AppTheme.primaryGreen)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildSummaryCard('This Week', '$_completedThisWeek', Colors.blue)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _buildSummaryCard('This Month', '$_completedThisMonth', Colors.purple)),
+                ],
+              ),
+            ),
+
+            // Date Filters Tabs
+            _buildFilterTabs(),
+
+            // Deliveries List
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
+                  : _errorMessage != null
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.error_outline_rounded, size: 48, color: Colors.orange),
+                                const SizedBox(height: 12),
+                                Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textPrimary)),
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: _loadHistory,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Retry'),
+                                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
+                                )
+                              ],
+                            ),
+                          ),
+                        )
+                      : _filteredHistory.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height: MediaQuery.of(context).size.height * 0.4,
+                                  child: Center(
+                                    child: Text(
+                                      _searchQuery.isEmpty ? 'No deliveries recorded for this period.' : 'No matches found.',
+                                      style: const TextStyle(color: Colors.grey),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _filteredHistory.length,
+                              itemBuilder: (context, index) {
+                                final item = _filteredHistory[index];
+                                return _buildHistoryCard(item);
+                              },
+                            ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -248,6 +313,7 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
           Expanded(child: _buildTabChip('Today', 'today')),
           Expanded(child: _buildTabChip('This Week', 'week')),
           Expanded(child: _buildTabChip('This Month', 'month')),
+          Expanded(child: _buildTabChip('All', 'all')),
         ],
       ),
     );
