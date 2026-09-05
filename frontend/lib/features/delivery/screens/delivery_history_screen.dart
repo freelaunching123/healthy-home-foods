@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/api_client.dart';
@@ -11,7 +12,8 @@ class DeliveryHistoryScreen extends StatefulWidget {
   State<DeliveryHistoryScreen> createState() => _DeliveryHistoryScreenState();
 }
 
-class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
+class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen>
+    with WidgetsBindingObserver {
   final _api = ApiClient();
   List<dynamic> _history = [];
   List<dynamic> _filteredHistory = [];
@@ -19,6 +21,7 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
   String? _errorMessage;
   String _selectedFilter = 'today'; // today, week, month, all
   String _searchQuery = '';
+  Timer? _autoRefreshTimer;
 
   int _completedToday = 0;
   int _completedThisWeek = 0;
@@ -27,14 +30,35 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadHistory();
+    // Automatically keep delivery history freshly synced every 15 seconds
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _loadHistory(silent: true);
+    });
   }
 
-  Future<void> _loadHistory() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadHistory(silent: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadHistory({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
     try {
       final res = await _api.get('${ApiConstants.partnerHistory}?filter_period=month');
       if (mounted) {
@@ -47,13 +71,13 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
       }
     } catch (e) {
       debugPrint('Error loading history: $e');
-      if (mounted) {
+      if (mounted && !silent) {
         setState(() {
           _errorMessage = 'Failed to load delivery history. Pull down or tap to retry.';
         });
       }
     } finally {
-      if (mounted) {
+      if (mounted && !silent) {
         setState(() => _isLoading = false);
       }
     }
@@ -151,16 +175,9 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
       backgroundColor: AppTheme.scaffoldBg,
       appBar: AppBar(
         title: const Text('Delivery History'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _loadHistory,
-            tooltip: 'Refresh',
-          )
-        ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadHistory,
+        onRefresh: () => _loadHistory(),
         color: AppTheme.primaryGreen,
         child: Column(
           children: [
