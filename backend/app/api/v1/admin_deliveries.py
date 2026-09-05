@@ -471,19 +471,24 @@ async def get_delivery_details(
             PartnerUser,
             Address,
         )
-        .join(Subscription, Subscription.id == SubscriptionDelivery.subscription_id)
-        .join(Customer, Customer.id == Subscription.customer_id)
-        .join(CustomerUser, CustomerUser.id == Customer.user_id)
+        .outerjoin(Subscription, Subscription.id == SubscriptionDelivery.subscription_id)
+        .outerjoin(Customer, Customer.id == Subscription.customer_id)
+        .outerjoin(CustomerUser, CustomerUser.id == Customer.user_id)
         .outerjoin(Address, Address.id == Subscription.address_id)
         .outerjoin(DeliveryAssignment, DeliveryAssignment.subscription_delivery_id == SubscriptionDelivery.id)
         .outerjoin(DeliveryPartner, DeliveryPartner.id == DeliveryAssignment.delivery_partner_id)
         .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
-        .where(SubscriptionDelivery.id == id)
+        .where(
+            or_(
+                SubscriptionDelivery.id == id,
+                DeliveryAssignment.id == id,
+            )
+        )
     )
     result = await db.execute(stmt)
     row = result.first()
     
-    if not row:
+    if not row or row[0] is None:
         # Check if it's a Fruit Order
         from app.models.fruit import FruitOrder, FruitOrderItem, Fruit
         fruit_stmt = (
@@ -496,27 +501,38 @@ async def get_delivery_details(
                 PartnerUser,
                 Address,
             )
-            .join(Customer, Customer.id == FruitOrder.customer_id)
-            .join(CustomerUser, CustomerUser.id == Customer.user_id)
+            .outerjoin(Customer, Customer.id == FruitOrder.customer_id)
+            .outerjoin(CustomerUser, CustomerUser.id == Customer.user_id)
             .outerjoin(Address, Address.id == FruitOrder.address_id)
             .outerjoin(DeliveryAssignment, DeliveryAssignment.fruit_order_id == FruitOrder.id)
             .outerjoin(DeliveryPartner, DeliveryPartner.id == DeliveryAssignment.delivery_partner_id)
             .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
-            .where(FruitOrder.id == id)
+            .where(
+                or_(
+                    FruitOrder.id == id,
+                    DeliveryAssignment.id == id,
+                )
+            )
         )
         fruit_res = await db.execute(fruit_stmt)
         f_row = fruit_res.first()
-        if not f_row:
+        if not f_row or f_row[0] is None:
             raise HTTPException(status_code=404, detail="Delivery not found")
         
         f_order, cust, c_user, assign, partner, p_user, addr = f_row
 
+        cust_id = cust.id if cust else (f_order.customer_id if f_order else uuid.uuid4())
+        c_name = c_user.full_name if c_user else "Customer"
+        c_phone = c_user.phone if c_user else ""
+        c_email = c_user.email if c_user else None
+        c_code = cust.customer_code if cust else None
+
         customer_detail = AdminDeliveryCustomer(
-            id=cust.id,
-            full_name=c_user.full_name,
-            phone=c_user.phone,
-            email=c_user.email,
-            customer_code=cust.customer_code
+            id=cust_id,
+            full_name=c_name,
+            phone=c_phone,
+            email=c_email,
+            customer_code=c_code
         )
 
         partner_detail = None
@@ -532,13 +548,14 @@ async def get_delivery_details(
 
         address_detail = AdminDeliveryAddress(
             id=addr.id if addr else uuid.uuid4(),
-            address_line1=addr.address_line1 if addr else "No Address",
+            address_line1=addr.address_line1 if addr else "No Address Provided",
             address_line2=addr.address_line2 if addr else None,
             city=addr.city if addr else "",
             state=addr.state if addr else "",
             pincode=addr.pincode if addr else "",
-            latitude=float(addr.latitude) if addr and addr.latitude else None,
-            longitude=float(addr.longitude) if addr and addr.longitude else None,
+            landmark=addr.landmark if addr else None,
+            latitude=float(addr.latitude) if (addr and addr.latitude is not None) else None,
+            longitude=float(addr.longitude) if (addr and addr.longitude is not None) else None,
         )
 
         f_items_stmt = select(FruitOrderItem, Fruit).outerjoin(Fruit, Fruit.id == FruitOrderItem.fruit_id).where(FruitOrderItem.order_id == f_order.id)
@@ -560,7 +577,8 @@ async def get_delivery_details(
         partner_name = p_user.full_name if (is_assigned and p_user) else None
         is_picked_up = is_assigned and getattr(assign, 'picked_up_at', None) is not None
         is_out = is_assigned and assign.out_at is not None
-        is_delivered = f_order.order_status == FruitOrderStatus.DELIVERED or (is_assigned and assign.delivered_at is not None)
+        f_order_status_str = f_order.order_status.value if hasattr(f_order.order_status, "value") else str(f_order.order_status or "pending")
+        is_delivered = f_order_status_str.lower() == "delivered" or (is_assigned and assign.delivered_at is not None)
 
         timeline = [
             AdminDeliveryTimelineStep(
@@ -594,22 +612,44 @@ async def get_delivery_details(
         ]
 
         assignment_history = []
+        if is_assigned:
+            try:
+                hist_stmt = (
+                    select(DeliveryAssignmentHistory, PartnerUser)
+                    .outerjoin(DeliveryPartner, DeliveryPartner.id == DeliveryAssignmentHistory.new_partner_id)
+                    .outerjoin(PartnerUser, PartnerUser.id == DeliveryPartner.user_id)
+                    .where(DeliveryAssignmentHistory.assignment_id == assign.id)
+                    .order_by(DeliveryAssignmentHistory.changed_at.desc())
+                )
+                hist_res = await db.execute(hist_stmt)
+                for h_row in hist_res.all():
+                    h_log, h_puser = h_row
+                    assignment_history.append(AdminDeliveryAssignmentLog(
+                        previous_partner_name=None,
+                        new_partner_name=h_puser.full_name if h_puser else "Partner",
+                        changed_by_name="Admin",
+                        changed_at=h_log.changed_at
+                    ))
+            except Exception:
+                pass
+        
+        ps_val = f_order.payment_status.value if hasattr(f_order.payment_status, "value") else str(f_order.payment_status or "pending")
         
         return AdminDeliveryDetail(
             id=f_order.id,
             subscription_id=None,
             fruit_order_id=f_order.id,
             order_type="grocery",
-            scheduled_date=f_order.delivery_date or f_order.created_at.date(),
-            status=f_order.order_status.value if hasattr(f_order.order_status, "value") else str(f_order.order_status),
+            scheduled_date=f_order.delivery_date or (f_order.created_at.date() if f_order.created_at else date.today()),
+            status=f_order_status_str,
             delivered_at=assign.delivered_at if assign else None,
             delivery_proof_url=None,
             customer_rating=f_order.rating,
             customer_feedback=f_order.review_text,
             notes=f_order.notes,
-            amount=float(f_order.total_amount),
+            amount=float(f_order.total_amount) if f_order.total_amount is not None else 0.0,
             payment_method=None,
-            payment_status="Paid" if (f_order.payment_status.value if hasattr(f_order.payment_status, "value") else str(f_order.payment_status)) == "success" else "Pending",
+            payment_status="Paid" if ps_val.lower() == "success" else "Pending",
             preferred_delivery_time=(f_order.delivery_slot or "Standard").split(' (')[0],
             customer=customer_detail,
             delivery_partner=partner_detail,
@@ -622,12 +662,18 @@ async def get_delivery_details(
     deliv, sub, cust, c_user, assign, partner, p_user, addr = row
 
     # 1. Customer detail
+    cust_id = cust.id if cust else uuid.uuid4()
+    c_name = c_user.full_name if c_user else "Customer"
+    c_phone = c_user.phone if c_user else ""
+    c_email = c_user.email if c_user else None
+    c_code = cust.customer_code if cust else None
+
     customer_detail = AdminDeliveryCustomer(
-        id=cust.id,
-        full_name=c_user.full_name,
-        phone=c_user.phone,
-        email=c_user.email,
-        customer_code=cust.customer_code
+        id=cust_id,
+        full_name=c_name,
+        phone=c_phone,
+        email=c_email,
+        customer_code=c_code
     )
 
     # 2. Partner detail
@@ -644,15 +690,15 @@ async def get_delivery_details(
 
     # 3. Address detail
     address_detail = AdminDeliveryAddress(
-        id=addr.id,
-        address_line1=addr.address_line1,
-        address_line2=addr.address_line2,
-        city=addr.city,
-        state=addr.state,
-        pincode=addr.pincode,
-        landmark=addr.landmark,
-        latitude=float(addr.latitude) if addr.latitude is not None else None,
-        longitude=float(addr.longitude) if addr.longitude is not None else None
+        id=addr.id if addr else uuid.uuid4(),
+        address_line1=addr.address_line1 if addr else "No Address Provided",
+        address_line2=addr.address_line2 if addr else None,
+        city=addr.city if addr else "",
+        state=addr.state if addr else "",
+        pincode=addr.pincode if addr else "",
+        landmark=addr.landmark if addr else None,
+        latitude=float(addr.latitude) if (addr and addr.latitude is not None) else None,
+        longitude=float(addr.longitude) if (addr and addr.longitude is not None) else None
     )
 
     # 4. Products detail

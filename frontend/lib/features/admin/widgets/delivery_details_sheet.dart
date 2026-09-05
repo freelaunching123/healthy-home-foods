@@ -11,11 +11,17 @@ class DeliveryDetailsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final customer = details['customer'] ?? {};
-    final address = details['address'] ?? {};
-    final timeline = List<Map<String, dynamic>>.from(details['timeline'] ?? []);
-    final products = List<Map<String, dynamic>>.from(details['products'] ?? []);
-    final partner = details['delivery_partner'];
+    final customer = details['customer'] is Map ? Map<String, dynamic>.from(details['customer']) : <String, dynamic>{};
+    final address = details['address'] is Map ? Map<String, dynamic>.from(details['address']) : <String, dynamic>{};
+    final timeline = (details['timeline'] as List<dynamic>? ?? [])
+        .map((e) => e is Map ? Map<String, dynamic>.from(e) : null)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    final products = (details['products'] as List<dynamic>? ?? [])
+        .map((e) => e is Map ? Map<String, dynamic>.from(e) : null)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    final partner = details['delivery_partner'] is Map ? Map<String, dynamic>.from(details['delivery_partner']) : null;
     
     final lat = address['latitude'];
     final lng = address['longitude'];
@@ -77,6 +83,10 @@ class DeliveryDetailsSheet extends StatelessWidget {
           const Text('No products listed.', style: TextStyle(color: Colors.grey))
         else
           ...products.map((p) {
+            final name = (p['product_name'] ?? p['name'] ?? 'Item').toString();
+            final qty = p['quantity']?.toString() ?? '1';
+            final unit = (p['unit'] ?? '').toString();
+            final unitDisplay = unit.isNotEmpty ? ' $unit' : '';
             return Padding(
               padding: const EdgeInsets.only(bottom: 4.0),
               child: Row(
@@ -84,7 +94,7 @@ class DeliveryDetailsSheet extends StatelessWidget {
                   const Icon(Icons.inventory_2_outlined, size: 16, color: Colors.grey),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text('${p['product_name'] ?? p['name']} (x${p['quantity']})'),
+                    child: Text('$name (x$qty$unitDisplay)'),
                   ),
                 ],
               ),
