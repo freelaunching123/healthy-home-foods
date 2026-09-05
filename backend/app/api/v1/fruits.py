@@ -28,6 +28,10 @@ from app.models.fruit import (
 )
 from app.models.user import User
 from app.schemas.common import MessageResponse
+from app.services.notification_service import NotificationService
+import logging
+
+logger = logging.getLogger(__name__)
 from app.services.payment_service import PaymentService
 from app.models.admin_settings import AdminSettings
 from app.services.delivery_engine import haversine
@@ -646,6 +650,45 @@ async def admin_create_fruit(
     db.add(fruit)
     await db.commit()
     await db.refresh(fruit)
+
+    # Dispatch notifications for newly added grocery item
+    try:
+        # 1. Notify all admins
+        try:
+            await NotificationService.send_notification_to_role(
+                db=db,
+                role="admin",
+                title="Grocery Item Added",
+                body=f"Grocery '{fruit.name}' has been successfully added to the catalog.",
+                notification_type="system",
+                reference_id=str(fruit.id),
+                data={"type": "system", "action_type": "grocery", "fruit_id": str(fruit.id)}
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify admins of new grocery: {e}")
+
+        # 2. Notify all customers if active and in stock
+        if fruit.is_active and fruit.availability_status == FruitAvailability.IN_STOCK:
+            try:
+                unit_label = f"{fruit.unit_value} ml" if fruit.unit == "ml" and fruit.unit_value else (fruit.unit or "kg")
+                body_text = f"{fruit.name}\n₹{fruit.price_per_kg:.1f} / {unit_label}\nFreshly available now! Tap to explore."
+                await NotificationService.send_notification_to_all_customers(
+                    db=db,
+                    title="New Fresh Grocery Available",
+                    body=body_text,
+                    notification_type="promo",
+                    reference_id=str(fruit.id),
+                    data={
+                        "type": "promo",
+                        "action_type": "grocery",
+                        "fruit_id": str(fruit.id),
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Failed to notify customers of new grocery: {e}")
+    except Exception as e:
+        logger.error(f"General notification error on grocery creation: {e}")
+
     return fruit
 
 
@@ -776,6 +819,27 @@ async def admin_update_availability(
         raise HTTPException(status_code=400, detail=f"Invalid availability status: {payload.availability_status}")
     await db.commit()
     await db.refresh(fruit)
+
+    # If restocked, notify customers
+    if fruit.is_active and fruit.availability_status == FruitAvailability.IN_STOCK:
+        try:
+            unit_label = f"{fruit.unit_value} ml" if fruit.unit == "ml" and fruit.unit_value else (fruit.unit or "kg")
+            body_text = f"{fruit.name}\n₹{fruit.price_per_kg:.1f} / {unit_label}\nIs back in stock! Tap to order."
+            await NotificationService.send_notification_to_all_customers(
+                db=db,
+                title="Back in Stock: Fresh Grocery Available",
+                body=body_text,
+                notification_type="promo",
+                reference_id=str(fruit.id),
+                data={
+                    "type": "promo",
+                    "action_type": "grocery",
+                    "fruit_id": str(fruit.id),
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify customers of restocked grocery: {e}")
+
     return fruit
 
 
@@ -793,6 +857,27 @@ async def admin_toggle_active(
     fruit.is_active = not fruit.is_active
     await db.commit()
     await db.refresh(fruit)
+
+    # If activated and in stock, notify customers
+    if fruit.is_active and fruit.availability_status == FruitAvailability.IN_STOCK:
+        try:
+            unit_label = f"{fruit.unit_value} ml" if fruit.unit == "ml" and fruit.unit_value else (fruit.unit or "kg")
+            body_text = f"{fruit.name}\n₹{fruit.price_per_kg:.1f} / {unit_label}\nNow available in our store! Tap to order."
+            await NotificationService.send_notification_to_all_customers(
+                db=db,
+                title="New Fresh Grocery Available",
+                body=body_text,
+                notification_type="promo",
+                reference_id=str(fruit.id),
+                data={
+                    "type": "promo",
+                    "action_type": "grocery",
+                    "fruit_id": str(fruit.id),
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify customers of reactivated grocery: {e}")
+
     return fruit
 
 

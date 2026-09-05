@@ -204,6 +204,16 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           context.push('/fruits/orders');
         }
         break;
+      case 'grocery':
+      case 'fruit':
+        if (isAdmin) {
+          context.push('/admin/fruits');
+        } else if (refId != null && refId.isNotEmpty) {
+          context.push('/fruits/$refId');
+        } else {
+          context.go('/home');
+        }
+        break;
       case 'payment':
         if (isAdmin) {
           context.go('/admin');
@@ -214,6 +224,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       case 'promo':
         if (isAdmin) {
           context.go('/admin');
+        } else if (refId != null && refId.isNotEmpty) {
+          final title = (notification['title'] ?? '').toString().toLowerCase();
+          final body = (notification['body'] ?? '').toString().toLowerCase();
+          if (title.contains('grocery') || title.contains('fruit') || body.contains('grocery') || body.contains('fruit')) {
+            context.push('/fruits/$refId');
+          } else {
+            context.push('/product/$refId');
+          }
         } else {
           context.go('/home');
         }
