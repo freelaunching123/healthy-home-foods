@@ -10,7 +10,7 @@ import io
 from app.db.session import get_db
 from app.core.dependencies import require_super_admin
 from app.models.user import User
-from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionItem
+from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionItem, SubscriptionPlan
 from app.models.payment import Payment, PaymentStatus
 from app.models.subscription_delivery import SubscriptionDelivery, DeliveryStatus
 from app.models.delivery_assignment import DeliveryAssignment, AssignmentStatus
@@ -655,3 +655,408 @@ async def get_admin_overview(
         "revenue_chart": chart_data,
         "recent_activity": recent_activity
     }
+
+
+# ── Detailed Purchase History & Statements ───────────────────────────────────
+
+async def _fetch_purchase_records_data(
+    db: AsyncSession,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    category: str = "all",
+):
+    sd, ed = parse_dates(start_date, end_date)
+    records = []
+    total_packages_amount = 0.0
+    total_groceries_amount = 0.0
+
+    # 1. Packages (Subscriptions)
+    if category in ("all", "packages", "both"):
+        sub_stmt = (
+            select(
+                Subscription,
+                User.full_name.label("user_name"),
+                User.phone.label("user_phone"),
+                User.email.label("user_email"),
+                Product.name.label("product_name"),
+                SubscriptionPlan.name.label("plan_name"),
+            )
+            .join(Customer, Subscription.customer_id == Customer.id)
+            .join(User, Customer.user_id == User.id)
+            .outerjoin(Product, Subscription.product_id == Product.id)
+            .outerjoin(SubscriptionPlan, Subscription.plan_id == SubscriptionPlan.id)
+            .where(
+                and_(
+                    func.date(Subscription.created_at) >= sd,
+                    func.date(Subscription.created_at) <= ed,
+                    Subscription.status.in_([
+                        SubscriptionStatus.ACTIVE,
+                        SubscriptionStatus.PAUSED,
+                        SubscriptionStatus.COMPLETED,
+                        SubscriptionStatus.PENDING_PAYMENT,
+                    ]),
+                )
+            )
+            .order_by(Subscription.created_at.desc())
+        )
+        sub_res = await db.execute(sub_stmt)
+        for sub, user_name, user_phone, user_email, prod_name, plan_name in sub_res.all():
+            amt = float(sub.total_amount or 0)
+            total_packages_amount += amt
+            dt = sub.created_at
+            item_desc = f"{prod_name or 'Package'}"
+            if plan_name:
+                item_desc += f" ({plan_name})"
+            records.append({
+                "id": str(sub.id),
+                "order_id": f"SUB-{str(sub.id)[:8].upper()}",
+                "timestamp": dt.isoformat() if dt else None,
+                "order_date": dt.strftime("%d %b %Y") if dt else "—",
+                "order_time": dt.strftime("%I:%M %p") if dt else "—",
+                "raw_date": dt,
+                "customer_name": user_name or "Valued Customer",
+                "customer_phone": user_phone or "—",
+                "customer_email": user_email or "—",
+                "particulars": "Packages",
+                "item_name": item_desc,
+                "price": amt,
+                "status": sub.status.value.upper() if hasattr(sub.status, "value") else str(sub.status).upper(),
+            })
+
+    # 2. Groceries (Fruit Orders)
+    if category in ("all", "groceries", "both"):
+        frt_stmt = (
+            select(
+                FruitOrder,
+                User.full_name.label("user_name"),
+                User.phone.label("user_phone"),
+                User.email.label("user_email"),
+            )
+            .join(Customer, FruitOrder.customer_id == Customer.id)
+            .join(User, Customer.user_id == User.id)
+            .where(
+                and_(
+                    func.date(FruitOrder.created_at) >= sd,
+                    func.date(FruitOrder.created_at) <= ed,
+                )
+            )
+            .order_by(FruitOrder.created_at.desc())
+        )
+        frt_res = await db.execute(frt_stmt)
+        orders_list = frt_res.all()
+
+        order_ids = [order.id for order, _, _, _ in orders_list]
+        items_by_order: Dict[UUID, List[str]] = {}
+        if order_ids:
+            item_stmt = (
+                select(FruitOrderItem.order_id, Fruit.name, FruitOrderItem.quantity_kg, FruitOrderItem.unit_price)
+                .join(Fruit, FruitOrderItem.fruit_id == Fruit.id)
+                .where(FruitOrderItem.order_id.in_(order_ids))
+            )
+            item_res = await db.execute(item_stmt)
+            for oid, fname, q_kg, uprice in item_res.all():
+                qty_str = f"{float(q_kg):g} kg" if q_kg is not None else "1"
+                items_by_order.setdefault(oid, []).append(f"{fname} ({qty_str})")
+
+        for order, user_name, user_phone, user_email in orders_list:
+            amt = float(order.total_amount or 0)
+            total_groceries_amount += amt
+            dt = order.created_at
+            item_list = items_by_order.get(order.id, [])
+            item_desc = ", ".join(item_list) if item_list else "Grocery Items"
+
+            records.append({
+                "id": str(order.id),
+                "order_id": order.order_number,
+                "timestamp": dt.isoformat() if dt else None,
+                "order_date": dt.strftime("%d %b %Y") if dt else "—",
+                "order_time": dt.strftime("%I:%M %p") if dt else "—",
+                "raw_date": dt,
+                "customer_name": user_name or "Valued Customer",
+                "customer_phone": user_phone or "—",
+                "customer_email": user_email or "—",
+                "particulars": "Groceries",
+                "item_name": item_desc,
+                "price": amt,
+                "status": order.payment_status.value.upper() if hasattr(order.payment_status, "value") else str(order.payment_status).upper(),
+            })
+
+    records.sort(
+        key=lambda r: (
+            r["raw_date"].replace(tzinfo=timezone.utc)
+            if (r["raw_date"] and r["raw_date"].tzinfo is None)
+            else (r["raw_date"] or datetime.min.replace(tzinfo=timezone.utc))
+        ),
+        reverse=True,
+    )
+
+    grand_total = total_packages_amount + total_groceries_amount
+    return {
+        "start_date": sd.strftime("%Y-%m-%d"),
+        "end_date": ed.strftime("%Y-%m-%d"),
+        "category": category,
+        "summary": {
+            "total_count": len(records),
+            "packages_count": sum(1 for r in records if r["particulars"] == "Packages"),
+            "groceries_count": sum(1 for r in records if r["particulars"] == "Groceries"),
+            "total_packages_amount": round(total_packages_amount, 2),
+            "total_groceries_amount": round(total_groceries_amount, 2),
+            "grand_total": round(grand_total, 2),
+        },
+        "records": records,
+    }
+
+
+@router.get("/purchases")
+async def get_purchase_history(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    category: str = "all",
+    _: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve detailed purchase ledger for Packages, Groceries, or Both."""
+    data = await _fetch_purchase_records_data(db, start_date, end_date, category)
+    # Strip non-serializable raw_date before JSON response
+    for r in data["records"]:
+        r.pop("raw_date", None)
+    return data
+
+
+@router.get("/purchases/export/pdf")
+async def export_purchase_statement_pdf(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    category: str = "all",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Generate and stream bank-statement style purchase statement PDF."""
+    from fpdf import FPDF
+
+    data = await _fetch_purchase_records_data(db, start_date, end_date, category)
+    records = data["records"]
+    summary = data["summary"]
+    sd_str = data["start_date"]
+    ed_str = data["end_date"]
+
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # Header Banner (Healthy Home Foods)
+    pdf.set_fill_color(27, 94, 32)
+    pdf.rect(0, 0, 297, 24, "F")
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", size=16, style="B")
+    pdf.set_xy(10, 4)
+    pdf.cell(277, 8, txt="HEALTHY HOME FOODS", ln=True, align="C")
+    pdf.set_font("helvetica", size=9)
+    pdf.cell(277, 5, txt="DETAILED PURCHASE HISTORY & ORDER STATEMENT", ln=True, align="C")
+
+    # Metadata row
+    pdf.set_text_color(60, 60, 60)
+    pdf.set_xy(10, 28)
+    pdf.set_font("helvetica", size=9)
+    filter_label = (
+        "All (Packages & Groceries)"
+        if category in ("all", "both")
+        else ("Packages Only" if category == "packages" else "Groceries Only")
+    )
+    pdf.cell(100, 5, txt=f"Reporting Period: {sd_str} to {ed_str}", ln=False)
+    pdf.cell(90, 5, txt=f"Category Filter: {filter_label}", ln=False, align="C")
+    pdf.cell(87, 5, txt=f"Generated On: {datetime.now().strftime('%d %b %Y, %I:%M %p')}", ln=True, align="R")
+    pdf.ln(3)
+
+    # Table Header
+    # Total width ~ 277mm
+    col_w = [28, 24, 20, 45, 26, 104, 30]
+    headers = ["Order ID", "Date", "Time", "Customer Name", "Particulars", "Item Name & Details", "Price (Rs.)"]
+
+    pdf.set_fill_color(38, 120, 45)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("helvetica", style="B", size=9)
+    for w, h in zip(col_w, headers):
+        align = "R" if h == "Price (Rs.)" else ("C" if h in ("Date", "Time", "Particulars") else "L")
+        pdf.cell(w, 7, txt=h, border=1, fill=True, align=align)
+    pdf.ln()
+
+    # Table Rows
+    pdf.set_font("helvetica", size=8)
+    pdf.set_text_color(30, 30, 30)
+
+    for i, r in enumerate(records):
+        fill = (i % 2 == 1)
+        if fill:
+            pdf.set_fill_color(248, 249, 248)
+        else:
+            pdf.set_fill_color(255, 255, 255)
+
+        oid = (r["order_id"][:14] + "..") if len(r["order_id"]) > 16 else r["order_id"]
+        cname = (r["customer_name"][:22] + "..") if len(r["customer_name"]) > 24 else r["customer_name"]
+        items = (r["item_name"][:65] + "..") if len(r["item_name"]) > 68 else r["item_name"]
+        price_str = f"Rs. {r['price']:,.2f}"
+
+        pdf.cell(col_w[0], 6, txt=oid, border="LRB", fill=fill)
+        pdf.cell(col_w[1], 6, txt=r["order_date"], border="LRB", align="C", fill=fill)
+        pdf.cell(col_w[2], 6, txt=r["order_time"], border="LRB", align="C", fill=fill)
+        pdf.cell(col_w[3], 6, txt=cname, border="LRB", fill=fill)
+        pdf.cell(col_w[4], 6, txt=r["particulars"], border="LRB", align="C", fill=fill)
+        pdf.cell(col_w[5], 6, txt=items, border="LRB", fill=fill)
+        pdf.cell(col_w[6], 6, txt=price_str, border="LRB", align="R", fill=fill, ln=True)
+
+    if not records:
+        pdf.cell(sum(col_w), 10, txt="No purchase records found for the selected period and filter.", border=1, align="C", ln=True)
+
+    pdf.ln(3)
+
+    # Summary Box
+    pdf.set_fill_color(232, 245, 233)
+    pdf.set_text_color(27, 94, 32)
+    pdf.set_font("helvetica", style="B", size=9)
+    pdf.cell(277, 7, txt="  PURCHASE PERIOD SUMMARY", ln=True, fill=True)
+
+    pdf.set_text_color(40, 40, 40)
+    pdf.set_font("helvetica", style="", size=9)
+    pdf.cell(70, 6, txt=f"Total Package Purchases: Rs. {summary['total_packages_amount']:,.2f} ({summary['packages_count']} orders)", border="B")
+    pdf.cell(70, 6, txt=f"Total Grocery Purchases: Rs. {summary['total_groceries_amount']:,.2f} ({summary['groceries_count']} orders)", border="B")
+    pdf.set_font("helvetica", style="B", size=10)
+    pdf.set_text_color(27, 94, 32)
+    pdf.cell(137, 6, txt=f"GRAND TOTAL AMOUNT: Rs. {summary['grand_total']:,.2f} ({summary['total_count']} transactions)", border="B", align="R", ln=True)
+
+    pdf_bytes = bytes(pdf.output())
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=purchase_statement_{sd_str}_{ed_str}.pdf"},
+    )
+
+
+@router.get("/purchases/export/excel")
+async def export_purchase_statement_excel(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    category: str = "all",
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_super_admin),
+):
+    """Generate and stream formatted Excel purchase statement."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    data = await _fetch_purchase_records_data(db, start_date, end_date, category)
+    records = data["records"]
+    summary = data["summary"]
+    sd_str = data["start_date"]
+    ed_str = data["end_date"]
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Purchase Statement"
+
+    header_fill = PatternFill(start_color="1B5E20", end_color="1B5E20", fill_type="solid")
+    sub_fill = PatternFill(start_color="E8F5E9", end_color="E8F5E9", fill_type="solid")
+    th_fill = PatternFill(start_color="2E7D32", end_color="2E7D32", fill_type="solid")
+    alt_fill = PatternFill(start_color="F9FAF9", end_color="F9FAF9", fill_type="solid")
+
+    thin_border = Border(
+        left=Side(style="thin", color="E0E0E0"),
+        right=Side(style="thin", color="E0E0E0"),
+        top=Side(style="thin", color="E0E0E0"),
+        bottom=Side(style="thin", color="E0E0E0"),
+    )
+
+    # Title Banner
+    ws.merge_cells("A1:H1")
+    ws["A1"] = "HEALTHY HOME FOODS - PURCHASE STATEMENT"
+    ws["A1"].font = Font(name="Calibri", size=14, bold=True, color="FFFFFF")
+    ws["A1"].fill = header_fill
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    filter_label = (
+        "All (Packages & Groceries)"
+        if category in ("all", "both")
+        else ("Packages Only" if category == "packages" else "Groceries Only")
+    )
+    ws["A2"] = f"Period: {sd_str} to {ed_str}"
+    ws["A2"].font = Font(italic=True, size=10, color="555555")
+    ws["D2"] = f"Filter: {filter_label}"
+    ws["D2"].font = Font(italic=True, size=10, color="555555")
+    ws["G2"] = f"Generated: {datetime.now().strftime('%d %b %Y, %I:%M %p')}"
+    ws["G2"].font = Font(italic=True, size=10, color="555555")
+
+    ws.append([])
+
+    # Table Header
+    headers = ["Order ID", "Date", "Time", "Customer Name", "Customer Phone", "Particulars", "Item Name & Details", "Price (Rs.)"]
+    ws.append(headers)
+    th_row = ws.max_row
+    ws.row_dimensions[th_row].height = 22
+    for col_idx in range(1, len(headers) + 1):
+        c = ws.cell(row=th_row, column=col_idx)
+        c.font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+        c.fill = th_fill
+        c.alignment = Alignment(horizontal="center" if col_idx in (2, 3, 6) else ("right" if col_idx == 8 else "left"), vertical="center")
+
+    for i, r in enumerate(records):
+        ws.append([
+            r["order_id"],
+            r["order_date"],
+            r["order_time"],
+            r["customer_name"],
+            r["customer_phone"],
+            r["particulars"],
+            r["item_name"],
+            r["price"],
+        ])
+        curr = ws.max_row
+        row_fill = alt_fill if (i % 2 == 1) else None
+        for col_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=curr, column=col_idx)
+            cell.font = Font(name="Calibri", size=10)
+            cell.border = thin_border
+            if row_fill:
+                cell.fill = row_fill
+            if col_idx == 8:
+                cell.number_format = '"Rs. "#,##0.00'
+                cell.alignment = Alignment(horizontal="right")
+            elif col_idx in (2, 3, 6):
+                cell.alignment = Alignment(horizontal="center")
+
+    ws.append([])
+
+    # Summary Rows
+    sum_row_start = ws.max_row
+    ws.append(["TOTAL PACKAGES AMOUNT", "", "", "", "", "", f"{summary['packages_count']} orders", summary["total_packages_amount"]])
+    ws.append(["TOTAL GROCERIES AMOUNT", "", "", "", "", "", f"{summary['groceries_count']} orders", summary["total_groceries_amount"]])
+    ws.append(["GRAND TOTAL AMOUNT", "", "", "", "", "", f"{summary['total_count']} total", summary["grand_total"]])
+
+    for r_idx in range(sum_row_start, ws.max_row + 1):
+        ws.row_dimensions[r_idx].height = 20
+        is_grand = (r_idx == ws.max_row)
+        for c_idx in range(1, 9):
+            c = ws.cell(row=r_idx, column=c_idx)
+            c.font = Font(name="Calibri", size=11, bold=True, color="1B5E20" if is_grand else "000000")
+            c.fill = sub_fill
+            if c_idx == 8:
+                c.number_format = '"Rs. "#,##0.00'
+                c.alignment = Alignment(horizontal="right")
+
+    ws.column_dimensions["A"].width = 18
+    ws.column_dimensions["B"].width = 14
+    ws.column_dimensions["C"].width = 12
+    ws.column_dimensions["D"].width = 24
+    ws.column_dimensions["E"].width = 16
+    ws.column_dimensions["F"].width = 14
+    ws.column_dimensions["G"].width = 38
+    ws.column_dimensions["H"].width = 18
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=purchase_statement_{sd_str}_{ed_str}.xlsx"},
+    )

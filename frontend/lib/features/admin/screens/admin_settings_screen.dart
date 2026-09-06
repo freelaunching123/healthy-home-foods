@@ -81,6 +81,36 @@ class AdminSettingsScreen extends StatelessWidget {
                 onTap: () => context.push('/admin/change-password'),
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Purchase History & Statement Card
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.grey.shade200),
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryGreen),
+                ),
+                title: Text(
+                  'Purchase History',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                subtitle: Text(
+                  'View & download detailed order statements (PDF & Excel)',
+                  style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/admin/purchase-history'),
+              ),
+            ),
           ],
         ),
       ),

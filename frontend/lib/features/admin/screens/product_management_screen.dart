@@ -112,7 +112,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen> {
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         title: const Text(
-          'Admin Dashboard',
+          'Products',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,

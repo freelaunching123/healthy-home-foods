@@ -74,7 +74,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final today = DateFormat('EEEE, MMM d').format(DateTime.now());
+    final today = DateFormat('EEE, MMM d').format(DateTime.now());
 
     return Scaffold(
       key: _scaffoldKey,
@@ -140,7 +140,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   Widget _buildHeader(String today) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFF0F0F0))),
@@ -167,12 +167,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               ),
             ],
           ),
-          Text(
-            today,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppTheme.textSecondary,
-              fontWeight: FontWeight.w500,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryGreen.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppTheme.primaryGreen.withOpacity(0.2),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.calendar_today_rounded,
+                  size: 13,
+                  color: AppTheme.primaryGreen,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  today,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryGreen,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

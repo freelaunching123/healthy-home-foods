@@ -72,6 +72,9 @@ class ApiConstants {
   static const String reports = '/reports';
   static const String reportsExportPdf = '/reports/export/pdf';
   static const String reportsExportExcel = '/reports/export/excel';
+  static const String reportsPurchases = '/reports/purchases';
+  static const String reportsPurchasesExportPdf = '/reports/purchases/export/pdf';
+  static const String reportsPurchasesExportExcel = '/reports/purchases/export/excel';
 
   // Notifications
   static const String notifications = '/notifications';

@@ -34,7 +34,7 @@ async def seed_roles():
             db.add(customer_user)
             await db.flush()
             
-            customer_code = f"C{shortuuid.ShortUUID().random(length=8).upper()}"
+            customer_code = "HHF-CUS-00001"
             db.add(Customer(user_id=customer_user.id, customer_code=customer_code))
             logger.info("Seeded Test Customer")
 

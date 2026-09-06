@@ -36,8 +36,7 @@ class HelpSupportScreen extends StatelessWidget {
               title: 'Terms and Conditions',
               content: '1. All orders placed are final.\n'
                        '2. Subscriptions start from the next day of order confirmation.\n'
-                       '3. Healthy Home Foods is not responsible for missed deliveries if the customer is unavailable at the provided address.\n'
-                       '4. We reserve the right to modify subscription contents based on seasonal availability.',
+                       '3. We reserve the right to modify subscription contents based on seasonal availability.',
             ),
             const SizedBox(height: 16),
             _buildPolicySection(
@@ -77,7 +76,7 @@ class HelpSupportScreen extends StatelessWidget {
       },
       {
         'q': 'How do Grocery deliveries work?',
-        'a': 'Grocery orders are scheduled for next-day delivery. If you order today, your fresh groceries will arrive tomorrow in your selected session.'
+        'a': 'Grocery orders are delivered on the date you select during checkout. Your fresh groceries will arrive on your chosen delivery date in your selected session.'
       },
       {
         'q': 'What happens if I miss a delivery?',

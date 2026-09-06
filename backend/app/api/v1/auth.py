@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 
 import uuid
 try:
@@ -59,12 +59,16 @@ async def register_customer(
     db.add(user)
     await db.flush()
 
-    # Role is already set to CUSTOMER by default in the model
+    # Generate sequential customer code: HHF-CUS-00001
+    count = await db.scalar(select(func.count(Customer.id)))
+    next_num = (count or 0) + 1
+    while True:
+        customer_code = f"HHF-CUS-{next_num:05d}"
+        existing = await db.scalar(select(Customer.id).where(Customer.customer_code == customer_code))
+        if not existing:
+            break
+        next_num += 1
 
-    if shortuuid:
-        customer_code = f"C{shortuuid.ShortUUID().random(length=8).upper()}"
-    else:
-        customer_code = f"C{uuid.uuid4().hex[:8].upper()}"
     db.add(Customer(user_id=user.id, customer_code=customer_code))
     await db.commit()
     

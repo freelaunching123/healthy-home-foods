@@ -58,6 +58,7 @@ import '../../features/admin/screens/package_orders_screen.dart';
 import '../../features/admin/screens/grocery_management_screen.dart';
 import '../../features/admin/screens/add_edit_grocery_screen.dart';
 import '../../features/admin/screens/grocery_orders_screen.dart';
+import '../../features/admin/screens/purchase_history_screen.dart';
 
 // Delivery boy screens
 import '../../features/delivery/screens/delivery_shell.dart';
@@ -235,6 +236,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/admin/settings', builder: (_, _) => const AdminSettingsScreen()),
     GoRoute(path: '/admin/change-password', builder: (_, _) => const AdminChangePasswordScreen()),
     GoRoute(path: '/admin/delivery-settings', builder: (_, _) => const DeliverySettingsScreen()),
+    GoRoute(path: '/admin/purchase-history', builder: (_, _) => const PurchaseHistoryScreen()),
 
     // ── Fruit admin routes ─────────────────────────────────────────────────────
     GoRoute(path: '/admin/fruits/add', builder: (_, _) => const AddEditGroceryScreen()),
