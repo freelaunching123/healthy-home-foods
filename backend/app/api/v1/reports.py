@@ -749,12 +749,12 @@ async def _fetch_purchase_records_data(
         items_by_order: Dict[UUID, List[str]] = {}
         if order_ids:
             item_stmt = (
-                select(FruitOrderItem.order_id, Fruit.name, FruitOrderItem.quantity_kg, FruitOrderItem.unit_price)
+                select(FruitOrderItem.order_id, Fruit.name, FruitOrderItem.quantity_kg, FruitOrderItem.price_per_kg)
                 .join(Fruit, FruitOrderItem.fruit_id == Fruit.id)
                 .where(FruitOrderItem.order_id.in_(order_ids))
             )
             item_res = await db.execute(item_stmt)
-            for oid, fname, q_kg, uprice in item_res.all():
+            for oid, fname, q_kg, p_kg in item_res.all():
                 qty_str = f"{float(q_kg):g} kg" if q_kg is not None else "1"
                 items_by_order.setdefault(oid, []).append(f"{fname} ({qty_str})")
 
