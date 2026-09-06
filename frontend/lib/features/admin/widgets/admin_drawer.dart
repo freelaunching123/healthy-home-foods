@@ -170,16 +170,6 @@ class AdminDrawer extends StatelessWidget {
                   ),
                   _buildDrawerItem(
                     context: context,
-                    icon: Icons.receipt_long_outlined,
-                    title: 'Purchase History',
-                    isSelected: currentRoute == '/admin/purchase-history',
-                    onTap: () {
-                      context.pop();
-                      if (currentRoute != '/admin/purchase-history') context.push('/admin/purchase-history');
-                    },
-                  ),
-                  _buildDrawerItem(
-                    context: context,
                     icon: Icons.settings_outlined,
                     title: 'Settings',
                     isSelected: currentRoute == '/admin/settings',
