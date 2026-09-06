@@ -492,79 +492,10 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                               ),
                               const SizedBox(height: 10),
                               _buildExportButtons(),
-
-                              const SizedBox(height: 24),
-
-                              // Statement Details Info Card
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: const Color(0xFFE2E8E4)),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.primaryGreen.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Icon(Icons.info_outline_rounded, color: AppTheme.primaryGreen, size: 20),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Text(
-                                          'Statement Format Details',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.textPrimary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'The exported PDF and Excel statements include complete line-item transaction records in bank-statement format:',
-                                      style: GoogleFonts.inter(fontSize: 12.5, color: AppTheme.textSecondary, height: 1.4),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _buildFeaturePoint(Icons.calendar_today_rounded, 'Date & Time of order placement'),
-                                    _buildFeaturePoint(Icons.receipt_rounded, 'Order ID / Subscription ID tracking number'),
-                                    _buildFeaturePoint(Icons.person_rounded, 'Customer Name & Mobile Number'),
-                                    _buildFeaturePoint(Icons.category_rounded, 'Particulars (Packages / Groceries)'),
-                                    _buildFeaturePoint(Icons.shopping_bag_rounded, 'Item Names, quantities & package plans'),
-                                    _buildFeaturePoint(Icons.currency_rupee_rounded, 'Transaction Price (₹) & period totals'),
-                                  ],
-                                ),
-                              ),
                             ],
                           ),
                         ),
                       ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeaturePoint(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 15, color: AppTheme.primaryGreen),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.textPrimary),
-            ),
           ),
         ],
       ),
