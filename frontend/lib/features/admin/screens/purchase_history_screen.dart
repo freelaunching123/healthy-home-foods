@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -21,6 +22,7 @@ class PurchaseHistoryScreen extends StatefulWidget {
 class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
   final _api = ApiClient();
   final TextEditingController _searchController = TextEditingController();
+  Timer? _refreshTimer;
 
   String _selectedPreset = '30d';
   String? _startDate;
@@ -43,10 +45,14 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
     super.initState();
     _applyPreset('30d', autoFetch: false);
     _loadPurchases();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _loadPurchases(silent: true);
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -121,11 +127,13 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
     }
   }
 
-  Future<void> _loadPurchases() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _loadPurchases({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final queryParams = <String, dynamic>{
@@ -145,14 +153,17 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
           _data = data;
           _records = data['records'] as List<dynamic>? ?? [];
           _isLoading = false;
+          _errorMessage = null;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _errorMessage = ApiErrorHandler.getMessage(e);
-          _isLoading = false;
-        });
+        if (!silent || _data == null) {
+          setState(() {
+            _errorMessage = ApiErrorHandler.getMessage(e);
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -361,13 +372,6 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
           'Purchase History',
           style: GoogleFonts.inter(fontWeight: FontWeight.bold),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Refresh',
-            onPressed: _loadPurchases,
-          ),
-        ],
       ),
       body: Column(
         children: [
