@@ -21,7 +21,6 @@ class PurchaseHistoryScreen extends StatefulWidget {
 
 class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
   final _api = ApiClient();
-  final TextEditingController _searchController = TextEditingController();
   Timer? _refreshTimer;
 
   String _selectedPreset = '30d';
@@ -30,12 +29,10 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
   DateTimeRange? _customDateRange;
 
   String _selectedCategory = 'all'; // 'all', 'packages', 'groceries'
-  String _searchQuery = '';
 
   bool _isLoading = true;
   String? _errorMessage;
   Map<String, dynamic>? _data;
-  List<dynamic> _records = [];
 
   bool _isExportingPdf = false;
   bool _isExportingExcel = false;
@@ -45,7 +42,7 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
     super.initState();
     _applyPreset('30d', autoFetch: false);
     _loadPurchases();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       _loadPurchases(silent: true);
     });
   }
@@ -53,7 +50,6 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -151,7 +147,6 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
       if (mounted) {
         setState(() {
           _data = data;
-          _records = data['records'] as List<dynamic>? ?? [];
           _isLoading = false;
           _errorMessage = null;
         });
@@ -327,18 +322,6 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
     );
   }
 
-  List<dynamic> get _filteredRecords {
-    if (_searchQuery.trim().isEmpty) return _records;
-    final q = _searchQuery.toLowerCase();
-    return _records.where((r) {
-      final orderId = (r['order_id'] ?? '').toString().toLowerCase();
-      final name = (r['customer_name'] ?? '').toString().toLowerCase();
-      final phone = (r['customer_phone'] ?? '').toString().toLowerCase();
-      final items = (r['item_name'] ?? '').toString().toLowerCase();
-      return orderId.contains(q) || name.contains(q) || phone.contains(q) || items.contains(q);
-    }).toList();
-  }
-
   String _getDateRangeLabel() {
     if (_selectedPreset == 'custom' && _customDateRange != null) {
       return '${DateFormat('d MMM yyyy').format(_customDateRange!.start)} - ${DateFormat('d MMM yyyy').format(_customDateRange!.end)}';
@@ -356,14 +339,12 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final summary = _data?['summary'] as Map<String, dynamic>?;
-    final totalCount = summary?['total_count'] ?? _records.length;
+    final totalCount = summary?['total_count'] ?? 0;
     final grandTotal = (summary?['grand_total'] as num?)?.toDouble() ?? 0.0;
     final pkgAmt = (summary?['total_packages_amount'] as num?)?.toDouble() ?? 0.0;
     final frtAmt = (summary?['total_groceries_amount'] as num?)?.toDouble() ?? 0.0;
     final pkgCount = summary?['packages_count'] ?? 0;
     final frtCount = summary?['groceries_count'] ?? 0;
-
-    final filtered = _filteredRecords;
 
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBg,
@@ -378,7 +359,7 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
           // Filter Controls Card
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -401,7 +382,7 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
 
                 // Active Date Range banner + Category filter
                 Row(
@@ -411,7 +392,7 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                         onTap: _selectCustomDateRange,
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF6F8F6),
                             borderRadius: BorderRadius.circular(8),
@@ -472,39 +453,9 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
             ),
           ),
 
-          // Search Bar
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search Order ID, Customer, Item...',
-                hintStyle: GoogleFonts.inter(fontSize: 13, color: AppTheme.textLight),
-                prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppTheme.textLight),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 18, color: AppTheme.textLight),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: AppTheme.scaffoldBg,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-              ),
-              onChanged: (val) {
-                setState(() => _searchQuery = val);
-              },
-            ),
-          ),
-
           const Divider(height: 1, thickness: 1, color: Color(0xFFEFEFEF)),
 
-          // Main Content
+          // Main Content Area
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryGreen))
@@ -513,99 +464,107 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                     : RefreshIndicator(
                         onRefresh: _loadPurchases,
                         color: AppTheme.primaryGreen,
-                        child: CustomScrollView(
-                          slivers: [
-                            // Summary Cards & Export Buttons
-                            SliverToBoxAdapter(
-                              child: Padding(
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Summary Breakdown Card
+                              _buildSummaryCard(
+                                totalCount: totalCount,
+                                grandTotal: grandTotal,
+                                pkgAmt: pkgAmt,
+                                frtAmt: frtAmt,
+                                pkgCount: pkgCount,
+                                frtCount: frtCount,
+                              ),
+                              const SizedBox(height: 20),
+
+                              // Export Action Buttons
+                              Text(
+                                'Export Statements',
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              _buildExportButtons(),
+
+                              const SizedBox(height: 24),
+
+                              // Statement Details Info Card
+                              Container(
+                                width: double.infinity,
                                 padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFE2E8E4)),
+                                ),
                                 child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _buildSummaryCard(
-                                      totalCount: totalCount,
-                                      grandTotal: grandTotal,
-                                      pkgAmt: pkgAmt,
-                                      frtAmt: frtAmt,
-                                      pkgCount: pkgCount,
-                                      frtCount: frtCount,
-                                    ),
-                                    const SizedBox(height: 14),
-                                    _buildExportButtons(),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Section Title
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Order Transactions (${filtered.length})',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.textPrimary,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Latest First',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        color: AppTheme.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Orders List
-                            if (filtered.isEmpty)
-                              SliverFillRemaining(
-                                hasScrollBody: false,
-                                child: Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(32),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                    Row(
                                       children: [
-                                        Icon(Icons.receipt_long_outlined, size: 54, color: Colors.grey.shade400),
-                                        const SizedBox(height: 12),
-                                        Text(
-                                          'No purchases found',
-                                          style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(Icons.info_outline_rounded, color: AppTheme.primaryGreen, size: 20),
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(width: 10),
                                         Text(
-                                          'Try adjusting the date range or category filter',
-                                          style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary),
-                                          textAlign: TextAlign.center,
+                                          'Statement Format Details',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.textPrimary,
+                                          ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ),
-                              )
-                            else
-                              SliverPadding(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                                sliver: SliverList(
-                                  delegate: SliverChildBuilderDelegate(
-                                    (context, index) {
-                                      final record = filtered[index] as Map<String, dynamic>;
-                                      return _buildOrderCard(record);
-                                    },
-                                    childCount: filtered.length,
-                                  ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'The exported PDF and Excel statements include complete line-item transaction records in bank-statement format:',
+                                      style: GoogleFonts.inter(fontSize: 12.5, color: AppTheme.textSecondary, height: 1.4),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _buildFeaturePoint(Icons.calendar_today_rounded, 'Date & Time of order placement'),
+                                    _buildFeaturePoint(Icons.receipt_rounded, 'Order ID / Subscription ID tracking number'),
+                                    _buildFeaturePoint(Icons.person_rounded, 'Customer Name & Mobile Number'),
+                                    _buildFeaturePoint(Icons.category_rounded, 'Particulars (Packages / Groceries)'),
+                                    _buildFeaturePoint(Icons.shopping_bag_rounded, 'Item Names, quantities & package plans'),
+                                    _buildFeaturePoint(Icons.currency_rupee_rounded, 'Transaction Price (₹) & period totals'),
+                                  ],
                                 ),
                               ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeaturePoint(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: AppTheme.primaryGreen),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.textPrimary),
+            ),
           ),
         ],
       ),
@@ -624,7 +583,7 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.primaryGreen : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
@@ -691,12 +650,20 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                     ),
                   ],
                 ),
-                Text(
-                  '$totalCount Orders',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.2)),
+                  ),
+                  child: Text(
+                    '$totalCount Orders',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primaryGreen,
+                    ),
                   ),
                 ),
               ],
@@ -850,181 +817,6 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildOrderCard(Map<String, dynamic> r) {
-    final isPackage = r['particulars'] == 'Packages';
-    final price = (r['price'] as num?)?.toDouble() ?? 0.0;
-    final orderId = r['order_id'] ?? '—';
-    final orderDate = r['order_date'] ?? '—';
-    final orderTime = r['order_time'] ?? '—';
-    final customerName = r['customer_name'] ?? 'Customer';
-    final customerPhone = r['customer_phone'] ?? '';
-    final itemName = r['item_name'] ?? 'Items';
-    final status = r['status'] ?? 'SUCCESS';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFECECEC)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Row: Order ID, Particulars badge, and Date/Time
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isPackage
-                            ? AppTheme.primaryGreen.withValues(alpha: 0.1)
-                            : Colors.amber.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        isPackage ? 'PACKAGE' : 'GROCERY',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: isPackage ? AppTheme.primaryGreen : Colors.amber.shade900,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      orderId,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    const Icon(Icons.access_time_rounded, size: 13, color: AppTheme.textLight),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$orderDate • $orderTime',
-                      style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            const Divider(height: 1, color: Color(0xFFF3F3F3)),
-            const SizedBox(height: 10),
-
-            // Middle: Customer Name & Phone
-            Row(
-              children: [
-                const Icon(Icons.person_outline_rounded, size: 16, color: AppTheme.textSecondary),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    customerName,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ),
-                if (customerPhone.isNotEmpty && customerPhone != '—') ...[
-                  const Icon(Icons.phone_outlined, size: 14, color: AppTheme.textLight),
-                  const SizedBox(width: 4),
-                  Text(
-                    customerPhone,
-                    style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Items Purchased Description
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAF9),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFF0F2F0)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    isPackage ? Icons.inventory_2_outlined : Icons.shopping_basket_outlined,
-                    size: 14,
-                    color: isPackage ? AppTheme.primaryGreen : Colors.orange.shade700,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      itemName,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Bottom: Status and Price
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    status,
-                    style: GoogleFonts.inter(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.green.shade800,
-                    ),
-                  ),
-                ),
-                Text(
-                  '₹${price.toStringAsFixed(2)}',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryGreen,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 
