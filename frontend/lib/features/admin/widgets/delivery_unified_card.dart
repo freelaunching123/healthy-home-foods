@@ -36,7 +36,6 @@ class DeliveryUnifiedCard extends StatelessWidget {
     final String customerPhone = delivery['phone'] ?? '';
     final String address = delivery['delivery_address'] ?? 'No Address';
     
-    final double amount = (delivery['amount'] as num?)?.toDouble() ?? 0.0;
     final String deliveryTime = delivery['delivery_time'] ?? 'Morning';
     final String paymentStatus = delivery['payment_status'] ?? 'Pending';
     
@@ -48,8 +47,6 @@ class DeliveryUnifiedCard extends StatelessWidget {
     
     final String rawId = (delivery['id'] ?? '').toString();
     final String displayId = rawId.length >= 8 ? rawId.substring(0, 8).toUpperCase() : rawId;
-
-    final formatCurrency = NumberFormat.currency(symbol: '₹', decimalDigits: 0);
 
     return Card(
       elevation: 2,
@@ -94,11 +91,6 @@ class DeliveryUnifiedCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text('#$displayId', style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
                       const Spacer(),
-                      Text(
-                        formatCurrency.format(amount),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.textPrimary),
-                      ),
-                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
